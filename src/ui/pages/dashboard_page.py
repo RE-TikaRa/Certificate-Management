@@ -227,7 +227,8 @@ class DashboardPage(BasePage):
     def _update_charts(self, level_data: dict[str, int], rank_data: dict[str, int]) -> None:
         is_dark = self.theme_manager.is_dark
         text_color = QColor(255, 255, 255) if is_dark else QColor(30, 39, 70)
-        grid_color = QColor(255, 255, 255, 30) if is_dark else QColor(0, 0, 0, 30)
+        grid_color = QColor(255, 255, 255, 80) if is_dark else QColor(90, 108, 243, 120)
+        bg_color = QColor(46, 49, 72) if is_dark else QColor(255, 255, 255)
 
         level_series = QPieSeries()
         for label, count in level_data.items():
@@ -243,7 +244,7 @@ class DashboardPage(BasePage):
         level_chart.setTitleBrush(QBrush(text_color))
         level_chart.legend().setLabelColor(text_color)
         level_chart.setAnimationOptions(QChart.SeriesAnimations)
-        level_chart.setBackgroundVisible(False)
+        level_chart.setBackgroundBrush(QBrush(bg_color))
         self.level_chart.setChart(level_chart)
 
         bar_series = QBarSeries()
@@ -276,7 +277,7 @@ class DashboardPage(BasePage):
         bar_chart.setTitleBrush(QBrush(text_color))
         bar_chart.legend().setLabelColor(text_color)
         bar_chart.setAnimationOptions(QChart.SeriesAnimations)
-        bar_chart.setBackgroundVisible(False)
+        bar_chart.setBackgroundBrush(QBrush(bg_color))
         self.rank_chart.setChart(bar_chart)
 
     @Slot()

@@ -341,6 +341,11 @@ QTableWidget {
     alternate-background-color: #f1f4ff;
     selection-background-color: rgba(90, 108, 243, 0.18);
     selection-color: #0f1a42;
+    color: #1e2746;
+}
+QTableWidget::item {
+    padding: 6px 8px;
+    color: #1e2746;
 }
 QHeaderView::section {
     background-color: rgba(90, 108, 243, 0.08);
