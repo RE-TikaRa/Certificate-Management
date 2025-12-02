@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
 )
 from qfluentwidgets import CheckBox, PrimaryPushButton, PushButton
 
+from ...services.validators import FormValidator
 from ..theme import create_card, create_page_header, make_section_title
 from ..styled_theme import ThemeManager
 
@@ -400,10 +401,19 @@ class EntryPage(BasePage):
             self.clear_btn.setText("清空表单")
 
     def _validate_form(self) -> list[str]:
+        """
+        Validate the entire award form using FormValidator.
+        Returns list of error messages (empty if valid).
+        """
         issues: list[str] = []
+        
+        # Validate competition name
         name = self.name_input.text().strip()
-        if not name:
-            issues.append("比赛名称不能为空。")
+        valid, msg = FormValidator.validate_competition_name(name)
+        if not valid:
+            issues.append(msg)
+        
+        # Validate award date
         try:
             award_date = QDate(self.year_input.value(), self.month_input.value(), self.day_input.value())
             if not award_date.isValid():
@@ -413,16 +423,27 @@ class EntryPage(BasePage):
         except Exception:
             issues.append("获奖日期不合法。")
         
-        # 检查是否有成员输入
-        has_members = any(
-            self.members_table.cellWidget(row, 0).text().strip() 
-            for row in range(self.members_table.rowCount())
-            if isinstance(self.members_table.cellWidget(row, 0), QLineEdit)
-        )
-        if not has_members:
-            issues.append("请至少添加一名成员。")
-        
+        # Validate certificate code
         code = self.certificate_input.text().strip()
-        if len(code) > 128:
-            issues.append("证书编号长度不能超过 128 字符。")
+        valid, msg = FormValidator.validate_certificate_code(code)
+        if not valid:
+            issues.append(msg)
+        
+        # Validate remarks
+        remarks = self.remarks_input.text().strip()
+        valid, msg = FormValidator.validate_remarks(remarks)
+        if not valid:
+            issues.append(msg)
+        
+        # Validate members
+        members_data = self._get_members_data()
+        if not members_data:
+            issues.append("请至少添加一名成员。")
+        else:
+            # Validate each member's information
+            for i, member in enumerate(members_data, 1):
+                member_errors = FormValidator.validate_member_info(member)
+                for error in member_errors:
+                    issues.append(f"成员 {i} - {error}")
+        
         return issues

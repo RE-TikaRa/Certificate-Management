@@ -4,7 +4,7 @@ from datetime import date
 from pathlib import Path
 from typing import Iterable, Sequence
 
-from sqlalchemy import select
+from sqlalchemy import select, and_, or_
 
 from ..data.database import Database
 from ..data.models import Award, Tag, TeamMember
@@ -138,7 +138,188 @@ class AwardService:
             if award:
                 session.delete(award)
 
+    def update_award(
+        self,
+        award_id: int,
+        *,
+        competition_name: str | None = None,
+        award_date: date | None = None,
+        level: str | None = None,
+        rank: str | None = None,
+        certificate_code: str | None = None,
+        remarks: str | None = None,
+        member_names: Sequence[str] | Sequence[dict] | None = None,
+        tag_names: Sequence[str] | None = None,
+    ) -> Award:
+        """
+        Update an existing award with transaction support.
+        Only updates fields that are provided (not None).
+        
+        Args:
+            award_id: ID of award to update
+            competition_name: New competition name
+            award_date: New award date
+            level: New award level
+            rank: New award rank
+            certificate_code: New certificate code
+            remarks: New remarks
+            member_names: New member list (replaces existing)
+            tag_names: New tag list (replaces existing)
+            
+        Returns:
+            Updated Award object
+            
+        Raises:
+            ValueError: If award not found
+        """
+        with self.db.session_scope() as session:
+            award = session.get(Award, award_id)
+            if not award:
+                raise ValueError(f"Award {award_id} not found")
+            
+            # Update scalar fields
+            if competition_name is not None:
+                award.competition_name = competition_name
+            if award_date is not None:
+                award.award_date = award_date
+            if level is not None:
+                award.level = level
+            if rank is not None:
+                award.rank = rank
+            if certificate_code is not None:
+                award.certificate_code = certificate_code
+            if remarks is not None:
+                award.remarks = remarks
+            
+            # Update member associations
+            if member_names is not None:
+                award.members.clear()
+                award.members = [
+                    self._get_or_create_member_with_info(session, item)
+                    for item in member_names
+                ]
+            
+            # Update tag associations
+            if tag_names is not None:
+                award.tags.clear()
+                award.tags = [
+                    self._get_or_create_tag(session, name)
+                    for name in tag_names
+                ]
+            
+            session.add(award)
+            session.flush()  # Validate before commit
+            return award
+
+
     def get_award_by_id(self, award_id: int) -> Award | None:
         """根据 ID 获取荣誉"""
         with self.db.session_scope() as session:
             return session.get(Award, award_id)
+
+    def search_awards(
+        self,
+        query: str = "",
+        level: str | None = None,
+        rank: str | None = None,
+        date_from: date | None = None,
+        date_to: date | None = None,
+        limit: int = 100,
+    ) -> list[Award]:
+        """
+        Search and filter awards by multiple criteria.
+        
+        Args:
+            query: Search text (matches competition_name or certificate_code)
+            level: Filter by level (国家级/省级/校级)
+            rank: Filter by rank (一等奖/二等奖/三等奖/优秀奖)
+            date_from: Start date for award_date range
+            date_to: End date for award_date range
+            limit: Maximum number of results to return
+            
+        Returns:
+            List of matching Award objects
+        """
+        with self.db.session_scope() as session:
+            q = select(Award)
+            conditions = []
+            
+            # Text search
+            if query:
+                conditions.append(
+                    or_(
+                        Award.competition_name.ilike(f"%{query}%"),
+                        Award.certificate_code.ilike(f"%{query}%"),
+                    )
+                )
+            
+            # Level filter
+            if level:
+                conditions.append(Award.level == level)
+            
+            # Rank filter
+            if rank:
+                conditions.append(Award.rank == rank)
+            
+            # Date range filter
+            if date_from:
+                conditions.append(Award.award_date >= date_from)
+            if date_to:
+                conditions.append(Award.award_date <= date_to)
+            
+            # Apply all conditions
+            if conditions:
+                q = q.where(and_(*conditions))
+            
+            # Order by date (newest first) and apply limit
+            q = q.order_by(Award.award_date.desc()).limit(limit)
+            
+            return session.scalars(q).all()
+
+    def batch_delete_awards(self, award_ids: list[int]) -> int:
+        """
+        Delete multiple awards in a single transaction.
+        
+        Args:
+            award_ids: List of award IDs to delete
+            
+        Returns:
+            Number of awards deleted
+        """
+        with self.db.session_scope() as session:
+            count = session.query(Award).filter(Award.id.in_(award_ids)).delete()
+            return count
+
+    def batch_update_level(self, award_ids: list[int], new_level: str) -> int:
+        """
+        Batch update award level for multiple records.
+        
+        Args:
+            award_ids: List of award IDs to update
+            new_level: New level value (国家级/省级/校级)
+            
+        Returns:
+            Number of awards updated
+        """
+        with self.db.session_scope() as session:
+            count = session.query(Award).filter(Award.id.in_(award_ids)).update(
+                {Award.level: new_level}
+            )
+            return count
+
+    def batch_update_rank(self, award_ids: list[int], new_rank: str) -> int:
+        """
+        Batch update award rank for multiple records.
+        
+        Args:
+            award_ids: List of award IDs to update
+            new_rank: New rank value (一等奖/二等奖/三等奖/优秀奖)
+            
+        Returns:
+            Number of awards updated
+        """
+        with self.db.session_scope() as session:
+            count = session.query(Award).filter(Award.id.in_(award_ids)).update(
+                {Award.rank: new_rank}
+            )
+            return count

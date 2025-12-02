@@ -15,27 +15,39 @@ class StatisticsService:
         self.db = db
 
     def get_overview(self) -> dict[str, Any]:
+        """
+        Get comprehensive statistics in a single query for performance.
+        Previously executed 9 separate queries, now optimized to 1 main query + 1 for latest awards.
+        """
         with self.db.session_scope() as session:
-            total = session.scalar(select(func.count(Award.id))) or 0
-            national = session.scalar(select(func.count(Award.id)).where(Award.level == "国家级")) or 0
-            provincial = session.scalar(select(func.count(Award.id)).where(Award.level == "省级")) or 0
-            school = session.scalar(select(func.count(Award.id)).where(Award.level == "校级")) or 0
-            first_prize = session.scalar(select(func.count(Award.id)).where(Award.rank == "一等奖")) or 0
-            second_prize = session.scalar(select(func.count(Award.id)).where(Award.rank == "二等奖")) or 0
-            third_prize = session.scalar(select(func.count(Award.id)).where(Award.rank == "三等奖")) or 0
-            excellent_prize = session.scalar(select(func.count(Award.id)).where(Award.rank == "优秀奖")) or 0
+            from sqlalchemy import case
+            
+            # Single query for all statistics
+            result = session.query(
+                func.count(Award.id).label('total'),
+                func.sum(case((Award.level == "国家级", 1), else_=0)).label('national'),
+                func.sum(case((Award.level == "省级", 1), else_=0)).label('provincial'),
+                func.sum(case((Award.level == "校级", 1), else_=0)).label('school'),
+                func.sum(case((Award.rank == "一等奖", 1), else_=0)).label('first_prize'),
+                func.sum(case((Award.rank == "二等奖", 1), else_=0)).label('second_prize'),
+                func.sum(case((Award.rank == "三等奖", 1), else_=0)).label('third_prize'),
+                func.sum(case((Award.rank == "优秀奖", 1), else_=0)).label('excellent_prize'),
+            ).first()
+            
+            # Separate query for latest awards (needed for UI display)
             latest_awards = (
                 session.execute(select(Award).order_by(Award.award_date.desc()).limit(10)).scalars().all()
             )
+        
         return {
-            "total": total,
-            "national": national,
-            "provincial": provincial,
-            "school": school,
-            "first_prize": first_prize,
-            "second_prize": second_prize,
-            "third_prize": third_prize,
-            "excellent_prize": excellent_prize,
+            "total": result.total or 0,
+            "national": result.national or 0,
+            "provincial": result.provincial or 0,
+            "school": result.school or 0,
+            "first_prize": result.first_prize or 0,
+            "second_prize": result.second_prize or 0,
+            "third_prize": result.third_prize or 0,
+            "excellent_prize": result.excellent_prize or 0,
             "latest_awards": latest_awards,
         }
 

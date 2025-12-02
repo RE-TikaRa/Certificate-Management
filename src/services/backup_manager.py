@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import logging
 import shutil
+import sqlite3
 import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
+from dataclasses import dataclass
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -14,6 +16,21 @@ from ..data.models import BackupRecord
 from .settings_service import SettingsService
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class BackupInfo:
+    """Information about a backup file."""
+    path: Path
+    size: int  # bytes
+    created_time: datetime
+    is_valid: bool = True
+    error_msg: str = ""
+    
+    @property
+    def size_mb(self) -> float:
+        """Return size in megabytes."""
+        return self.size / (1024 * 1024)
 
 
 class BackupManager:
@@ -124,3 +141,102 @@ class BackupManager:
                 logger.info("Removed old backup %s", extra)
             except Exception:  # noqa: BLE001
                 logger.warning("Failed to remove old backup %s", extra)
+
+    def verify_backup(self, backup_path: Path) -> tuple[bool, str]:
+        """
+        Verify backup file integrity by checking SQLite database within.
+        
+        Args:
+            backup_path: Path to backup file
+            
+        Returns:
+            (is_valid, error_message)
+        """
+        if not backup_path.exists():
+            return False, "备份文件不存在"
+        
+        if not backup_path.suffix.lower() == '.zip':
+            return False, "备份文件格式不正确"
+        
+        try:
+            import zipfile
+            with zipfile.ZipFile(backup_path, 'r') as zip_ref:
+                # Check if database exists in backup
+                if 'data/awards.db' not in zip_ref.namelist():
+                    return False, "备份中不包含数据库文件"
+                
+                # Verify SQLite database integrity
+                with zip_ref.open('data/awards.db') as db_file:
+                    with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
+                        tmp.write(db_file.read())
+                        tmp_path = tmp.name
+                
+                try:
+                    conn = sqlite3.connect(tmp_path)
+                    cursor = conn.cursor()
+                    cursor.execute("PRAGMA integrity_check;")
+                    result = cursor.fetchone()
+                    conn.close()
+                    
+                    if result[0] != 'ok':
+                        return False, f"数据库完整性检查失败: {result[0]}"
+                    
+                    return True, ""
+                finally:
+                    Path(tmp_path).unlink(missing_ok=True)
+        
+        except Exception as exc:
+            return False, f"验证失败: {str(exc)}"
+
+    def list_backups(self) -> list[BackupInfo]:
+        """
+        List all backups with their information.
+        
+        Returns:
+            List of BackupInfo objects sorted by creation time (newest first)
+        """
+        backups: list[BackupInfo] = []
+        
+        for backup_file in sorted(self.backup_root.glob('*.zip'), reverse=True):
+            try:
+                stat = backup_file.stat()
+                created_time = datetime.fromtimestamp(stat.st_mtime)
+                
+                # Quick validation
+                is_valid, error_msg = self.verify_backup(backup_file)
+                
+                backups.append(
+                    BackupInfo(
+                        path=backup_file,
+                        size=stat.st_size,
+                        created_time=created_time,
+                        is_valid=is_valid,
+                        error_msg=error_msg,
+                    )
+                )
+            except Exception as exc:
+                logger.warning("Failed to read backup %s: %s", backup_file, exc)
+                backups.append(
+                    BackupInfo(
+                        path=backup_file,
+                        size=0,
+                        created_time=datetime.now(),
+                        is_valid=False,
+                        error_msg=str(exc),
+                    )
+                )
+        
+        return backups
+
+    def get_latest_valid_backup(self) -> BackupInfo | None:
+        """
+        Get the latest valid backup.
+        
+        Returns:
+            BackupInfo of the latest valid backup, or None if no valid backups exist
+        """
+        for backup in self.list_backups():
+            if backup.is_valid:
+                return backup
+        return None
+
