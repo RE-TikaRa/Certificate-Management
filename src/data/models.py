@@ -62,7 +62,17 @@ class Award(Base):
 class TeamMember(Base):
     __tablename__ = "team_members"
 
-    name: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    gender: Mapped[str | None] = mapped_column(String(10))  # 男/女
+    age: Mapped[int | None] = mapped_column(Integer)
+    id_card: Mapped[str | None] = mapped_column(String(18), unique=True)  # 身份证号
+    phone: Mapped[str | None] = mapped_column(String(20))  # 手机号
+    student_id: Mapped[str | None] = mapped_column(String(20), unique=True)  # 学号
+    contact_phone: Mapped[str | None] = mapped_column(String(20))  # 联系电话
+    email: Mapped[str | None] = mapped_column(String(128))  # 邮箱
+    major: Mapped[str | None] = mapped_column(String(128))  # 专业
+    class_name: Mapped[str | None] = mapped_column(String(128))  # 班级
+    college: Mapped[str | None] = mapped_column(String(128))  # 学院
     pinyin: Mapped[str | None] = mapped_column(String(255))
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     sort_index: Mapped[int] = mapped_column(Integer, default=0)

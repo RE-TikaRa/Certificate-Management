@@ -2,87 +2,115 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import (
     QHBoxLayout,
-    QInputDialog,
-    QListWidget,
-    QListWidgetItem,
     QVBoxLayout,
     QWidget,
     QLabel,
+    QTableWidget,
+    QTableWidgetItem,
+    QScrollArea,
+    QFrame,
 )
-from qfluentwidgets import PrimaryPushButton, PushButton
+from PySide6.QtCore import Qt
+from qfluentwidgets import PushButton
 
-from ..theme import create_card, create_page_header, make_section_title
+from ..theme import create_card, create_page_header, make_section_title, apply_table_style
+from ..styled_theme import ThemeManager
 
 from .base_page import BasePage
 
 
 class ManagementPage(BasePage):
-    def __init__(self, ctx):
-        super().__init__(ctx)
+    """成员历史页面 - 显示所有历史成员信息"""
+    
+    def __init__(self, ctx, theme_manager: ThemeManager):
+        super().__init__(ctx, theme_manager)
         layout = QVBoxLayout(self)
-        layout.setSpacing(18)
-        layout.addWidget(create_page_header("成员与标签", "构建有序的团队与标签体系"))
-
-        main_row = QHBoxLayout()
-        main_row.setSpacing(16)
-
-        self.members_list = QListWidget()
-        member_panel = self._build_panel("成员", self.members_list, self._add_member, self._remove_member)
-        main_row.addWidget(member_panel)
-
-        self.tags_list = QListWidget()
-        tag_panel = self._build_panel("标签", self.tags_list, self._add_tag, self._remove_tag)
-        main_row.addWidget(tag_panel)
-
-        layout.addLayout(main_row)
-
+        layout.setContentsMargins(0, 0, 0, 0)
+        
+        # 滚动区域
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        layout.addWidget(scroll)
+        
+        # 容器
+        container = QWidget()
+        container.setObjectName("pageRoot")
+        scroll.setWidget(container)
+        
+        container_layout = QVBoxLayout(container)
+        container_layout.setContentsMargins(32, 24, 32, 32)
+        container_layout.setSpacing(28)
+        
+        # 页面头
+        container_layout.addWidget(create_page_header("成员管理", "查看历史成员信息"))
+        
+        # 成员表格卡片
+        card, card_layout = create_card()
+        card_layout.addWidget(make_section_title("历史成员"))
+        
+        # 创建表格
+        self.members_table = QTableWidget()
+        self.members_table.setColumnCount(13)
+        self.members_table.setHorizontalHeaderLabels([
+            "姓名", "性别", "年龄", "身份证号", "手机号", "学号",
+            "联系电话", "邮箱", "专业", "班级", "学院", "获奖次数", "操作"
+        ])
+        apply_table_style(self.members_table)
+        self.members_table.setMinimumHeight(400)
+        
+        # 设置列宽
+        widths = [80, 60, 50, 100, 90, 80, 90, 100, 80, 80, 80, 80, 60]
+        for i, w in enumerate(widths):
+            self.members_table.setColumnWidth(i, w)
+        
+        card_layout.addWidget(self.members_table)
+        container_layout.addWidget(card)
+        
+        container_layout.addStretch()
+        
         self.refresh()
-
-    def _build_panel(self, title: str, list_widget: QListWidget, add_slot, remove_slot) -> QWidget:
-        panel, layout = create_card()
-        layout.addWidget(make_section_title(title))
-        layout.addWidget(list_widget)
-        btn_row = QHBoxLayout()
-        add_btn = PrimaryPushButton("新增")
-        add_btn.clicked.connect(add_slot)
-        remove_btn = PushButton("删除")
-        remove_btn.clicked.connect(remove_slot)
-        btn_row.addWidget(add_btn)
-        btn_row.addWidget(remove_btn)
-        btn_row.addStretch()
-        layout.addLayout(btn_row)
-        return panel
-
+    
     def refresh(self) -> None:
-        self.members_list.clear()
-        for member in self.ctx.awards.list_members():
-            self.members_list.addItem(QListWidgetItem(member.name))
-        self.tags_list.clear()
-        for tag in self.ctx.awards.list_tags():
-            self.tags_list.addItem(QListWidgetItem(tag.name))
+        """刷新成员表格"""
+        self.members_table.setRowCount(0)
+        members = self.ctx.awards.list_members()
+        
+        for row, member in enumerate(members):
+            self.members_table.insertRow(row)
+            
+            # 基本信息
+            fields = [
+                member.name or "",
+                member.gender or "",
+                str(member.age) if member.age else "",
+                member.id_card or "",
+                member.phone or "",
+                member.student_id or "",
+                member.contact_phone or "",
+                member.email or "",
+                member.major or "",
+                member.class_name or "",
+                member.college or "",
+            ]
+            
+            # 填充信息字段
+            for col, value in enumerate(fields):
+                item = QTableWidgetItem(value)
+                self.members_table.setItem(row, col, item)
+            
+            # 获奖次数
+            award_count = len(member.awards)
+            count_item = QTableWidgetItem(str(award_count))
+            self.members_table.setItem(row, 11, count_item)
+            
+            # 操作按钮
+            btn = PushButton("编辑")
+            btn.clicked.connect(lambda checked, m=member: self._edit_member(m))
+            self.members_table.setCellWidget(row, 12, btn)
+    
+    def _edit_member(self, member) -> None:
+        """编辑成员信息"""
+        # TODO: 实现成员编辑对话框
+        pass
 
-    def _add_member(self) -> None:
-        name, ok = QInputDialog.getText(self, "新增成员", "名称")
-        if ok and name.strip():
-            self.ctx.awards.add_member(name.strip())
-            self.refresh()
-
-    def _remove_member(self) -> None:
-        current = self.members_list.currentItem()
-        if not current:
-            return
-        self.ctx.awards.remove_member(current.text())
-        self.refresh()
-
-    def _add_tag(self) -> None:
-        name, ok = QInputDialog.getText(self, "新增标签", "名称")
-        if ok and name.strip():
-            self.ctx.awards.add_tag(name.strip())
-            self.refresh()
-
-    def _remove_tag(self) -> None:
-        current = self.tags_list.currentItem()
-        if not current:
-            return
-        self.ctx.awards.remove_tag(current.text())
-        self.refresh()

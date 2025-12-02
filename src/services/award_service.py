@@ -25,7 +25,7 @@ class AwardService:
         rank: str,
         certificate_code: str | None,
         remarks: str | None,
-        member_names: Sequence[str],
+        member_names: Sequence[str] | Sequence[dict],
         tag_names: Sequence[str],
         attachment_files: Sequence[Path],
     ) -> Award:
@@ -38,7 +38,8 @@ class AwardService:
                 certificate_code=certificate_code,
                 remarks=remarks,
             )
-            award.members = [self._get_or_create_member(session, name) for name in member_names]
+            # 处理成员信息（可能是字符串或字典）
+            award.members = [self._get_or_create_member_with_info(session, item) for item in member_names]
             award.tags = [self._get_or_create_tag(session, name) for name in tag_names]
             session.add(award)
             session.flush()
@@ -95,6 +96,32 @@ class AwardService:
         session.flush()
         return member
 
+    def _get_or_create_member_with_info(self, session, member_info: str | dict) -> TeamMember:
+        """获取或创建成员，支持字符串（姓名）或字典（完整信息）"""
+        if isinstance(member_info, str):
+            # 如果是字符串，使用原来的逻辑
+            return self._get_or_create_member(session, member_info)
+        
+        # 如果是字典，提取姓名并查询现有成员
+        name = member_info.get('name', '')
+        if not name:
+            raise ValueError("成员信息必须包含 'name' 字段")
+        
+        member = session.scalar(select(TeamMember).where(TeamMember.name == name))
+        if member:
+            # 成员已存在，更新其信息
+            for key, value in member_info.items():
+                if key != 'name' and value:
+                    setattr(member, key, value)
+            session.flush()
+            return member
+        
+        # 创建新成员
+        member = TeamMember(name=name, pinyin=name, **{k: v for k, v in member_info.items() if k != 'name'})
+        session.add(member)
+        session.flush()
+        return member
+
     def _get_or_create_tag(self, session, name: str) -> Tag:
         tag = session.scalar(select(Tag).where(Tag.name == name))
         if tag:
@@ -103,3 +130,15 @@ class AwardService:
         session.add(tag)
         session.flush()
         return tag
+
+    def delete_award(self, award_id: int) -> None:
+        """删除指定 ID 的荣誉"""
+        with self.db.session_scope() as session:
+            award = session.get(Award, award_id)
+            if award:
+                session.delete(award)
+
+    def get_award_by_id(self, award_id: int) -> Award | None:
+        """根据 ID 获取荣誉"""
+        with self.db.session_scope() as session:
+            return session.get(Award, award_id)

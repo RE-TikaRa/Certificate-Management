@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from PySide6.QtCharts import QBarCategoryAxis, QBarSeries, QBarSet, QChart, QChartView, QPieSeries, QValueAxis
 from PySide6.QtCore import Qt, Slot, QUrl
-from PySide6.QtGui import QDesktopServices, QPainter
+from PySide6.QtGui import QDesktopServices, QPainter, QColor, QBrush
 from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -14,17 +14,19 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
     QSizePolicy,
+    QMessageBox,
 )
 from qfluentwidgets import InfoBar, PrimaryPushButton, PushButton
 
 from ..theme import apply_table_style, create_card, create_page_header, make_section_title
+from ..styled_theme import ThemeManager
 
 from .base_page import BasePage
 
 
 class DashboardPage(BasePage):
-    def __init__(self, ctx):
-        super().__init__(ctx)
+    def __init__(self, ctx, theme_manager: ThemeManager):
+        super().__init__(ctx, theme_manager)
         self.metric_labels: dict[str, QLabel] = {}
         self._latest_awards = []
 
@@ -37,6 +39,7 @@ class DashboardPage(BasePage):
         outer_layout.addWidget(scroll)
 
         container = QWidget()
+        container.setObjectName("pageRoot")  # Apply background color from QSS
         scroll.setWidget(container)
         layout = QVBoxLayout(container)
         layout.setContentsMargins(32, 24, 32, 32)
@@ -48,7 +51,6 @@ class DashboardPage(BasePage):
         layout.addWidget(self._build_distribution_section())
         layout.addWidget(self._build_breakdown_section())
         layout.addWidget(self._build_recent_section())
-        layout.addWidget(self._build_action_section())
         layout.addStretch()
         self.refresh()
 
@@ -61,11 +63,15 @@ class DashboardPage(BasePage):
             ("总荣誉数", "🗂", "violet"),
             ("国家级", "🏅", "blue"),
             ("省级", "🏆", "gold"),
-            ("一等奖", "🎖", "green"),
+            ("校级", "🎖", "green"),
+            ("一等奖", "🥇", "cyan"),
+            ("二等奖", "🥈", "purple"),
+            ("三等奖", "🥉", "red"),
+            ("优秀奖", "⭐", "blue"),
         ]
         for idx, (title, icon, accent) in enumerate(tiles):
             tile = self._create_metric_tile(title, icon, accent)
-            row, col = divmod(idx, 2)
+            row, col = divmod(idx, 4)
             grid.addWidget(tile, row, col)
         card_layout.addLayout(grid)
         return card
@@ -101,12 +107,14 @@ class DashboardPage(BasePage):
         self.level_chart.setRenderHint(QPainter.Antialiasing)
         self.level_chart.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.level_chart.setMinimumHeight(260)
+        self.level_chart.setStyleSheet("background: transparent;")
         charts_row.addWidget(self.level_chart)
 
         self.rank_chart = QChartView()
         self.rank_chart.setRenderHint(QPainter.Antialiasing)
         self.rank_chart.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.rank_chart.setMinimumHeight(260)
+        self.rank_chart.setStyleSheet("background: transparent;")
         charts_row.addWidget(self.rank_chart)
 
         card_layout.addLayout(charts_row)
@@ -151,34 +159,12 @@ class DashboardPage(BasePage):
     def _build_recent_section(self) -> QWidget:
         card, card_layout = create_card()
         card_layout.addWidget(make_section_title("最近录入"))
-        self.recent_table = QTableWidget(0, 5)
-        self.recent_table.setHorizontalHeaderLabels(["比赛", "级别", "等级", "日期", "成员"])
+        self.recent_table = QTableWidget(0, 6)
+        self.recent_table.setHorizontalHeaderLabels(["比赛", "级别", "等级", "日期", "成员", "操作"])
         apply_table_style(self.recent_table)
         self.recent_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.recent_table.cellDoubleClicked.connect(self._open_attachment_folder)
         self.recent_table.setMinimumHeight(220)
         card_layout.addWidget(self.recent_table)
-        return card
-
-    def _build_action_section(self) -> QWidget:
-        card, card_layout = create_card(shadow=False)
-        card_layout.addWidget(make_section_title("快捷操作"))
-        quick_layout = QHBoxLayout()
-        quick_layout.setSpacing(12)
-        actions = [
-            ("录入荣誉", lambda: self._navigate("entry")),
-            ("成员与标签", lambda: self._navigate("management")),
-            ("附件回收站", lambda: self._navigate("recycle")),
-        ]
-        for text, handler in actions:
-            btn = PrimaryPushButton(text)
-            btn.clicked.connect(handler)
-            quick_layout.addWidget(btn)
-        backup_btn = PushButton("立即备份")
-        backup_btn.clicked.connect(self._do_backup)
-        quick_layout.addWidget(backup_btn)
-        quick_layout.addStretch()
-        card_layout.addLayout(quick_layout)
         return card
 
     def refresh(self) -> None:
@@ -187,7 +173,11 @@ class DashboardPage(BasePage):
         self.metric_labels["总荣誉数"].setText(str(stats["total"]))
         self.metric_labels["国家级"].setText(str(stats["national"]))
         self.metric_labels["省级"].setText(str(stats["provincial"]))
+        self.metric_labels["校级"].setText(str(stats["school"]))
         self.metric_labels["一等奖"].setText(str(stats["first_prize"]))
+        self.metric_labels["二等奖"].setText(str(stats["second_prize"]))
+        self.metric_labels["三等奖"].setText(str(stats["third_prize"]))
+        self.metric_labels["优秀奖"].setText(str(stats["excellent_prize"]))
 
         self.recent_table.setRowCount(len(self._latest_awards))
         for row, award in enumerate(self._latest_awards):
@@ -197,6 +187,23 @@ class DashboardPage(BasePage):
             self.recent_table.setItem(row, 3, QTableWidgetItem(str(award.award_date)))
             members = ", ".join(member.name for member in award.members)
             self.recent_table.setItem(row, 4, QTableWidgetItem(members))
+            
+            # 操作按钮
+            action_widget = QWidget()
+            action_layout = QHBoxLayout(action_widget)
+            action_layout.setContentsMargins(0, 0, 0, 0)
+            action_layout.setSpacing(4)
+            
+            edit_btn = PushButton("编辑")
+            edit_btn.clicked.connect(lambda checked, a=award: self._edit_award(a))
+            delete_btn = PushButton("删除")
+            delete_btn.clicked.connect(lambda checked, a=award: self._delete_award(a))
+            
+            action_layout.addWidget(edit_btn)
+            action_layout.addWidget(delete_btn)
+            action_layout.addStretch()
+            
+            self.recent_table.setCellWidget(row, 5, action_widget)
 
         level_stats = self.ctx.statistics.get_group_by_level()
         top_level = max(level_stats.items(), key=lambda x: x[1]) if level_stats else ("--", 0)
@@ -218,12 +225,23 @@ class DashboardPage(BasePage):
         self._update_charts(level_stats, rank_stats)
 
     def _update_charts(self, level_data: dict[str, int], rank_data: dict[str, int]) -> None:
+        is_dark = self.theme_manager.is_dark
+        text_color = QColor(255, 255, 255) if is_dark else QColor(30, 39, 70)
+        grid_color = QColor(255, 255, 255, 30) if is_dark else QColor(0, 0, 0, 30)
+
         level_series = QPieSeries()
         for label, count in level_data.items():
             level_series.append(label, count)
+        
+        # Set pie slice labels color
+        for slice in level_series.slices():
+            slice.setLabelColor(text_color)
+
         level_chart = QChart()
         level_chart.addSeries(level_series)
         level_chart.setTitle("按级别分布")
+        level_chart.setTitleBrush(QBrush(text_color))
+        level_chart.legend().setLabelColor(text_color)
         level_chart.setAnimationOptions(QChart.SeriesAnimations)
         level_chart.setBackgroundVisible(False)
         self.level_chart.setChart(level_chart)
@@ -232,20 +250,31 @@ class DashboardPage(BasePage):
         bar_set = QBarSet("数量")
         categories = []
         for label, count in rank_data.items():
-            bar_set << count
+            bar_set.append(count)
             categories.append(label)
         bar_series.append(bar_set)
+        
         bar_chart = QChart()
         bar_chart.addSeries(bar_series)
+        
         axis_x = QBarCategoryAxis()
         axis_x.append(categories)
+        axis_x.setLabelsColor(text_color)
+        axis_x.setGridLineColor(grid_color)
+        
         axis_y = QValueAxis()
         axis_y.setRange(0, max(rank_data.values(), default=1))
+        axis_y.setLabelsColor(text_color)
+        axis_y.setGridLineColor(grid_color)
+        
         bar_chart.addAxis(axis_x, Qt.AlignBottom)
         bar_chart.addAxis(axis_y, Qt.AlignLeft)
         bar_series.attachAxis(axis_x)
         bar_series.attachAxis(axis_y)
+        
         bar_chart.setTitle("按等级分布")
+        bar_chart.setTitleBrush(QBrush(text_color))
+        bar_chart.legend().setLabelColor(text_color)
         bar_chart.setAnimationOptions(QChart.SeriesAnimations)
         bar_chart.setBackgroundVisible(False)
         self.rank_chart.setChart(bar_chart)
@@ -258,6 +287,27 @@ class DashboardPage(BasePage):
         folder = self.ctx.attachments.root / f"award_{award.id}"
         folder.mkdir(parents=True, exist_ok=True)
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder.resolve())))
+
+    def _edit_award(self, award) -> None:
+        """编辑荣誉"""
+        window = self.window()
+        if hasattr(window, 'entry_page'):
+            window.entry_page.load_award_for_editing(award)
+            if hasattr(window, "navigate"):
+                window.navigate("entry")
+
+    def _delete_award(self, award) -> None:
+        """删除荣誉"""
+        reply = QMessageBox.question(
+            self, 
+            "确认删除", 
+            f'确定要删除"{award.competition_name}"吗？',
+            QMessageBox.Yes | QMessageBox.No
+        )
+        if reply == QMessageBox.Yes:
+            self.ctx.awards.delete_award(award.id)
+            self.refresh()
+            InfoBar.success("删除成功", f"已删除：{award.competition_name}", duration=2000, parent=self)
 
     def _navigate(self, route: str) -> None:
         window = self.window()

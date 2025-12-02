@@ -9,13 +9,14 @@ from PySide6.QtWidgets import (
 from qfluentwidgets import PrimaryPushButton, PushButton
 
 from ..theme import apply_table_style, create_card, create_page_header, make_section_title
+from ..styled_theme import ThemeManager
 
 from .base_page import BasePage
 
 
 class RecyclePage(BasePage):
-    def __init__(self, ctx):
-        super().__init__(ctx)
+    def __init__(self, ctx, theme_manager: ThemeManager):
+        super().__init__(ctx, theme_manager)
         layout = QVBoxLayout(self)
         layout.setSpacing(18)
         layout.addWidget(create_page_header("附件回收站", "统一管理已删除的附件"))

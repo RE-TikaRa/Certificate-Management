@@ -1,0 +1,95 @@
+from __future__ import annotations
+
+from enum import Enum
+
+from PySide6.QtWidgets import QApplication
+from PySide6.QtGui import QGuiApplication, QPalette
+from qfluentwidgets import Theme, setTheme
+from qfluentwidgets.common.config import qconfig
+
+from ..config import BASE_DIR
+
+STYLE_DIR = BASE_DIR / 'src' / 'resources' / 'styles'
+
+
+class ThemeMode(Enum):
+    """ Theme mode: light, dark, or auto (follow system) """
+    LIGHT = 'light'
+    DARK = 'dark'
+    AUTO = 'auto'
+
+
+def _is_system_dark() -> bool:
+    """Check if the system is using dark mode."""
+    palette = QGuiApplication.palette()
+    window_color = palette.color(QPalette.ColorRole.Window)
+    # If background is dark (luminance < 128), it's dark mode
+    luminance = (window_color.red() * 299 + window_color.green() * 587 + window_color.blue() * 114) / 1000
+    return luminance < 128
+
+
+def _load_qss(is_dark: bool) -> str:
+    """Load qss file based on actual theme (dark or light)."""
+    filename = 'styled_dark.qss' if is_dark else 'styled_light.qss'
+    target = STYLE_DIR / filename
+    if not target.exists():
+        return ''
+    return target.read_text(encoding='utf-8')
+
+
+class ThemeManager:
+    """ Theme manager supporting light, dark, and auto modes """
+
+    def __init__(self, app: QApplication):
+        self.app = app
+        self._mode = ThemeMode.LIGHT
+        self._is_dark = False
+
+    @property
+    def mode(self) -> ThemeMode:
+        """Get the current theme mode setting."""
+        return self._mode
+    
+    @property
+    def is_dark(self) -> bool:
+        """Get whether the current actual theme is dark."""
+        return self._is_dark
+
+    def set_theme(self, mode: ThemeMode) -> None:
+        """Set theme mode and update qfluentwidgets theme.
+        Note: Does NOT apply stylesheets - that's handled by MainWindow.
+        """
+        self._mode = mode
+        
+        # Determine actual dark/light based on mode
+        if mode == ThemeMode.AUTO:
+            self._is_dark = _is_system_dark()
+        else:
+            self._is_dark = (mode == ThemeMode.DARK)
+        
+        # Apply qfluentwidgets theme only
+        q_theme = Theme.DARK if self._is_dark else Theme.LIGHT
+        setTheme(q_theme, lazy=True)
+        qconfig.themeMode.value = q_theme
+    
+    def get_window_stylesheet(self) -> str:
+        """Get complete stylesheet for MainWindow including background color.
+        This combines FluentWindow background override with page styles.
+        """
+        # Window background color
+        bg_color = '#1c1f2e' if self._is_dark else '#f4f6fb'
+        window_style = f'FluentWindow, AcrylicWindow {{ background-color: {bg_color}; }}\n\n'
+        
+        # Page styles from QSS file
+        page_styles = _load_qss(self._is_dark)
+        
+        return window_style + page_styles
+
+    def get_theme_from_text(self, text: str) -> ThemeMode:
+        """Get ThemeMode from text."""
+        text = text.lower().strip()
+        for mode in ThemeMode:
+            if mode.value == text:
+                return mode
+        return ThemeMode.LIGHT
+

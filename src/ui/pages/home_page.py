@@ -6,13 +6,14 @@ from PySide6.QtSvgWidgets import QSvgWidget
 
 from .base_page import BasePage
 from ...config import BASE_DIR
+from ..styled_theme import ThemeManager
 
 
 class HomePage(BasePage):
     ASPECT_RATIO = 170 / 100
 
-    def __init__(self, ctx):
-        super().__init__(ctx)
+    def __init__(self, ctx, theme_manager: ThemeManager):
+        super().__init__(ctx, theme_manager)
         layout = QVBoxLayout(self)
         layout.addStretch()
 

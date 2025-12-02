@@ -18,8 +18,6 @@ DEFAULT_SETTINGS: Final[dict[str, str]] = {
     "backup_frequency": "manual",
     "include_attachments": "true",
     "include_logs": "true",
-    "auto_backup_mode": "manual",
-    "theme": "fluent",
     "theme_mode": "light",
     "backup_retention": "5",
 }

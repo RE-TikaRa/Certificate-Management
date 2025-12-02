@@ -30,3 +30,7 @@ src/
 
 ## 模板
 src/resources/templates/awards_template.csv、.xlsx 可作为导入模板。
+
+## 主题
+- 全局样式取材自 [StyledWidgets](libs/StyledWidgets) 的 CSS 灵感，离线复制并提供 `src/resources/styles/styled_light.qss` 与 `styled_dark.qss`。
+- 应用启动及设置保存时调用 `apply_styled_theme`，根据设置中的 `theme_mode` 自动切换浅色/深色模式。

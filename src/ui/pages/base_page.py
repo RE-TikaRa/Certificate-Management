@@ -3,19 +3,22 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from PySide6.QtWidgets import QWidget
+from PySide6.QtCore import Qt
 
-from ..theme import PAGE_STYLE
 
 if TYPE_CHECKING:
     from ...app_context import AppContext
+    from ..styled_theme import ThemeManager
 
 
 class BasePage(QWidget):
-    def __init__(self, ctx: "AppContext"):
+    def __init__(self, ctx: "AppContext", theme_manager: "ThemeManager" = None):
         super().__init__()
+        self.setAttribute(Qt.WA_StyledBackground, True)
         self.ctx = ctx
+        self.theme_manager = theme_manager
         self.setObjectName("pageRoot")
-        self.setStyleSheet(PAGE_STYLE)
 
     def refresh(self) -> None:  # pragma: no cover - optional override
+        pass
         pass

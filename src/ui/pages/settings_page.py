@@ -3,34 +3,39 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtWidgets import (
-    QCheckBox,
     QFileDialog,
     QFormLayout,
-    QPushButton,
     QVBoxLayout,
     QWidget,
-    QComboBox,
     QLabel,
     QHBoxLayout,
+    QApplication,
 )
-from qfluentwidgets import InfoBar, PrimaryPushButton, PushButton
+from qfluentwidgets import CheckBox, InfoBar, PrimaryPushButton, PushButton, ComboBox
 
 from ..theme import create_card, create_page_header, make_section_title
+from ..styled_theme import ThemeManager, ThemeMode
 
 from .base_page import BasePage
 
 
 class SettingsPage(BasePage):
-    def __init__(self, ctx):
-        super().__init__(ctx)
+    THEME_OPTIONS = {
+        "light": "浅色",
+        "dark": "深色", 
+        "auto": "跟随系统",
+    }
+    
+    def __init__(self, ctx, theme_manager: ThemeManager):
+        super().__init__(ctx, theme_manager)
         self.attach_dir = QLabel()
         self.backup_dir = QLabel()
-        self.frequency = QComboBox()
+        self.frequency = ComboBox()
         self.frequency.addItems(["manual", "startup", "daily", "weekly"])
-        self.include_attachments = QCheckBox("包含附件")
-        self.include_logs = QCheckBox("包含日志")
-        self.theme_mode = QComboBox()
-        self.theme_mode.addItems(["light", "dark"])
+        self.include_attachments = CheckBox("包含附件")
+        self.include_logs = CheckBox("包含日志")
+        self.theme_mode = ComboBox()
+        self.theme_mode.addItems(list(self.THEME_OPTIONS.values()))
         self._build_ui()
         self.refresh()
 
@@ -83,7 +88,10 @@ class SettingsPage(BasePage):
         self.frequency.setCurrentText(self.ctx.settings.get("backup_frequency", "manual"))
         self.include_attachments.setChecked(self.ctx.settings.get("include_attachments", "true") == "true")
         self.include_logs.setChecked(self.ctx.settings.get("include_logs", "true") == "true")
-        self.theme_mode.setCurrentText(self.ctx.settings.get("theme_mode", "light"))
+        # Convert stored theme value to display text
+        stored_theme = self.ctx.settings.get("theme_mode", "light")
+        display_text = self.THEME_OPTIONS.get(stored_theme, "浅色")
+        self.theme_mode.setCurrentText(display_text)
 
     def _choose_attach_dir(self) -> None:
         path = QFileDialog.getExistingDirectory(self, "选择附件目录", self.attach_dir.text())
@@ -96,18 +104,33 @@ class SettingsPage(BasePage):
             self.backup_dir.setText(path)
 
     def _save(self) -> None:
-        self.ctx.settings.bulk_update(
-            {
-                "attachment_root": self.attach_dir.text(),
-                "backup_root": self.backup_dir.text(),
-                "backup_frequency": self.frequency.currentText(),
-                "include_attachments": str(self.include_attachments.isChecked()).lower(),
-                "include_logs": str(self.include_logs.isChecked()).lower(),
-                "theme_mode": self.theme_mode.currentText(),
-            }
-        )
-        self.ctx.backup.schedule_jobs()
-        InfoBar.success("设置已保存", "", duration=2000, parent=self)
+        try:
+            self.ctx.settings.set("attachment_root", self.attach_dir.text())
+            self.ctx.settings.set("backup_root", self.backup_dir.text())
+            self.ctx.settings.set("backup_frequency", self.frequency.currentText())
+            self.ctx.settings.set("include_attachments", str(self.include_attachments.isChecked()).lower())
+            self.ctx.settings.set("include_logs", str(self.include_logs.isChecked()).lower())
+            
+            # Convert display text back to theme value
+            display_text = self.theme_mode.currentText()
+            theme_value = next(
+                (k for k, v in self.THEME_OPTIONS.items() if v == display_text),
+                "light"
+            )
+            self.ctx.settings.set("theme_mode", theme_value)
+            
+            # Apply theme changes
+            theme_mode = self.theme_manager.get_theme_from_text(theme_value)
+            self.theme_manager.set_theme(theme_mode)
+            
+            # Refresh entire window stylesheet
+            main_window = self.window()
+            if hasattr(main_window, 'apply_theme_stylesheet'):
+                main_window.apply_theme_stylesheet()
+            
+            InfoBar.success("成功", "设置已保存", parent=self.window())
+        except Exception as e:
+            InfoBar.error("错误", f"保存设置失败: {e}", parent=self.window())
 
     def _backup_now(self) -> None:
         path = self.ctx.backup.perform_backup()

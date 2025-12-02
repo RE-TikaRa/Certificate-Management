@@ -164,3 +164,7 @@ src/
 - OCR 自动解析证书图片。
 - 联动 Web 仪表盘或移动端。
 - 备份结果推送（邮件/微信）。
+
+## 14. 主题与 StyledWidgets 灵感
+- 在 libs/StyledWidgets 离线拷贝的基础上，提取其 CSS 式风格理念并实现 `styled_light.qss` 与 `styled_dark.qss`。
+- `apply_styled_theme` 在应用启动与设置保存时加载 QSS，实现类似 StyledWidgets 的渐层、卡片、滚动条一体化外观；同时保留现有 `PAGE_STYLE` 控制细节。
