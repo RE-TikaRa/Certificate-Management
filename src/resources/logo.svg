@@ -1,0 +1,10 @@
+<svg width='300' height='120' viewBox='0 0 300 120' xmlns='http://www.w3.org/2000/svg'>
+  <defs>
+    <linearGradient id='grad' x1='0%' y1='0%' x2='100%' y2='100%'>
+      <stop offset='0%' stop-color='#4F8EF7'/>
+      <stop offset='100%' stop-color='#8A5EF9'/>
+    </linearGradient>
+  </defs>
+  <rect x='10' y='10' width='280' height='100' rx='20' fill='url(#grad)'/>
+  <text x='150' y='70' font-family='Segoe UI' font-size='32' fill='#FFFFFF' text-anchor='middle'>Cert Manager</text>
+</svg>
