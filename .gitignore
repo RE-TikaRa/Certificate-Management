@@ -67,3 +67,4 @@ site/
 # 其他
 *.bak
 *.tmp
+.codemap/
