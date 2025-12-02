@@ -9,7 +9,6 @@ from .pages.home_page import HomePage
 from .pages.management_page import ManagementPage
 from .pages.recycle_page import RecyclePage
 from .pages.settings_page import SettingsPage
-from .pages.statistics_page import StatisticsPage
 
 
 class MainWindow(FluentWindow):
@@ -27,7 +26,6 @@ class MainWindow(FluentWindow):
             ("home", HomePage(self.ctx), FIF.HOME, "首页", NavigationItemPosition.TOP),
             ("dashboard", DashboardPage(self.ctx), FIF.SPEED_HIGH, "仪表盘", NavigationItemPosition.TOP),
             ("entry", EntryPage(self.ctx), FIF.ADD, "录入", NavigationItemPosition.TOP),
-            ("statistics", StatisticsPage(self.ctx), FIF.PIE_SINGLE, "统计", NavigationItemPosition.TOP),
             ("management", ManagementPage(self.ctx), FIF.PEOPLE, "成员与标签", NavigationItemPosition.TOP),
             ("recycle", RecyclePage(self.ctx), FIF.DELETE, "附件回收站", NavigationItemPosition.TOP),
             ("settings", SettingsPage(self.ctx), FIF.SETTING, "系统设置", NavigationItemPosition.BOTTOM),

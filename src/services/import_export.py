@@ -42,6 +42,8 @@ class ImportExportService:
         self.db = db
         self.attachments = attachments
         self._ensure_template()
+        self._member_cache: dict[str, TeamMember] = {}
+        self._tag_cache: dict[str, Tag] = {}
 
     def _ensure_template(self) -> None:
         csv_path = TEMPLATES_DIR / "awards_template.csv"
@@ -134,22 +136,37 @@ class ImportExportService:
         return ImportResult(total=total, success=success, failed=total - success, errors=errors)
 
     def _parse_items(self, value: str, sep: str = ",") -> list[str]:
-        return [item.strip() for item in value.split(sep) if item.strip()]
+        unique: list[str] = []
+        seen: set[str] = set()
+        for item in value.split(sep):
+            cleaned = item.strip()
+            if cleaned and cleaned.lower() not in seen:
+                seen.add(cleaned.lower())
+                unique.append(cleaned)
+        return unique
 
     def _get_or_create_member(self, session, name: str) -> TeamMember:
+        if name in self._member_cache:
+            return self._member_cache[name]
         member = session.scalar(select(TeamMember).where(TeamMember.name == name))
         if member:
+            self._member_cache[name] = member
             return member
         member = TeamMember(name=name, pinyin=name)
         session.add(member)
         session.flush()
+        self._member_cache[name] = member
         return member
 
     def _get_or_create_tag(self, session, name: str) -> Tag:
+        if name in self._tag_cache:
+            return self._tag_cache[name]
         tag = session.scalar(select(Tag).where(Tag.name == name))
         if tag:
+            self._tag_cache[name] = tag
             return tag
         tag = Tag(name=name, pinyin=name)
         session.add(tag)
         session.flush()
+        self._tag_cache[name] = tag
         return tag

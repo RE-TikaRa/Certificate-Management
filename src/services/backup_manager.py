@@ -69,7 +69,21 @@ class BackupManager:
                 )
             logger.info("Backup created at %s", archive_path)
             self.settings.set("last_backup_time", datetime.utcnow().isoformat())
+            self._cleanup_old_archives()
             return archive_path
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Backup failed: %s", exc)
+            with self.db.session_scope() as session:
+                session.add(
+                    BackupRecord(
+                        path=str(archive_path),
+                        include_attachments=include_attachments,
+                        include_logs=include_logs,
+                        status="failed",
+                        message=str(exc),
+                    )
+                )
+            raise
         finally:
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
@@ -97,3 +111,16 @@ class BackupManager:
     def _as_bool(self, key: str) -> bool:
         value = self.settings.get(key, "false")
         return value.lower() in {"1", "true", "yes", "on"}
+
+    def _cleanup_old_archives(self) -> None:
+        try:
+            retention = int(self.settings.get("backup_retention", "5"))
+        except ValueError:
+            retention = 5
+        archives = sorted(self.backup_root.glob("*.zip"), key=lambda p: p.stat().st_mtime, reverse=True)
+        for extra in archives[retention:]:
+            try:
+                extra.unlink()
+                logger.info("Removed old backup %s", extra)
+            except Exception:  # noqa: BLE001
+                logger.warning("Failed to remove old backup %s", extra)

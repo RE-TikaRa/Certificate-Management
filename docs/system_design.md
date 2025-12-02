@@ -17,21 +17,19 @@
 组件划分：
 1. `AppContext`：加载设置、初始化数据库连接、注册服务，注入到各页面。
 2. `NavigationController`：管理侧边栏/顶部快捷入口，协调页面切换。
-3. 页面模块：`HomePage`, `DashboardPage`, `EntryPage`, `StatisticsPage`, `ManagementPage`, `SettingsPanel`。
+3. 页面模块：`HomePage`, `DashboardPage`（含统计分析）、`EntryPage`, `ManagementPage`, `SettingsPanel`。
 4. 服务模块：`AttachmentManager`, `BackupManager`, `ImportExportService`, `SettingsService`, `AuditLogger`。
 
 ## 3. UI 信息架构
 - **HomePage**：仪表卡片（总荣誉、国家级、省级、一等奖等）、最近录入表格（双击打开附件目录）、快捷按钮（录入/统计/成员/备份）。
-- **DashboardPage**：以文本表格呈现按级别/等级的聚合结果，含最近记录列表（双击打开附件）。
+- **DashboardPage**：以卡片+图表形式呈现关键指标、最近记录、按级别/等级分布等综合统计，双击最近列表可打开附件目录。
 - **EntryPage**：
-  - 表单字段：比赛名称、获奖日期、赛事级别、奖项等级、证书编号、备注。
-  - 成员/标签列表：复选 + 即时新增弹窗。
-  - 附件上传：多文件选择，复制到附件根目录 `attachments/<award-id>/`，命名“比赛名-附件NN”。
-- **StatisticsPage**：
-  - 概览表：总数及按级别/等级统计。
-  - 图表页：使用饼图/柱状图展示按级别、按等级占比。
+  - 表单字段：比赛名称、获奖日期、赛事级别、奖项等级、证书编号、备注，并含输入校验（必填、日期范围、去重提醒）。
+  - 成员/标签列表：复选、批量选择/导入（弹窗勾选已有项）与即时新增。
+  - 附件上传：多文件选择，复制到附件根目录 `attachments/<award-id>/`，命名“比赛名-附件NN”，并提供清空表单、一键重置。
 - **ManagementPage**：左右双列表维护成员、标签；支持新增、删除、重命名、排序（名称 A-Z/Z-A、拼音、手动拖拽），搜索过滤，批量导入/导出。
 - **SettingsPanel**：配置附件根目录、备份目录、自动备份频率（手动/启动/每日/每周）、是否包含附件、是否包含日志；提供“保存设置”“立即备份”“打开附件目录”“打开备份目录”。
+- 备份策略默认保留近 5 次记录，可通过 `backup_retention` 设置调整。
 - **附件回收站视图**：展示被标记删除的附件，可恢复或彻底删除。
 
 ### 3.1 视觉与主题策略

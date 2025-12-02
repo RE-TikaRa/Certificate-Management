@@ -5,11 +5,13 @@ from PySide6.QtWidgets import (
     QInputDialog,
     QListWidget,
     QListWidgetItem,
-    QPushButton,
     QVBoxLayout,
     QWidget,
     QLabel,
 )
+from qfluentwidgets import PrimaryPushButton, PushButton
+
+from ..theme import create_card, create_page_header, make_section_title
 
 from .base_page import BasePage
 
@@ -17,30 +19,38 @@ from .base_page import BasePage
 class ManagementPage(BasePage):
     def __init__(self, ctx):
         super().__init__(ctx)
-        layout = QHBoxLayout(self)
+        layout = QVBoxLayout(self)
+        layout.setSpacing(18)
+        layout.addWidget(create_page_header("成员与标签", "构建有序的团队与标签体系"))
+
+        main_row = QHBoxLayout()
+        main_row.setSpacing(16)
 
         self.members_list = QListWidget()
-        self.tags_list = QListWidget()
-
         member_panel = self._build_panel("成员", self.members_list, self._add_member, self._remove_member)
-        tag_panel = self._build_panel("标签", self.tags_list, self._add_tag, self._remove_tag)
+        main_row.addWidget(member_panel)
 
-        layout.addWidget(member_panel)
-        layout.addWidget(tag_panel)
+        self.tags_list = QListWidget()
+        tag_panel = self._build_panel("标签", self.tags_list, self._add_tag, self._remove_tag)
+        main_row.addWidget(tag_panel)
+
+        layout.addLayout(main_row)
 
         self.refresh()
 
     def _build_panel(self, title: str, list_widget: QListWidget, add_slot, remove_slot) -> QWidget:
-        panel = QWidget()
-        vbox = QVBoxLayout(panel)
-        vbox.addWidget(QLabel(title))
-        vbox.addWidget(list_widget)
-        add_btn = QPushButton("新增")
+        panel, layout = create_card()
+        layout.addWidget(make_section_title(title))
+        layout.addWidget(list_widget)
+        btn_row = QHBoxLayout()
+        add_btn = PrimaryPushButton("新增")
         add_btn.clicked.connect(add_slot)
-        remove_btn = QPushButton("删除")
+        remove_btn = PushButton("删除")
         remove_btn.clicked.connect(remove_slot)
-        vbox.addWidget(add_btn)
-        vbox.addWidget(remove_btn)
+        btn_row.addWidget(add_btn)
+        btn_row.addWidget(remove_btn)
+        btn_row.addStretch()
+        layout.addLayout(btn_row)
         return panel
 
     def refresh(self) -> None:

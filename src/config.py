@@ -21,6 +21,7 @@ DEFAULT_SETTINGS: Final[dict[str, str]] = {
     "auto_backup_mode": "manual",
     "theme": "fluent",
     "theme_mode": "light",
+    "backup_retention": "5",
 }
 
 for directory in (DATA_DIR, ATTACHMENTS_DIR, BACKUP_DIR, LOG_DIR, TEMPLATES_DIR):

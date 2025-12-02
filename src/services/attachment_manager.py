@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import shutil
 import contextlib
 from datetime import datetime
@@ -13,6 +14,8 @@ from ..config import ATTACHMENTS_DIR
 from ..data.database import Database
 from ..data.models import Attachment
 from .settings_service import SettingsService
+
+logger = logging.getLogger(__name__)
 
 
 class AttachmentManager:
@@ -35,6 +38,16 @@ class AttachmentManager:
         safe = "".join(keep).strip().replace(" ", "_")
         return safe or "attachment"
 
+    def _ensure_unique_path(self, folder: Path, filename: str) -> Path:
+        dest = folder / filename
+        counter = 1
+        while dest.exists():
+            stem = dest.stem
+            suffix = dest.suffix
+            dest = folder / f"{stem}_{counter}{suffix}"
+            counter += 1
+        return dest
+
     def save_attachments(
         self,
         award_id: int,
@@ -50,9 +63,12 @@ class AttachmentManager:
         context = self.db.session_scope() if session is None else contextlib.nullcontext(session)
         with context as active_session:
             for index, src in enumerate(file_paths, start=1):
+                if not src.exists():
+                    logger.warning("Attachment %s not found, skipped", src)
+                    continue
                 suffix = src.suffix
                 safe_name = self._sanitize_name(f"{competition_name}-附件{index:02d}{suffix}")
-                dest = folder / safe_name
+                dest = self._ensure_unique_path(folder, safe_name)
                 shutil.copy2(src, dest)
                 rel_path = dest.relative_to(root)
 
