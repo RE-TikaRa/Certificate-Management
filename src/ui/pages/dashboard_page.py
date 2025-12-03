@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCharts import QBarCategoryAxis, QBarSeries, QBarSet, QChart, QChartView, QPieSeries, QValueAxis
-from PySide6.QtCore import Qt, Slot, QUrl
+from PySide6.QtCore import Qt, Slot, QUrl, QTimer
 from PySide6.QtGui import QDesktopServices, QPainter, QColor, QBrush
 from PySide6.QtWidgets import (
     QFrame,
@@ -29,6 +29,14 @@ class DashboardPage(BasePage):
         super().__init__(ctx, theme_manager)
         self.metric_labels: dict[str, QLabel] = {}
         self._latest_awards = []
+
+        # 连接主题变化信号
+        self.theme_manager.themeChanged.connect(self._on_theme_changed)
+        
+        # 设置自动刷新定时器（每5秒检查一次）
+        self.refresh_timer = QTimer()
+        self.refresh_timer.timeout.connect(self._auto_refresh)
+        self.refresh_timer.start(5000)  # 5秒更新一次
 
         outer_layout = QVBoxLayout(self)
         outer_layout.setContentsMargins(0, 0, 0, 0)
@@ -61,13 +69,13 @@ class DashboardPage(BasePage):
         grid.setSpacing(16)
         tiles = [
             ("总荣誉数", "🗂", "violet"),
-            ("国家级", "🏅", "blue"),
-            ("省级", "🏆", "gold"),
+            ("国家级", "🏅", "gold"),
+            ("省级", "🏆", "blue"),
             ("校级", "🎖", "green"),
             ("一等奖", "🥇", "cyan"),
             ("二等奖", "🥈", "purple"),
             ("三等奖", "🥉", "red"),
-            ("优秀奖", "⭐", "blue"),
+            ("优秀奖", "⭐", "orange"),
         ]
         for idx, (title, icon, accent) in enumerate(tiles):
             tile = self._create_metric_tile(title, icon, accent)
@@ -167,6 +175,20 @@ class DashboardPage(BasePage):
         card_layout.addWidget(self.recent_table)
         return card
 
+    def _auto_refresh(self) -> None:
+        """自动刷新数据（每5秒检查一次是否有新数据）"""
+        try:
+            stats = self.ctx.statistics.get_overview()
+            current_count = len(self._latest_awards)
+            new_count = len(stats["latest_awards"])
+            
+            # 只在数据有变化时刷新UI
+            if current_count != new_count or stats["total"] != int(self.metric_labels["总荣誉数"].text()):
+                self.refresh()
+        except Exception:
+            # 忽略自动刷新的错误，避免打扰用户
+            pass
+
     def refresh(self) -> None:
         stats = self.ctx.statistics.get_overview()
         self._latest_awards = stats["latest_awards"]
@@ -224,11 +246,18 @@ class DashboardPage(BasePage):
 
         self._update_charts(level_stats, rank_stats)
 
+    @Slot()
+    def _on_theme_changed(self) -> None:
+        """主题变化时重新更新图表"""
+        level_stats = self.ctx.statistics.get_group_by_level()
+        rank_stats = self.ctx.statistics.get_group_by_rank()
+        self._update_charts(level_stats, rank_stats)
+
     def _update_charts(self, level_data: dict[str, int], rank_data: dict[str, int]) -> None:
         is_dark = self.theme_manager.is_dark
         text_color = QColor(255, 255, 255) if is_dark else QColor(30, 39, 70)
         grid_color = QColor(255, 255, 255, 80) if is_dark else QColor(90, 108, 243, 120)
-        bg_color = QColor(46, 49, 72) if is_dark else QColor(255, 255, 255)
+        chart_bg_color = QColor(46, 49, 72) if is_dark else QColor(255, 255, 255)
 
         level_series = QPieSeries()
         for label, count in level_data.items():
@@ -244,7 +273,7 @@ class DashboardPage(BasePage):
         level_chart.setTitleBrush(QBrush(text_color))
         level_chart.legend().setLabelColor(text_color)
         level_chart.setAnimationOptions(QChart.SeriesAnimations)
-        level_chart.setBackgroundBrush(QBrush(bg_color))
+        level_chart.setBackgroundBrush(QBrush(chart_bg_color))
         self.level_chart.setChart(level_chart)
 
         bar_series = QBarSeries()
@@ -277,7 +306,7 @@ class DashboardPage(BasePage):
         bar_chart.setTitleBrush(QBrush(text_color))
         bar_chart.legend().setLabelColor(text_color)
         bar_chart.setAnimationOptions(QChart.SeriesAnimations)
-        bar_chart.setBackgroundBrush(QBrush(bg_color))
+        bar_chart.setBackgroundBrush(QBrush(chart_bg_color))
         self.rank_chart.setChart(bar_chart)
 
     @Slot()
@@ -318,3 +347,15 @@ class DashboardPage(BasePage):
     def _do_backup(self) -> None:
         path = self.ctx.backup.perform_backup()
         InfoBar.success("备份完成", str(path), duration=3000, parent=self)
+
+    def showEvent(self, event) -> None:
+        """页面显示时启动定时器"""
+        super().showEvent(event)
+        if hasattr(self, 'refresh_timer'):
+            self.refresh_timer.start(5000)
+
+    def closeEvent(self, event) -> None:
+        """页面关闭时停止定时器"""
+        if hasattr(self, 'refresh_timer'):
+            self.refresh_timer.stop()
+        super().closeEvent(event)

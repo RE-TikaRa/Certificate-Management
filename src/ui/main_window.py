@@ -8,6 +8,7 @@ from .pages.dashboard_page import DashboardPage
 from .pages.entry_page import EntryPage
 from .pages.home_page import HomePage
 from .pages.management_page import ManagementPage
+from .pages.overview_page import OverviewPage
 from .pages.recycle_page import RecyclePage
 from .pages.settings_page import SettingsPage
 from .styled_theme import ThemeManager
@@ -43,6 +44,7 @@ class MainWindow(FluentWindow):
         # 创建页面实例
         home_page = HomePage(self.ctx, self.theme_manager)
         dashboard_page = DashboardPage(self.ctx, self.theme_manager)
+        overview_page = OverviewPage(self.ctx, self.theme_manager)
         entry_page = EntryPage(self.ctx, self.theme_manager)
         management_page = ManagementPage(self.ctx, self.theme_manager)
         recycle_page = RecyclePage(self.ctx, self.theme_manager)
@@ -52,10 +54,12 @@ class MainWindow(FluentWindow):
         self.entry_page = entry_page
         self.dashboard_page = dashboard_page
         self.management_page = management_page
+        self.overview_page = overview_page
         
         pages = [
             ("home", home_page, FIF.HOME, "首页", NavigationItemPosition.TOP),
             ("dashboard", dashboard_page, FIF.SPEED_HIGH, "仪表盘", NavigationItemPosition.TOP),
+            ("overview", overview_page, FIF.ALIGNMENT, "总览", NavigationItemPosition.TOP),
             ("entry", entry_page, FIF.ADD, "录入", NavigationItemPosition.TOP),
             ("management", management_page, FIF.PEOPLE, "成员管理", NavigationItemPosition.TOP),
             ("recycle", recycle_page, FIF.DELETE, "附件回收站", NavigationItemPosition.TOP),

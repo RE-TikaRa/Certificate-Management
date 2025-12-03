@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Iterable, Sequence
 
 from sqlalchemy import select, and_, or_
+from sqlalchemy.orm import selectinload
 
 from ..data.database import Database
 from ..data.models import Award, Tag, TeamMember
@@ -55,7 +56,14 @@ class AwardService:
 
     def list_members(self) -> list[TeamMember]:
         with self.db.session_scope() as session:
-            return session.scalars(select(TeamMember).order_by(TeamMember.sort_index, TeamMember.name)).all()
+            # Eager load the awards relationship to avoid lazy loading errors
+            members = session.scalars(
+                select(TeamMember)
+                .options(selectinload(TeamMember.awards))
+                .order_by(TeamMember.sort_index, TeamMember.name)
+            ).all()
+            # Convert to dict to preserve data after session closes
+            return members
 
     def list_tags(self) -> list[Tag]:
         with self.db.session_scope() as session:
@@ -130,6 +138,20 @@ class AwardService:
         session.add(tag)
         session.flush()
         return tag
+
+    def list_awards(self) -> list[Award]:
+        """获取所有荣誉记录（按日期降序排列）"""
+        with self.db.session_scope() as session:
+            # Eager load members and tags to avoid lazy loading
+            awards = session.scalars(
+                select(Award)
+                .options(
+                    selectinload(Award.members),
+                    selectinload(Award.tags)
+                )
+                .order_by(Award.award_date.desc())
+            ).all()
+            return awards
 
     def delete_award(self, award_id: int) -> None:
         """删除指定 ID 的荣誉"""

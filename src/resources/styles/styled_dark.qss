@@ -292,6 +292,25 @@ QFrame[card="true"] {
     border-radius: 20px;
     border: 1px solid rgba(138, 159, 255, 0.08);
 }
+QFrame#awardItemCard {
+    background-color: #353751;
+    border-radius: 8px;
+    border: 1px solid rgba(138, 159, 255, 0.1);
+}
+QWidget[awardCard="true"] {
+    background-color: #2a2d3f;
+    border-radius: 8px;
+    border: 1px solid rgba(138, 159, 255, 0.15);
+}
+QWidget[awardCard="true"] QLabel {
+    color: #e1e1e1;
+}
+QWidget[awardCard="true"] TitleLabel {
+    color: #ffffff;
+}
+QWidget[awardCard="true"] CaptionLabel {
+    color: #a2a8c9;
+}
 QFrame[metricTile="true"] {
     border-radius: 18px;
     padding: 18px;
@@ -301,10 +320,10 @@ QFrame[metricTile="true"][accent="violet"] {
     background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #a071ff, stop:1 #7b6cff);
 }
 QFrame[metricTile="true"][accent="blue"] {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #5a80f3, stop:1 #4ac6ff);
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ffb347, stop:1 #ffcc33);
 }
 QFrame[metricTile="true"][accent="gold"] {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ffb347, stop:1 #ffcc33);
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #5a80f3, stop:1 #4ac6ff);
 }
 QFrame[metricTile="true"][accent="green"] {
     background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #3ec8a0, stop:1 #45dd8e);
@@ -317,6 +336,9 @@ QFrame[metricTile="true"][accent="purple"] {
 }
 QFrame[metricTile="true"][accent="red"] {
     background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ff6b6b, stop:1 #ff8787);
+}
+QFrame[metricTile="true"][accent="orange"] {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #999999, stop:1 #b3b3b3);
 }
 QLabel[metricValue="true"] {
     font-size: 28px;

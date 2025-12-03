@@ -53,7 +53,9 @@ def apply_table_style(table: QTableWidget) -> None:
     table.setSelectionMode(QTableWidget.SingleSelection)
     table.setShowGrid(False)
     table.verticalHeader().setVisible(False)
+    table.verticalHeader().setDefaultSectionSize(55)  # 增加行高到55
     header = table.horizontalHeader()
+    # 根据窗口宽度自动调整列宽，最后一列自动拉伸
     header.setStretchLastSection(True)
-    header.setSectionResizeMode(QHeaderView.ResizeToContents)
+    header.setSectionResizeMode(QHeaderView.Stretch)
     header.setHighlightSections(False)

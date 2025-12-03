@@ -13,6 +13,7 @@ def main(debug: bool = False) -> None:
     app = QApplication(sys.argv)
     ctx = bootstrap(debug=debug)
     theme_manager = ThemeManager(app)
+    ThemeManager.set_instance(theme_manager)  # 设置单例
     
     # Load and apply saved theme
     theme_mode_text = ctx.settings.get("theme_mode", "light")

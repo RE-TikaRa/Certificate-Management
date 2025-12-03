@@ -165,22 +165,19 @@ class EntryPage(BasePage):
         members_card, members_layout = create_card()
         members_layout.addWidget(make_section_title("参与成员"))
         
-        # 创建成员表格（11列：姓名、性别、年龄、身份证号、手机号、学号、联系电话、邮箱、专业、班级、学院）
-        self.members_table = QTableWidget(0, 12)
-        self.members_table.setHorizontalHeaderLabels([
-            "姓名", "性别", "年龄", "身份证号", "手机号", "学号",
-            "联系电话", "邮箱", "专业", "班级", "学院", "删除"
-        ])
+        # 成员列表容器 - 直接使用 QWidget，会自动扩展
+        self.members_container = QWidget()
+        self.members_container.setStyleSheet("QWidget { background-color: transparent; }")
+        self.members_list_layout = QVBoxLayout(self.members_container)
+        self.members_list_layout.setContentsMargins(0, 0, 0, 0)
+        self.members_list_layout.setSpacing(12)
+        self.members_list_layout.setSizeConstraint(QVBoxLayout.SetMinAndMaxSize)  # 自动调整大小
         
-        # 设置列宽
-        widths = [100, 60, 50, 120, 100, 80, 100, 120, 100, 100, 100, 60]
-        for i, w in enumerate(widths):
-            self.members_table.setColumnWidth(i, w)
+        # 成员卡片会自动扩展父容器的高度
+        members_layout.addWidget(self.members_container)
         
-        self.members_table.setMinimumHeight(250)
-        from ..theme import apply_table_style
-        apply_table_style(self.members_table)
-        members_layout.addWidget(self.members_table)
+        # 存储成员数据的列表（用于保存和提取）
+        self.members_data = []
         
         # 添加成员按钮
         add_member_btn = PrimaryPushButton("添加成员")
@@ -214,53 +211,167 @@ class EntryPage(BasePage):
         layout.addStretch()
 
         self.refresh()
+
     def _add_member_row(self) -> None:
-        """添加新的成员行到表格"""
-        row = self.members_table.rowCount()
-        self.members_table.insertRow(row)
+        """添加新的成员卡片（表单列表风格）"""
+        import logging
+        from ...services.validators import FormValidator
         
-        # 字段列表：姓名、性别、年龄、身份证号、手机号、学号、联系电话、邮箱、专业、班级、学院
-        for col in range(11):
+        logger = logging.getLogger(__name__)
+        
+        # 创建成员卡片
+        member_card = QWidget()
+        # 深色模式和浅色模式的样式
+        is_dark = self.theme_manager.is_dark
+        if is_dark:
+            card_style = """
+                QWidget {
+                    background-color: #353751;
+                    border-radius: 8px;
+                    border: 1px solid #4a4a5e;
+                }
+            """
+            label_style = "color: #a0a0a0; font-size: 12px;"
+            input_style = """
+                QLineEdit {
+                    border: 1px solid #4a4a5e;
+                    border-radius: 4px;
+                    padding: 6px;
+                    background-color: #2a2a3a;
+                    color: #e0e0e0;
+                }
+                QLineEdit:focus {
+                    border: 2px solid #4a90e2;
+                    color: #e0e0e0;
+                }
+            """
+        else:
+            card_style = """
+                QWidget {
+                    background-color: #f5f5f5;
+                    border-radius: 8px;
+                    border: 1px solid #e0e0e0;
+                }
+            """
+            label_style = "color: #666; font-size: 12px;"
+            input_style = """
+                QLineEdit {
+                    border: 1px solid #ddd;
+                    border-radius: 4px;
+                    padding: 6px;
+                    background-color: white;
+                    color: #333;
+                }
+                QLineEdit:focus {
+                    border: 2px solid #1890ff;
+                    color: #333;
+                }
+            """
+        
+        member_card.setStyleSheet(card_style)
+        member_layout = QVBoxLayout(member_card)
+        member_layout.setContentsMargins(12, 12, 12, 12)
+        member_layout.setSpacing(10)
+        
+        # 成员编号和删除按钮
+        header_layout = QHBoxLayout()
+        member_index = len(self.members_data) + 1
+        member_label = QLabel(f"成员 #{member_index}")
+        member_label.setStyleSheet("font-weight: bold; font-size: 13px;")
+        header_layout.addWidget(member_label)
+        header_layout.addStretch()
+        
+        delete_btn = PushButton("删除")
+        delete_btn.setMaximumWidth(60)
+        member_layout.addLayout(header_layout)
+        
+        # 创建3列的表单布局
+        form_grid = QGridLayout()
+        form_grid.setSpacing(12)
+        form_grid.setColumnStretch(1, 1)
+        form_grid.setColumnStretch(3, 1)
+        
+        # 字段配置：标签、输入框（按2列布局）
+        field_names = ['name', 'gender', 'id_card', 'phone', 'student_id', 
+                       'email', 'major', 'class_name', 'college']
+        field_labels = ['姓名', '性别', '身份证号', '手机号', '学号', 
+                        '邮箱', '专业', '班级', '学院']
+        
+        # 存储该成员的所有字段输入框
+        member_fields = {}
+        
+        # 首先创建所有输入框
+        for field_name, label in zip(field_names, field_labels):
             input_widget = QLineEdit()
-            self.members_table.setCellWidget(row, col, input_widget)
+            input_widget.setPlaceholderText(f"请输入{label}")
+            input_widget.setStyleSheet(input_style)
+            member_fields[field_name] = input_widget
+        
+        # 然后按2列布局添加到表单
+        for idx, (field_name, label) in enumerate(zip(field_names, field_labels)):
+            col = (idx % 2) * 2
+            row = idx // 2
+            
+            label_widget = QLabel(label)
+            label_widget.setStyleSheet(label_style)
+            label_widget.setMinimumWidth(50)
+            label_widget.setAlignment(Qt.AlignmentFlag.AlignCenter)  # 标签居中
+            
+            form_grid.addWidget(label_widget, row, col, alignment=Qt.AlignmentFlag.AlignCenter)
+            form_grid.addWidget(member_fields[field_name], row, col + 1)
+        
+        member_layout.addLayout(form_grid)
         
         # 删除按钮
-        delete_btn = PushButton("删除")
-        delete_btn.clicked.connect(lambda: self._remove_member_row(row))
-        self.members_table.setCellWidget(row, 11, delete_btn)
+        delete_btn.clicked.connect(lambda: self._remove_member_card(member_card, member_fields))
+        header_layout.addWidget(delete_btn)
+        
+        # 保存成员数据
+        member_data = {
+            'card': member_card,
+            'fields': member_fields
+        }
+        self.members_data.append(member_data)
+        
+        # 添加到列表
+        self.members_list_layout.addWidget(member_card)
+        
+        logger.debug(f"成员 #{member_index} 已添加，总成员数：{len(self.members_data)}")
 
-    def _remove_member_row(self, row: int) -> None:
-        """删除一行成员"""
-        self.members_table.removeRow(row)
+    def _remove_member_card(self, member_card: QWidget, member_fields: dict) -> None:
+        """删除一个成员卡片"""
+        # 从列表中移除
+        for idx, data in enumerate(self.members_data):
+            if data['card'] == member_card:
+                self.members_data.pop(idx)
+                break
+        
+        # 从UI中移除
+        member_card.deleteLater()
 
     def _get_members_data(self) -> list[dict]:
-        """获取表格中的成员数据"""
+        """获取成员卡片中的成员数据"""
         members = []
-        field_names = ['name', 'gender', 'age', 'id_card', 'phone', 'student_id',
-                       'contact_phone', 'email', 'major', 'class_name', 'college']
+        field_names = ['name', 'gender', 'id_card', 'phone', 'student_id',
+                       'email', 'major', 'class_name', 'college']
         
-        for row in range(self.members_table.rowCount()):
-            name_widget = self.members_table.cellWidget(row, 0)
+        for member_data in self.members_data:
+            member_fields = member_data['fields']
             
+            # 获取姓名，如果有则表示成员有效
+            name_widget = member_fields.get('name')
             if isinstance(name_widget, QLineEdit):
                 name = name_widget.text().strip()
                 if name:  # 只记录有姓名的成员
                     member_info = {'name': name}
                     
                     # 收集其他字段
-                    for col, field in enumerate(field_names[1:], start=1):
-                        widget = self.members_table.cellWidget(row, col)
+                    for field_name in field_names[1:]:
+                        widget = member_fields.get(field_name)
                         if isinstance(widget, QLineEdit):
                             value = widget.text().strip()
                             if value:
-                                # 年龄转换为整数
-                                if field == 'age':
-                                    try:
-                                        member_info[field] = int(value)
-                                    except ValueError:
-                                        pass
-                                else:
-                                    member_info[field] = value
+                                member_info[field_name] = value
                     
                     members.append(member_info)
         return members
@@ -289,36 +400,36 @@ class EntryPage(BasePage):
         self.certificate_input.setText(award.certificate_code or "")
         self.remarks_input.setText(award.remarks or "")
         
-        # 清空并填充成员信息
-        self.members_table.setRowCount(0)
+        # 清空并填充成员信息（使用新的表单卡片风格）
+        for member_data in self.members_data:
+            member_data['card'].deleteLater()
+        self.members_data.clear()
+        
         for member in award.members:
-            row = self.members_table.rowCount()
-            self.members_table.insertRow(row)
+            # 添加新的成员卡片
+            self._add_member_row()
             
-            # 填充各字段
-            fields = [
-                member.name or "",
-                member.gender or "",
-                str(member.age) if member.age else "",
-                member.id_card or "",
-                member.phone or "",
-                member.student_id or "",
-                member.contact_phone or "",
-                member.email or "",
-                member.major or "",
-                member.class_name or "",
-                member.college or "",
-            ]
+            # 填充最后添加的成员卡片的数据
+            member_data = self.members_data[-1]
+            member_fields = member_data['fields']
             
-            for col, value in enumerate(fields):
-                widget = QLineEdit()
-                widget.setText(value)
-                self.members_table.setCellWidget(row, col, widget)
+            # 映射成员数据到表单字段
+            field_mapping = {
+                'name': member.name or "",
+                'gender': member.gender or "",
+                'id_card': member.id_card or "",
+                'age': str(member.age) if member.age else "",
+                'phone': member.phone or "",
+                'student_id': member.student_id or "",
+                'email': member.email or "",
+                'major': member.major or "",
+                'class_name': member.class_name or "",
+                'college': member.college or "",
+            }
             
-            # 删除按钮
-            delete_btn = PushButton("删除")
-            delete_btn.clicked.connect(lambda checked, r=row: self._remove_member_row(r))
-            self.members_table.setCellWidget(row, 11, delete_btn)
+            for field_name, value in field_mapping.items():
+                if field_name in member_fields:
+                    member_fields[field_name].setText(value)
         
         self.selected_files = []
         self.attach_label.setText("未选择附件")
@@ -391,8 +502,10 @@ class EntryPage(BasePage):
         self.remarks_input.clear()
         self.selected_files = []
         self.attach_label.setText("未选择附件")
-        # 清空成员表格
-        self.members_table.setRowCount(0)
+        # 清空成员卡片
+        for member_data in self.members_data:
+            member_data['card'].deleteLater()
+        self.members_data.clear()
         
         # 退出编辑模式
         if self.editing_award:

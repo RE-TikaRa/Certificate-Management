@@ -308,3 +308,62 @@ class FormValidator:
             return card[17] == check_codes[checksum], "身份证号校验位错误"
         except (ValueError, IndexError):
             return False, "身份证号格式不正确"
+
+    @staticmethod
+    def calculate_age_from_id_card(id_card: str) -> int | None:
+        """
+        从身份证号计算年龄。
+        
+        支持18位和15位身份证号：
+        - 18位：YYYYMMDDXXXXXXXXXXXXXX（前8位为出生日期）
+        - 15位：YYMMDDXXXXXXXXXXXXXX（前6位为出生日期，YY表示年份）
+        
+        Args:
+            id_card: 身份证号
+            
+        Returns:
+            年龄（整数）或 None 如果无法计算
+        """
+        from datetime import datetime
+        
+        if not id_card:
+            return None
+        
+        id_card = id_card.strip()
+        
+        try:
+            if len(id_card) == 18:
+                # 18位身份证
+                birth_year = int(id_card[0:4])
+                birth_month = int(id_card[4:6])
+                birth_day = int(id_card[6:8])
+            elif len(id_card) == 15:
+                # 15位身份证（旧版）
+                yy = int(id_card[0:2])
+                # 如果YY > 当前年份的后两位，说明是19xx年；否则是20xx年
+                current_year = datetime.today().year
+                current_yy = current_year % 100
+                
+                if yy > current_yy:
+                    birth_year = 1900 + yy
+                else:
+                    birth_year = 2000 + yy
+                
+                birth_month = int(id_card[2:4])
+                birth_day = int(id_card[4:6])
+            else:
+                return None
+            
+            # 验证日期有效性
+            birth_date = datetime(birth_year, birth_month, birth_day)
+            today = datetime.today()
+            
+            # 计算年龄
+            age = today.year - birth_date.year
+            # 如果今年生日还没有，年龄减1
+            if (today.month, today.day) < (birth_date.month, birth_date.day):
+                age -= 1
+            
+            return age if 0 <= age <= 120 else None
+        except (ValueError, IndexError):
+            return None

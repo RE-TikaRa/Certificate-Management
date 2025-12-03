@@ -3,6 +3,7 @@ from __future__ import annotations
 from enum import Enum
 
 from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QGuiApplication, QPalette
 from qfluentwidgets import Theme, setTheme
 from qfluentwidgets.common.config import qconfig
@@ -37,13 +38,35 @@ def _load_qss(is_dark: bool) -> str:
     return target.read_text(encoding='utf-8')
 
 
-class ThemeManager:
+class ThemeManager(QObject):
     """ Theme manager supporting light, dark, and auto modes """
+    
+    themeChanged = Signal()  # 主题变化信号
+    _instance = None
 
     def __init__(self, app: QApplication):
+        super().__init__()
         self.app = app
         self._mode = ThemeMode.LIGHT
         self._is_dark = False
+
+    @classmethod
+    def instance(cls) -> ThemeManager:
+        """Get singleton instance"""
+        if cls._instance is None:
+            from PySide6.QtWidgets import QApplication
+            cls._instance = cls(QApplication.instance())
+        return cls._instance
+    
+    @classmethod
+    def set_instance(cls, instance: ThemeManager) -> None:
+        """Set singleton instance"""
+        cls._instance = instance
+
+    @property
+    def current_theme(self) -> str:
+        """Get current theme as string: 'dark' or 'light'"""
+        return 'dark' if self._is_dark else 'light'
 
     @property
     def mode(self) -> ThemeMode:
@@ -71,6 +94,9 @@ class ThemeManager:
         q_theme = Theme.DARK if self._is_dark else Theme.LIGHT
         setTheme(q_theme, lazy=True)
         qconfig.themeMode.value = q_theme
+        
+        # 发出主题变化信号
+        self.themeChanged.emit()
     
     def get_window_stylesheet(self) -> str:
         """Get complete stylesheet for MainWindow including background color.

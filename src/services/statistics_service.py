@@ -35,9 +35,19 @@ class StatisticsService:
             ).first()
             
             # Separate query for latest awards (needed for UI display)
-            latest_awards = (
-                session.execute(select(Award).order_by(Award.award_date.desc()).limit(10)).scalars().all()
+            # Get only award IDs first to avoid loading relationships
+            award_ids = (
+                session.query(Award.id)
+                .order_by(Award.award_date.desc())
+                .limit(10)
+                .all()
             )
+            # Now load full Award objects by ID
+            latest_awards = []
+            for (aid,) in award_ids:
+                award = session.get(Award, aid)
+                if award:
+                    latest_awards.append(award)
         
         return {
             "total": result.total or 0,
