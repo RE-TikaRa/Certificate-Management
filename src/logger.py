@@ -33,7 +33,7 @@ def configure_logging(debug_enabled: bool = False) -> None:
     app_handler = _build_handler("app.log", logging.INFO)
     error_handler = _build_handler("error.log", logging.ERROR)
     console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
+    console_handler.setLevel(logging.DEBUG if debug_enabled else logging.INFO)
     console_handler.setFormatter(logging.Formatter("%(levelname)s - %(message)s"))
 
     root_logger.addHandler(app_handler)

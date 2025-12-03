@@ -4,7 +4,7 @@ from datetime import date
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QDate
-from PySide6.QtGui import QCursor
+from PySide6.QtGui import QCursor, QColor, QPalette
 from PySide6.QtWidgets import (
     QFileDialog,
     QGridLayout,
@@ -15,15 +15,10 @@ from PySide6.QtWidgets import (
     QWidget,
     QComboBox,
     QLabel,
-    QInputDialog,
     QScrollArea,
     QMenu,
-    QDialog,
-    QDialogButtonBox,
     QFrame,
     QSpinBox,
-    QTableWidget,
-    QTableWidgetItem,
 )
 from qfluentwidgets import CheckBox, PrimaryPushButton, PushButton
 
@@ -43,14 +38,14 @@ class EntryPage(BasePage):
 
     def _build_ui(self) -> None:
         outer_layout = QVBoxLayout(self)
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        outer_layout.addWidget(scroll)
+        self.scrollArea = QScrollArea()
+        self.scrollArea.setWidgetResizable(True)
+        self.scrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        outer_layout.addWidget(self.scrollArea)
 
         container = QWidget()
         container.setObjectName("pageRoot")  # Apply background color from QSS
-        scroll.setWidget(container)
+        self.scrollArea.setWidget(container)
         layout = QVBoxLayout(container)
         layout.setContentsMargins(32, 24, 32, 32)
         layout.setSpacing(28)
@@ -210,6 +205,7 @@ class EntryPage(BasePage):
         layout.addLayout(action_row)
         layout.addStretch()
 
+        self._apply_theme()
         self.refresh()
 
     def _add_member_row(self) -> None:
@@ -418,7 +414,6 @@ class EntryPage(BasePage):
                 'name': member.name or "",
                 'gender': member.gender or "",
                 'id_card': member.id_card or "",
-                'age': str(member.age) if member.age else "",
                 'phone': member.phone or "",
                 'student_id': member.student_id or "",
                 'email': member.email or "",
@@ -560,3 +555,31 @@ class EntryPage(BasePage):
                     issues.append(f"成员 {i} - {error}")
         
         return issues
+    
+    def _apply_theme(self) -> None:
+        """应用主题到滚动区域"""
+        is_dark = self.theme_manager.is_dark
+        scroll_bg = "#2a2a3a" if is_dark else "#f5f5f5"
+        
+        scroll_stylesheet = f"""
+            QScrollArea {{
+                border: none;
+                background-color: {scroll_bg};
+            }}
+            QScrollArea > QWidget {{
+                background-color: {scroll_bg};
+            }}
+            QWidget#scrollContent {{
+                background-color: {scroll_bg};
+            }}
+        """
+        self.scrollArea.setStyleSheet(scroll_stylesheet)
+        # 确保内部容器也有正确的背景色
+        scroll_widget = self.scrollArea.widget()
+        if scroll_widget:
+            scroll_widget.setObjectName("scrollContent")
+            scroll_widget.setAutoFillBackground(True)
+            palette = scroll_widget.palette()
+            palette.setColor(palette.ColorRole.Window, 
+                           {"#2a2a3a": QColor(42, 42, 58), "#f5f5f5": QColor(245, 245, 245)}[scroll_bg])
+            scroll_widget.setPalette(palette)

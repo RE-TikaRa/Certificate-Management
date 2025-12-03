@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from PySide6.QtCharts import QBarCategoryAxis, QBarSeries, QBarSet, QChart, QChartView, QPieSeries, QValueAxis
-from PySide6.QtCore import Qt, Slot, QUrl, QTimer
+from PySide6.QtCore import Qt, Slot, QUrl
+
 from PySide6.QtGui import QDesktopServices, QPainter, QColor, QBrush
 from PySide6.QtWidgets import (
     QFrame,
@@ -14,7 +15,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
     QSizePolicy,
-    QMessageBox,
 )
 from qfluentwidgets import InfoBar, PrimaryPushButton, PushButton
 
@@ -32,11 +32,6 @@ class DashboardPage(BasePage):
 
         # 连接主题变化信号
         self.theme_manager.themeChanged.connect(self._on_theme_changed)
-        
-        # 设置自动刷新定时器（每5秒检查一次）
-        self.refresh_timer = QTimer()
-        self.refresh_timer.timeout.connect(self._auto_refresh)
-        self.refresh_timer.start(5000)  # 5秒更新一次
 
         outer_layout = QVBoxLayout(self)
         outer_layout.setContentsMargins(0, 0, 0, 0)
@@ -167,27 +162,22 @@ class DashboardPage(BasePage):
     def _build_recent_section(self) -> QWidget:
         card, card_layout = create_card()
         card_layout.addWidget(make_section_title("最近录入"))
-        self.recent_table = QTableWidget(0, 6)
-        self.recent_table.setHorizontalHeaderLabels(["比赛", "级别", "等级", "日期", "成员", "操作"])
+        self.recent_table = QTableWidget(0, 5)
+        self.recent_table.setHorizontalHeaderLabels(["比赛", "级别", "等级", "日期", "成员"])
         apply_table_style(self.recent_table)
         self.recent_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.recent_table.setMinimumHeight(220)
         card_layout.addWidget(self.recent_table)
         return card
 
-    def _auto_refresh(self) -> None:
-        """自动刷新数据（每5秒检查一次是否有新数据）"""
-        try:
-            stats = self.ctx.statistics.get_overview()
-            current_count = len(self._latest_awards)
-            new_count = len(stats["latest_awards"])
-            
-            # 只在数据有变化时刷新UI
-            if current_count != new_count or stats["total"] != int(self.metric_labels["总荣誉数"].text()):
-                self.refresh()
-        except Exception:
-            # 忽略自动刷新的错误，避免打扰用户
-            pass
+    def showEvent(self, event) -> None:
+        """页面显示时刷新数据"""
+        super().showEvent(event)
+        self.refresh()
+
+    def closeEvent(self, event) -> None:
+        """页面关闭时的清理"""
+        super().closeEvent(event)
 
     def refresh(self) -> None:
         stats = self.ctx.statistics.get_overview()
@@ -209,23 +199,6 @@ class DashboardPage(BasePage):
             self.recent_table.setItem(row, 3, QTableWidgetItem(str(award.award_date)))
             members = ", ".join(member.name for member in award.members)
             self.recent_table.setItem(row, 4, QTableWidgetItem(members))
-            
-            # 操作按钮
-            action_widget = QWidget()
-            action_layout = QHBoxLayout(action_widget)
-            action_layout.setContentsMargins(0, 0, 0, 0)
-            action_layout.setSpacing(4)
-            
-            edit_btn = PushButton("编辑")
-            edit_btn.clicked.connect(lambda checked, a=award: self._edit_award(a))
-            delete_btn = PushButton("删除")
-            delete_btn.clicked.connect(lambda checked, a=award: self._delete_award(a))
-            
-            action_layout.addWidget(edit_btn)
-            action_layout.addWidget(delete_btn)
-            action_layout.addStretch()
-            
-            self.recent_table.setCellWidget(row, 5, action_widget)
 
         level_stats = self.ctx.statistics.get_group_by_level()
         top_level = max(level_stats.items(), key=lambda x: x[1]) if level_stats else ("--", 0)
@@ -317,27 +290,6 @@ class DashboardPage(BasePage):
         folder = self.ctx.attachments.root / f"award_{award.id}"
         folder.mkdir(parents=True, exist_ok=True)
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder.resolve())))
-
-    def _edit_award(self, award) -> None:
-        """编辑荣誉"""
-        window = self.window()
-        if hasattr(window, 'entry_page'):
-            window.entry_page.load_award_for_editing(award)
-            if hasattr(window, "navigate"):
-                window.navigate("entry")
-
-    def _delete_award(self, award) -> None:
-        """删除荣誉"""
-        reply = QMessageBox.question(
-            self, 
-            "确认删除", 
-            f'确定要删除"{award.competition_name}"吗？',
-            QMessageBox.Yes | QMessageBox.No
-        )
-        if reply == QMessageBox.Yes:
-            self.ctx.awards.delete_award(award.id)
-            self.refresh()
-            InfoBar.success("删除成功", f"已删除：{award.competition_name}", duration=2000, parent=self)
 
     def _navigate(self, route: str) -> None:
         window = self.window()

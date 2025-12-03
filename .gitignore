@@ -49,6 +49,7 @@ backups/
 logs/
 temp/
 *.log
+*.txt
 
 # 敏感信息
 .env

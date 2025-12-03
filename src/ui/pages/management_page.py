@@ -10,12 +10,12 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QFrame,
     QDialog,
-    QDialogButtonBox,
     QGridLayout,
     QLineEdit,
     QMessageBox,
 )
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt
+
 from PySide6.QtGui import QColor, QPalette
 from qfluentwidgets import PushButton
 
@@ -75,20 +75,18 @@ class ManagementPage(BasePage):
         container_layout.addWidget(card)
         
         container_layout.addStretch()
-        
-        # 设置自动刷新定时器
-        self.refresh_timer = QTimer()
-        self.refresh_timer.timeout.connect(self._auto_refresh)
-        self.refresh_timer.start(5000)  # 5秒刷新一次
-        
         self.refresh()
     
     def _auto_refresh(self):
         """自动刷新 - 检测数据变化后刷新"""
         members = self.ctx.awards.list_members()
         
-        # 转换为可比较的格式
-        current_data = [(m.id, m.name, m.gender, m.phone, m.college, m.class_name) for m in members]
+        # 转换为可比较的格式（包含所有字段以检测所有变化）
+        current_data = [
+            (m.id, m.name, m.gender, m.id_card, m.phone, m.student_id, 
+             m.email, m.major, m.class_name, m.college) 
+            for m in members
+        ]
         
         # 如果数据有变化，刷新表格
         if current_data != self.last_members_data:
@@ -288,7 +286,7 @@ class MemberDetailDialog(QDialog):
     
     def _enable_edit(self):
         """启用编辑模式 - 将标签转换为输入框"""
-        for field_key, widget in self.field_widgets.items():
+        for field_key, widget in list(self.field_widgets.items()):
             if isinstance(widget, QLabel):
                 current_value = widget.text()
                 
@@ -297,20 +295,23 @@ class MemberDetailDialog(QDialog):
                 input_field.setText(current_value)
                 input_field.setObjectName("memberDetailInput")
                 
-                # 替换 widget
+                # 获取布局并替换
                 parent = widget.parent()
                 if parent:
                     layout = parent.layout()
-                    if layout:
-                        index = layout.indexOf(widget)
-                        layout.replaceWidget(widget, input_field)
-                        widget.hide()
+                    if layout and isinstance(layout, QGridLayout):
+                        # 在网格布局中查找并替换
+                        for i in range(layout.count()):
+                            if layout.itemAt(i).widget() == widget:
+                                item = layout.takeAt(i)
+                                layout.addWidget(input_field, *layout.getItemPosition(i))
+                                break
                 
                 self.field_widgets[field_key] = input_field
     
     def _disable_edit(self):
         """禁用编辑模式 - 将输入框转换回标签"""
-        for field_key, widget in self.field_widgets.items():
+        for field_key, widget in list(self.field_widgets.items()):
             if isinstance(widget, QLineEdit):
                 current_value = widget.text()
                 
@@ -319,14 +320,17 @@ class MemberDetailDialog(QDialog):
                 label.setObjectName("memberDetailValue")
                 label.setWordWrap(True)
                 
-                # 替换 widget
+                # 获取布局并替换
                 parent = widget.parent()
                 if parent:
                     layout = parent.layout()
-                    if layout:
-                        index = layout.indexOf(widget)
-                        layout.replaceWidget(widget, label)
-                        widget.hide()
+                    if layout and isinstance(layout, QGridLayout):
+                        # 在网格布局中查找并替换
+                        for i in range(layout.count()):
+                            if layout.itemAt(i).widget() == widget:
+                                item = layout.takeAt(i)
+                                layout.addWidget(label, *layout.getItemPosition(i))
+                                break
                 
                 self.field_widgets[field_key] = label
     
@@ -340,7 +344,9 @@ class MemberDetailDialog(QDialog):
             # 更新成员数据
             def get_field_value(key: str) -> str:
                 widget = self.field_widgets.get(key)
-                if widget:
+                if isinstance(widget, QLineEdit):
+                    return widget.text()
+                elif isinstance(widget, QLabel):
                     return widget.text()
                 return ""
             

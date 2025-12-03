@@ -1,0 +1,13 @@
+2025-12-03 17:14:27 [ERROR] src.ui.pages.overview_page - 保存奖项失败: AwardService.update_award() got an unexpected keyword argument 'members'
+Traceback (most recent call last):
+  File "C:\Users\Tika\Desktop\学校\PersonalProject\Certificate Management\src\ui\pages\overview_page.py", line 606, in _save
+    self.ctx.awards.update_award(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self.award.id,
+        ^^^^^^^^^^^^^^
+    ...<6 lines>...
+        members=members
+        ^^^^^^^^^^^^^^^
+    )
+    ^
+TypeError: AwardService.update_award() got an unexpected keyword argument 'members'
