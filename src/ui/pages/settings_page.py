@@ -26,12 +26,19 @@ class SettingsPage(BasePage):
         "auto": "跟随系统",
     }
     
+    FREQUENCY_OPTIONS = {
+        "manual": "手动",
+        "startup": "启动时",
+        "daily": "每天",
+        "weekly": "每周",
+    }
+    
     def __init__(self, ctx, theme_manager: ThemeManager):
         super().__init__(ctx, theme_manager)
         self.attach_dir = QLabel()
         self.backup_dir = QLabel()
         self.frequency = ComboBox()
-        self.frequency.addItems(["manual", "startup", "daily", "weekly"])
+        self.frequency.addItems(list(self.FREQUENCY_OPTIONS.values()))
         self.include_attachments = CheckBox("包含附件")
         self.include_logs = CheckBox("包含日志")
         self.theme_mode = ComboBox()
@@ -40,6 +47,7 @@ class SettingsPage(BasePage):
         self.refresh()
 
     def _build_ui(self) -> None:
+        self.setObjectName("pageRoot")
         layout = QVBoxLayout(self)
         layout.setSpacing(18)
         layout.addWidget(create_page_header("系统设置", "配置目录、主题与备份策略"))
@@ -85,7 +93,12 @@ class SettingsPage(BasePage):
     def refresh(self) -> None:
         self.attach_dir.setText(self.ctx.attachments.root.as_posix())
         self.backup_dir.setText(self.ctx.backup.backup_root.as_posix())
-        self.frequency.setCurrentText(self.ctx.settings.get("backup_frequency", "manual"))
+        
+        # Convert stored frequency value to display text
+        stored_frequency = self.ctx.settings.get("backup_frequency", "manual")
+        display_frequency = self.FREQUENCY_OPTIONS.get(stored_frequency, "手动")
+        self.frequency.setCurrentText(display_frequency)
+        
         self.include_attachments.setChecked(self.ctx.settings.get("include_attachments", "true") == "true")
         self.include_logs.setChecked(self.ctx.settings.get("include_logs", "true") == "true")
         # Convert stored theme value to display text
@@ -107,7 +120,15 @@ class SettingsPage(BasePage):
         try:
             self.ctx.settings.set("attachment_root", self.attach_dir.text())
             self.ctx.settings.set("backup_root", self.backup_dir.text())
-            self.ctx.settings.set("backup_frequency", self.frequency.currentText())
+            
+            # Convert display text back to frequency value
+            display_frequency = self.frequency.currentText()
+            frequency_value = next(
+                (k for k, v in self.FREQUENCY_OPTIONS.items() if v == display_frequency),
+                "manual"
+            )
+            self.ctx.settings.set("backup_frequency", frequency_value)
+            
             self.ctx.settings.set("include_attachments", str(self.include_attachments.isChecked()).lower())
             self.ctx.settings.set("include_logs", str(self.include_logs.isChecked()).lower())
             
@@ -134,4 +155,4 @@ class SettingsPage(BasePage):
 
     def _backup_now(self) -> None:
         path = self.ctx.backup.perform_backup()
-        InfoBar.success("备份完成", str(path), duration=2000, parent=self)
+        InfoBar.success("备份完成", str(path), duration=2000, parent=self.window())

@@ -5,6 +5,7 @@ import time
 import logging
 
 from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import QTranslator, QLocale, QLibraryInfo
 
 from .app_context import bootstrap
 from .ui.main_window import MainWindow
@@ -18,6 +19,16 @@ def main(debug: bool = False) -> None:
     start_time = time.time()
     
     app = QApplication(sys.argv)
+    
+    # 加载Qt中文翻译
+    translator = QTranslator()
+    translations_path = QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath)
+    if translator.load(QLocale.system(), "qtbase", "_", translations_path):
+        app.installTranslator(translator)
+        logger.info("Qt中文翻译加载成功")
+    else:
+        logger.warning("Qt中文翻译加载失败")
+    
     ctx = bootstrap(debug=debug)
     logger.info(f"Bootstrap completed in {time.time() - start_time:.2f}s")
     

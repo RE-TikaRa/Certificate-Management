@@ -219,11 +219,6 @@ class FormValidator:
             errors.append("成员姓名不能超过128字符")
         
         # Validate optional fields
-        if age := member_data.get('age'):
-            valid, msg = FormValidator.validate_age(age)
-            if not valid:
-                errors.append(f"年龄: {msg}")
-        
         if id_card := member_data.get('id_card'):
             valid, msg = FormValidator.validate_id_card(id_card)
             if not valid:

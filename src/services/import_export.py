@@ -11,7 +11,7 @@ from sqlalchemy import select
 
 from ..config import TEMPLATES_DIR
 from ..data.database import Database
-from ..data.models import Award, ImportJob, Tag, TeamMember
+from ..data.models import Award, ImportJob, TeamMember
 from .attachment_manager import AttachmentManager
 
 logger = logging.getLogger(__name__)
@@ -24,7 +24,6 @@ TEMPLATE_HEADERS = [
     "证书编号",
     "备注",
     "成员",
-    "标签",
     "附件路径",
 ]
 
@@ -43,7 +42,6 @@ class ImportExportService:
         self.attachments = attachments
         self._ensure_template()
         self._member_cache: dict[str, TeamMember] = {}
-        self._tag_cache: dict[str, Tag] = {}
 
     def _ensure_template(self) -> None:
         csv_path = TEMPLATES_DIR / "awards_template.csv"
@@ -67,7 +65,6 @@ class ImportExportService:
                     "证书编号": award.certificate_code,
                     "备注": award.remarks,
                     "成员": ",".join(member.name for member in award.members),
-                    "标签": ",".join(tag.name for tag in award.tags),
                     "附件数量": len(award.attachments),
                 }
                 for award in awards
@@ -114,9 +111,7 @@ class ImportExportService:
                     session.flush()
 
                     members = self._parse_items(str(row.get("成员", "")))
-                    tags = self._parse_items(str(row.get("标签", "")))
                     award.members = [self._get_or_create_member(session, name) for name in members]
-                    award.tags = [self._get_or_create_tag(session, name) for name in tags]
 
                     attachment_paths = self._parse_items(str(row.get("附件路径", "")), sep=";")
                     files = [Path(path) for path in attachment_paths if path]
@@ -158,15 +153,3 @@ class ImportExportService:
         self._member_cache[name] = member
         return member
 
-    def _get_or_create_tag(self, session, name: str) -> Tag:
-        if name in self._tag_cache:
-            return self._tag_cache[name]
-        tag = session.scalar(select(Tag).where(Tag.name == name))
-        if tag:
-            self._tag_cache[name] = tag
-            return tag
-        tag = Tag(name=name, pinyin=name)
-        session.add(tag)
-        session.flush()
-        self._tag_cache[name] = tag
-        return tag

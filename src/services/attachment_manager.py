@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import logging
 import shutil
 import contextlib
@@ -37,6 +38,14 @@ class AttachmentManager:
         keep = [c for c in name if c.isalnum() or c in (" ", "_", "-", ".")]
         safe = "".join(keep).strip().replace(" ", "_")
         return safe or "attachment"
+    
+    def _calculate_md5(self, file_path: Path) -> str:
+        """计算文件的MD5哈希值"""
+        md5_hash = hashlib.md5()
+        with open(file_path, "rb") as f:
+            for chunk in iter(lambda: f.read(4096), b""):
+                md5_hash.update(chunk)
+        return md5_hash.hexdigest()
 
     def _ensure_unique_path(self, folder: Path, filename: str) -> Path:
         dest = folder / filename
@@ -66,6 +75,11 @@ class AttachmentManager:
                 if not src.exists():
                     logger.warning("Attachment %s not found, skipped", src)
                     continue
+                
+                # 计算MD5和文件大小
+                file_md5 = self._calculate_md5(src)
+                file_size = src.stat().st_size
+                
                 suffix = src.suffix
                 safe_name = self._sanitize_name(f"{competition_name}-附件{index:02d}{suffix}")
                 dest = self._ensure_unique_path(folder, safe_name)
@@ -77,6 +91,8 @@ class AttachmentManager:
                     stored_name=safe_name,
                     original_name=src.name,
                     relative_path=str(rel_path),
+                    file_md5=file_md5,
+                    file_size=file_size,
                 )
                 active_session.add(attachment)
                 saved.append(attachment)

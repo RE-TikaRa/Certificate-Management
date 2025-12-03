@@ -14,6 +14,7 @@ class HomePage(BasePage):
 
     def __init__(self, ctx, theme_manager: ThemeManager):
         super().__init__(ctx, theme_manager)
+        self.setObjectName("pageRoot")
         layout = QVBoxLayout(self)
         layout.addStretch()
 

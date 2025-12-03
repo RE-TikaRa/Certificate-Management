@@ -17,8 +17,6 @@ class BasePage(QWidget):
         self.setAttribute(Qt.WA_StyledBackground, True)
         self.ctx = ctx
         self.theme_manager = theme_manager
-        self.setObjectName("pageRoot")
 
     def refresh(self) -> None:  # pragma: no cover - optional override
-        pass
         pass

@@ -251,3 +251,206 @@ TypeError: AwardService.update_award() got an unexpected keyword argument 'membe
 2025-12-03 17:49:26 [INFO] __main__ - Bootstrap completed in 0.10s
 2025-12-03 17:49:27 [INFO] __main__ - MainWindow initialized in 0.95s
 2025-12-03 17:49:27 [INFO] __main__ - Total startup time: 1.07s
+2025-12-03 23:50:24 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-03 23:50:24 [INFO] __main__ - Bootstrap completed in 0.11s
+2025-12-03 23:50:26 [INFO] __main__ - MainWindow initialized in 1.47s
+2025-12-03 23:50:26 [INFO] __main__ - Total startup time: 1.61s
+2025-12-03 23:55:20 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-03 23:55:20 [INFO] __main__ - Bootstrap completed in 0.12s
+2025-12-03 23:55:21 [INFO] __main__ - MainWindow initialized in 1.44s
+2025-12-03 23:55:21 [INFO] __main__ - Total startup time: 1.61s
+2025-12-03 23:58:50 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-03 23:58:50 [INFO] __main__ - Bootstrap completed in 0.11s
+2025-12-03 23:58:51 [INFO] __main__ - MainWindow initialized in 1.32s
+2025-12-03 23:58:51 [INFO] __main__ - Total startup time: 1.47s
+2025-12-04 00:02:31 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 00:02:31 [INFO] __main__ - Bootstrap completed in 0.09s
+2025-12-04 00:02:32 [INFO] __main__ - MainWindow initialized in 1.25s
+2025-12-04 00:02:32 [INFO] __main__ - Total startup time: 1.38s
+2025-12-04 00:04:47 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 00:04:47 [INFO] __main__ - Bootstrap completed in 0.09s
+2025-12-04 00:04:48 [INFO] __main__ - MainWindow initialized in 1.26s
+2025-12-04 00:04:49 [INFO] __main__ - Total startup time: 1.38s
+2025-12-04 00:05:00 [ERROR] src.ui.pages.overview_page - 编辑失败: Dialog.__init__() missing 1 required positional argument: 'content'
+Traceback (most recent call last):
+  File "C:\Users\Tika\Desktop\学校\PersonalProject\Certificate Management\src\ui\pages\overview_page.py", line 256, in _edit_award
+    dialog = AwardDetailDialog(self, award, self.theme_manager, self.ctx)
+  File "C:\Users\Tika\Desktop\学校\PersonalProject\Certificate Management\src\ui\pages\overview_page.py", line 326, in __init__
+    super().__init__(parent)
+    ~~~~~~~~~~~~~~~~^^^^^^^^
+TypeError: Dialog.__init__() missing 1 required positional argument: 'content'
+2025-12-04 00:05:50 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 00:05:50 [INFO] __main__ - Bootstrap completed in 0.08s
+2025-12-04 00:05:51 [INFO] __main__ - MainWindow initialized in 1.28s
+2025-12-04 00:05:51 [INFO] __main__ - Total startup time: 1.40s
+2025-12-04 00:07:58 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 00:07:58 [INFO] __main__ - Bootstrap completed in 0.10s
+2025-12-04 00:08:00 [INFO] __main__ - MainWindow initialized in 1.25s
+2025-12-04 00:08:00 [INFO] __main__ - Total startup time: 1.38s
+2025-12-04 00:24:55 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 00:24:55 [INFO] __main__ - Bootstrap completed in 0.11s
+2025-12-04 00:24:56 [INFO] __main__ - MainWindow initialized in 1.30s
+2025-12-04 00:24:56 [INFO] __main__ - Total startup time: 1.44s
+2025-12-04 00:29:10 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 00:29:10 [INFO] __main__ - Bootstrap completed in 0.10s
+2025-12-04 00:29:12 [INFO] __main__ - MainWindow initialized in 1.42s
+2025-12-04 00:29:12 [INFO] __main__ - Total startup time: 1.55s
+2025-12-04 00:34:41 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 00:34:41 [INFO] __main__ - Bootstrap completed in 0.09s
+2025-12-04 00:34:42 [INFO] __main__ - MainWindow initialized in 1.32s
+2025-12-04 00:34:42 [INFO] __main__ - Total startup time: 1.44s
+2025-12-04 00:36:54 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 00:36:54 [INFO] __main__ - Bootstrap completed in 0.09s
+2025-12-04 00:36:56 [INFO] __main__ - MainWindow initialized in 1.26s
+2025-12-04 00:36:56 [INFO] __main__ - Total startup time: 1.38s
+2025-12-04 00:40:06 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 00:40:06 [INFO] __main__ - Bootstrap completed in 0.09s
+2025-12-04 00:40:08 [INFO] __main__ - MainWindow initialized in 1.24s
+2025-12-04 00:40:08 [INFO] __main__ - Total startup time: 1.35s
+2025-12-04 00:43:12 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 00:43:12 [INFO] __main__ - Bootstrap completed in 0.12s
+2025-12-04 00:43:14 [INFO] __main__ - MainWindow initialized in 1.42s
+2025-12-04 00:43:14 [INFO] __main__ - Total startup time: 1.58s
+2025-12-04 00:43:41 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 00:43:41 [INFO] __main__ - Bootstrap completed in 0.11s
+2025-12-04 00:43:42 [INFO] __main__ - MainWindow initialized in 1.48s
+2025-12-04 00:43:42 [INFO] __main__ - Total startup time: 1.64s
+2025-12-04 00:49:00 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 00:49:00 [INFO] __main__ - Bootstrap completed in 0.10s
+2025-12-04 00:49:02 [INFO] __main__ - MainWindow initialized in 1.28s
+2025-12-04 00:49:02 [INFO] __main__ - Total startup time: 1.40s
+2025-12-04 00:51:39 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 00:51:39 [INFO] __main__ - Bootstrap completed in 0.12s
+2025-12-04 00:51:41 [INFO] __main__ - MainWindow initialized in 1.58s
+2025-12-04 00:51:41 [INFO] __main__ - Total startup time: 1.74s
+2025-12-04 01:03:49 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 01:03:49 [INFO] __main__ - Bootstrap completed in 0.10s
+2025-12-04 01:03:51 [INFO] __main__ - MainWindow initialized in 1.20s
+2025-12-04 01:03:51 [INFO] __main__ - Total startup time: 1.32s
+2025-12-04 01:05:43 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 01:05:43 [INFO] __main__ - Bootstrap completed in 0.09s
+2025-12-04 01:05:44 [INFO] __main__ - MainWindow initialized in 1.18s
+2025-12-04 01:05:44 [INFO] __main__ - Total startup time: 1.29s
+2025-12-04 01:10:14 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 01:10:14 [INFO] __main__ - Bootstrap completed in 0.12s
+2025-12-04 01:10:16 [INFO] __main__ - MainWindow initialized in 1.19s
+2025-12-04 01:10:16 [INFO] __main__ - Total startup time: 1.34s
+2025-12-04 01:12:56 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 01:12:56 [INFO] __main__ - Bootstrap completed in 0.09s
+2025-12-04 01:12:57 [INFO] __main__ - MainWindow initialized in 1.23s
+2025-12-04 01:12:57 [INFO] __main__ - Total startup time: 1.35s
+2025-12-04 01:15:50 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 01:15:50 [INFO] __main__ - Bootstrap completed in 0.11s
+2025-12-04 01:15:52 [INFO] __main__ - MainWindow initialized in 1.29s
+2025-12-04 01:15:52 [INFO] __main__ - Total startup time: 1.43s
+2025-12-04 01:18:34 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 01:19:30 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 01:19:30 [INFO] __main__ - Bootstrap completed in 0.09s
+2025-12-04 01:19:32 [INFO] __main__ - MainWindow initialized in 1.17s
+2025-12-04 01:19:32 [INFO] __main__ - Total startup time: 1.29s
+2025-12-04 01:32:34 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 01:32:34 [INFO] __main__ - Bootstrap completed in 0.09s
+2025-12-04 01:32:36 [INFO] __main__ - MainWindow initialized in 1.16s
+2025-12-04 01:32:36 [INFO] __main__ - Total startup time: 1.28s
+2025-12-04 01:47:58 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 01:47:58 [INFO] __main__ - Bootstrap completed in 0.09s
+2025-12-04 01:48:00 [INFO] __main__ - MainWindow initialized in 1.18s
+2025-12-04 01:48:00 [INFO] __main__ - Total startup time: 1.30s
+2025-12-04 01:50:42 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 01:50:42 [INFO] __main__ - Bootstrap completed in 0.13s
+2025-12-04 01:50:44 [INFO] __main__ - MainWindow initialized in 1.37s
+2025-12-04 01:50:44 [INFO] __main__ - Total startup time: 1.56s
+2025-12-04 01:51:23 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 01:51:23 [INFO] __main__ - Bootstrap completed in 0.09s
+2025-12-04 01:51:24 [INFO] __main__ - MainWindow initialized in 1.18s
+2025-12-04 01:51:24 [INFO] __main__ - Total startup time: 1.31s
+2025-12-04 01:53:50 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 01:53:50 [INFO] __main__ - Bootstrap completed in 0.10s
+2025-12-04 01:53:51 [INFO] __main__ - MainWindow initialized in 1.37s
+2025-12-04 01:53:51 [INFO] __main__ - Total startup time: 1.51s
+2025-12-04 01:57:57 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 01:57:57 [INFO] __main__ - Bootstrap completed in 0.12s
+2025-12-04 01:57:58 [INFO] __main__ - MainWindow initialized in 1.40s
+2025-12-04 01:57:58 [INFO] __main__ - Total startup time: 1.56s
+2025-12-04 02:12:37 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 02:12:37 [INFO] __main__ - Bootstrap completed in 0.16s
+2025-12-04 02:12:38 [INFO] __main__ - MainWindow initialized in 1.56s
+2025-12-04 02:12:38 [INFO] __main__ - Total startup time: 1.75s
+2025-12-04 02:17:29 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 02:17:29 [INFO] __main__ - Bootstrap completed in 0.12s
+2025-12-04 02:17:30 [INFO] __main__ - MainWindow initialized in 1.50s
+2025-12-04 02:17:30 [INFO] __main__ - Total startup time: 1.66s
+2025-12-04 02:20:05 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 02:20:05 [INFO] __main__ - Bootstrap completed in 0.09s
+2025-12-04 02:20:06 [INFO] __main__ - MainWindow initialized in 1.27s
+2025-12-04 02:20:06 [INFO] __main__ - Total startup time: 1.40s
+2025-12-04 02:26:58 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 02:26:58 [INFO] __main__ - Bootstrap completed in 0.13s
+2025-12-04 02:27:00 [INFO] __main__ - MainWindow initialized in 1.53s
+2025-12-04 02:27:00 [INFO] __main__ - Total startup time: 1.71s
+2025-12-04 02:31:22 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 02:31:22 [INFO] __main__ - Bootstrap completed in 0.16s
+2025-12-04 02:31:23 [INFO] __main__ - MainWindow initialized in 1.57s
+2025-12-04 02:31:23 [INFO] __main__ - Total startup time: 1.78s
+2025-12-04 02:36:46 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 02:36:46 [INFO] __main__ - Bootstrap completed in 0.10s
+2025-12-04 02:36:48 [INFO] __main__ - MainWindow initialized in 1.22s
+2025-12-04 02:36:48 [INFO] __main__ - Total startup time: 1.35s
+2025-12-04 02:37:40 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 02:37:40 [INFO] src.services.backup_manager - Backup created at C:\Users\Tika\Desktop\学校\PersonalProject\Certificate Management\backups\awards-backup-20251204-0237.zip
+2025-12-04 02:37:40 [INFO] __main__ - Bootstrap completed in 0.13s
+2025-12-04 02:37:42 [INFO] __main__ - MainWindow initialized in 1.62s
+2025-12-04 02:37:42 [INFO] __main__ - Total startup time: 1.79s
+2025-12-04 02:37:56 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 02:37:56 [INFO] __main__ - Bootstrap completed in 0.05s
+2025-12-04 02:37:57 [INFO] __main__ - MainWindow initialized in 1.01s
+2025-12-04 02:37:57 [INFO] __main__ - Total startup time: 1.09s
+2025-12-04 02:42:43 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 02:42:43 [INFO] __main__ - Bootstrap completed in 0.17s
+2025-12-04 02:42:45 [INFO] __main__ - MainWindow initialized in 2.01s
+2025-12-04 02:42:45 [INFO] __main__ - Total startup time: 2.21s
+2025-12-04 02:44:46 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 02:44:46 [INFO] __main__ - Bootstrap completed in 0.14s
+2025-12-04 02:44:48 [INFO] __main__ - MainWindow initialized in 1.52s
+2025-12-04 02:44:48 [INFO] __main__ - Total startup time: 1.71s
+2025-12-04 02:47:39 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 02:47:39 [INFO] __main__ - Bootstrap completed in 0.11s
+2025-12-04 02:47:40 [INFO] __main__ - MainWindow initialized in 1.29s
+2025-12-04 02:47:40 [INFO] __main__ - Total startup time: 1.44s
+2025-12-04 02:48:20 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 02:48:20 [INFO] __main__ - Bootstrap completed in 0.11s
+2025-12-04 02:48:21 [INFO] __main__ - MainWindow initialized in 1.75s
+2025-12-04 02:48:21 [INFO] __main__ - Total startup time: 1.91s
+2025-12-04 02:48:58 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 02:48:58 [INFO] __main__ - Bootstrap completed in 0.12s
+2025-12-04 02:48:59 [INFO] __main__ - MainWindow initialized in 1.34s
+2025-12-04 02:49:00 [INFO] __main__ - Total startup time: 1.49s
+2025-12-04 02:49:51 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 02:49:51 [INFO] __main__ - Bootstrap completed in 0.05s
+2025-12-04 02:49:52 [INFO] __main__ - MainWindow initialized in 1.08s
+2025-12-04 02:49:52 [INFO] __main__ - Total startup time: 1.16s
+2025-12-04 02:54:13 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 02:54:13 [INFO] __main__ - Bootstrap completed in 0.12s
+2025-12-04 02:54:14 [INFO] __main__ - MainWindow initialized in 1.47s
+2025-12-04 02:54:14 [INFO] __main__ - Total startup time: 1.63s
+2025-12-04 02:54:43 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 02:54:43 [INFO] __main__ - Bootstrap completed in 0.08s
+2025-12-04 02:54:44 [INFO] __main__ - MainWindow initialized in 1.20s
+2025-12-04 02:54:44 [INFO] __main__ - Total startup time: 1.32s
+2025-12-04 02:58:54 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 02:58:54 [INFO] __main__ - Bootstrap completed in 0.15s
+2025-12-04 02:58:56 [INFO] __main__ - MainWindow initialized in 1.52s
+2025-12-04 02:58:56 [INFO] __main__ - Total startup time: 1.72s
+2025-12-04 03:01:12 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 03:01:12 [INFO] __main__ - Bootstrap completed in 0.15s
+2025-12-04 03:01:14 [INFO] __main__ - MainWindow initialized in 1.59s
+2025-12-04 03:01:14 [INFO] __main__ - Total startup time: 1.83s
+2025-12-04 03:01:32 [INFO] src.services.backup_manager - Backup created at C:\Users\Tika\Desktop\学校\PersonalProject\Certificate Management\backups\awards-backup-20251204-0301.zip
+2025-12-04 03:02:25 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 03:02:25 [INFO] __main__ - Bootstrap completed in 0.10s
+2025-12-04 03:02:27 [INFO] __main__ - MainWindow initialized in 1.21s
+2025-12-04 03:02:27 [INFO] __main__ - Total startup time: 1.33s
+2025-12-04 03:02:59 [INFO] apscheduler.scheduler - Scheduler started
+2025-12-04 03:02:59 [INFO] __main__ - Bootstrap completed in 0.07s
+2025-12-04 03:03:01 [INFO] __main__ - MainWindow initialized in 1.24s
+2025-12-04 03:03:01 [INFO] __main__ - Total startup time: 1.34s

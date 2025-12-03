@@ -47,12 +47,11 @@ class Award(Base):
     certificate_code: Mapped[str | None] = mapped_column(String(128))
     remarks: Mapped[str | None] = mapped_column(Text)
     attachment_folder: Mapped[str | None] = mapped_column(String(255))
+    deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime)
 
     members: Mapped[list["TeamMember"]] = relationship(
         secondary=lambda: award_members_table, back_populates="awards", lazy="joined"
-    )
-    tags: Mapped[list["Tag"]] = relationship(
-        secondary=lambda: award_tags_table, back_populates="awards", lazy="joined"
     )
     attachments: Mapped[list["Attachment"]] = relationship(
         back_populates="award", cascade="all, delete-orphan"
@@ -64,11 +63,9 @@ class TeamMember(Base):
 
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     gender: Mapped[str | None] = mapped_column(String(10))  # 男/女
-    age: Mapped[int | None] = mapped_column(Integer)
     id_card: Mapped[str | None] = mapped_column(String(18), unique=True)  # 身份证号
     phone: Mapped[str | None] = mapped_column(String(20))  # 手机号
     student_id: Mapped[str | None] = mapped_column(String(20), unique=True)  # 学号
-    contact_phone: Mapped[str | None] = mapped_column(String(20))  # 联系电话
     email: Mapped[str | None] = mapped_column(String(128))  # 邮箱
     major: Mapped[str | None] = mapped_column(String(128))  # 专业
     class_name: Mapped[str | None] = mapped_column(String(128))  # 班级
@@ -82,31 +79,11 @@ class TeamMember(Base):
     )
 
 
-class Tag(Base):
-    __tablename__ = "tags"
-
-    name: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
-    pinyin: Mapped[str | None] = mapped_column(String(255))
-    active: Mapped[bool] = mapped_column(Boolean, default=True)
-    sort_index: Mapped[int] = mapped_column(Integer, default=0)
-
-    awards: Mapped[list[Award]] = relationship(
-        secondary=lambda: award_tags_table, back_populates="tags"
-    )
-
-
 award_members_table = Table(
     "award_members",
     Base.metadata,
     Column("award_id", ForeignKey("awards.id", ondelete="CASCADE"), primary_key=True),
     Column("member_id", ForeignKey("team_members.id", ondelete="CASCADE"), primary_key=True),
-)
-
-award_tags_table = Table(
-    "award_tags",
-    Base.metadata,
-    Column("award_id", ForeignKey("awards.id", ondelete="CASCADE"), primary_key=True),
-    Column("tag_id", ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True),
 )
 
 
@@ -117,6 +94,8 @@ class Attachment(Base):
     stored_name: Mapped[str] = mapped_column(String(255), nullable=False)
     original_name: Mapped[str] = mapped_column(String(255), nullable=False)
     relative_path: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    file_md5: Mapped[str | None] = mapped_column(String(32))  # MD5哈希值
+    file_size: Mapped[int | None] = mapped_column(Integer)  # 文件大小（字节）
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime)
 

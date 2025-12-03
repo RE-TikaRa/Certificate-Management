@@ -12,12 +12,11 @@ from PySide6.QtWidgets import (
     QDialog,
     QGridLayout,
     QLineEdit,
-    QMessageBox,
 )
 from PySide6.QtCore import Qt
 
 from PySide6.QtGui import QColor, QPalette
-from qfluentwidgets import PushButton
+from qfluentwidgets import PushButton, MaskDialogBase, MessageBox, InfoBar
 
 from ..theme import create_card, create_page_header, make_section_title, apply_table_style
 from ..styled_theme import ThemeManager
@@ -30,7 +29,10 @@ class ManagementPage(BasePage):
     
     def __init__(self, ctx, theme_manager: ThemeManager):
         super().__init__(ctx, theme_manager)
-        self.last_members_data = None  # 保存上次数据用于变化检测
+        # ✅ 优化：使用 ID 集合替代完整数据比较
+        self._cached_member_ids = set()
+        self.setObjectName("pageRoot")
+        
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         
@@ -54,7 +56,17 @@ class ManagementPage(BasePage):
         
         # 成员表格卡片
         card, card_layout = create_card()
-        card_layout.addWidget(make_section_title("历史成员"))
+        
+        # 标题和刷新按钮
+        header_layout = QHBoxLayout()
+        header_layout.addWidget(make_section_title("成员列表"))
+        header_layout.addStretch()
+        from qfluentwidgets import TransparentToolButton, FluentIcon
+        refresh_btn = TransparentToolButton(FluentIcon.SYNC)
+        refresh_btn.setToolTip("刷新数据")
+        refresh_btn.clicked.connect(self.refresh)
+        header_layout.addWidget(refresh_btn)
+        card_layout.addLayout(header_layout)
         
         # 创建表格
         self.members_table = QTableWidget()
@@ -78,28 +90,31 @@ class ManagementPage(BasePage):
         self.refresh()
     
     def _auto_refresh(self):
-        """自动刷新 - 检测数据变化后刷新"""
-        members = self.ctx.awards.list_members()
-        
-        # 转换为可比较的格式（包含所有字段以检测所有变化）
-        current_data = [
-            (m.id, m.name, m.gender, m.id_card, m.phone, m.student_id, 
-             m.email, m.major, m.class_name, m.college) 
-            for m in members
-        ]
-        
-        # 如果数据有变化，刷新表格
-        if current_data != self.last_members_data:
-            self.last_members_data = current_data
-            self.refresh()
+        """✅ 优化：快速成员变化检测 - 仅比较 ID 集合"""
+        try:
+            from sqlalchemy import select
+            from ..data.models import TeamMember
+            
+            # 仅查询成员 ID（轻量化）
+            with self.ctx.db.session_scope() as session:
+                member_ids = set(
+                    session.scalars(select(TeamMember.id)).all()
+                )
+            
+            # 快速集合比较
+            if member_ids != self._cached_member_ids:
+                self._cached_member_ids = member_ids
+                self.refresh()  # 成员有变化才刷新
+        except Exception as e:
+            logger.debug(f"成员自动刷新失败: {e}")
     
     def refresh(self) -> None:
         """刷新成员表格"""
         self.members_table.setRowCount(0)
         members = self.ctx.awards.list_members()
         
-        # 保存当前数据用于变化检测
-        self.last_members_data = [(m.id, m.name, m.gender, m.phone, m.college, m.class_name) for m in members]
+        # ✅ 优化：更新缓存
+        self._cached_member_ids = {m.id for m in members}
         
         for row, member in enumerate(members):
             self.members_table.insertRow(row)
@@ -133,7 +148,7 @@ class ManagementPage(BasePage):
                 self.refresh()
 
 
-class MemberDetailDialog(QDialog):
+class MemberDetailDialog(MaskDialogBase):
     """成员详情对话框 - 多分栏网格布局"""
     
     def __init__(self, member, parent=None):
@@ -142,12 +157,18 @@ class MemberDetailDialog(QDialog):
         self.original_data = self._get_member_data()
         self.is_editing = False
         self.field_widgets = {}  # 存储字段 widget
+        # ✅ 优化:提前缓存所有输入框,而不是动态创建
+        self.input_field_cache = {}  # 缓存所有 QLineEdit 实例
         self.member_deleted = False  # 标记成员是否被删除
         
         self.setWindowTitle(f"成员详情 - {member.name}")
         self.setModal(True)
         self.setMinimumWidth(900)
         self.setMinimumHeight(600)
+        
+        # ✅ 设置中心 widget 的圆角
+        self.widget.setObjectName("centerWidget")
+        
         self._init_ui()
         self._apply_theme()
     
@@ -166,7 +187,7 @@ class MemberDetailDialog(QDialog):
         }
     
     def _init_ui(self):
-        layout = QVBoxLayout(self)
+        layout = QVBoxLayout(self.widget)  # ✅ 添加到 self.widget 而不是 self
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(16)
         
@@ -267,13 +288,22 @@ class MemberDetailDialog(QDialog):
             # 存储 widget
             self.field_widgets[field_key] = value_label
             
+            # ✅ 优化：提前创建并缓存所有输入框（初始化时隐藏）
+            input_field = QLineEdit()
+            input_field.setText(value)
+            input_field.setObjectName("memberDetailInput")
+            input_field.hide()  # 初始隐藏
+            self.input_field_cache[field_key] = input_field
+            grid.addWidget(input_field, row * 2 + 1, col)
+            
+            # 值标签添加到网格
             grid.addWidget(value_label, row * 2 + 1, col)
         
         layout.addLayout(grid)
         return section
     
     def _toggle_edit_mode(self):
-        """切换编辑模式"""
+        """切换编辑模式 - ✅ 优化：仅改 show/hide 状态，不创建/销毁 widget"""
         self.is_editing = not self.is_editing
         
         if self.is_editing:
@@ -285,69 +315,44 @@ class MemberDetailDialog(QDialog):
             self._disable_edit()
     
     def _enable_edit(self):
-        """启用编辑模式 - 将标签转换为输入框"""
-        for field_key, widget in list(self.field_widgets.items()):
-            if isinstance(widget, QLabel):
-                current_value = widget.text()
-                
-                # 创建输入框
-                input_field = QLineEdit()
-                input_field.setText(current_value)
-                input_field.setObjectName("memberDetailInput")
-                
-                # 获取布局并替换
-                parent = widget.parent()
-                if parent:
-                    layout = parent.layout()
-                    if layout and isinstance(layout, QGridLayout):
-                        # 在网格布局中查找并替换
-                        for i in range(layout.count()):
-                            if layout.itemAt(i).widget() == widget:
-                                item = layout.takeAt(i)
-                                layout.addWidget(input_field, *layout.getItemPosition(i))
-                                break
-                
-                self.field_widgets[field_key] = input_field
+        """启用编辑模式 - ✅ 优化：只改状态，不创建新 widget"""
+        for field_key in list(self.field_widgets.keys()):
+            value_label = self.field_widgets[field_key]
+            input_field = self.input_field_cache[field_key]
+            
+            # 同步当前值到输入框
+            input_field.setText(value_label.text())
+            
+            # 隐藏标签，显示输入框
+            value_label.hide()
+            input_field.show()
     
     def _disable_edit(self):
-        """禁用编辑模式 - 将输入框转换回标签"""
-        for field_key, widget in list(self.field_widgets.items()):
-            if isinstance(widget, QLineEdit):
-                current_value = widget.text()
-                
-                # 创建标签
-                label = QLabel(current_value)
-                label.setObjectName("memberDetailValue")
-                label.setWordWrap(True)
-                
-                # 获取布局并替换
-                parent = widget.parent()
-                if parent:
-                    layout = parent.layout()
-                    if layout and isinstance(layout, QGridLayout):
-                        # 在网格布局中查找并替换
-                        for i in range(layout.count()):
-                            if layout.itemAt(i).widget() == widget:
-                                item = layout.takeAt(i)
-                                layout.addWidget(label, *layout.getItemPosition(i))
-                                break
-                
-                self.field_widgets[field_key] = label
+        """禁用编辑模式 - ✅ 优化：只改状态，不销毁 widget"""
+        for field_key in list(self.field_widgets.keys()):
+            value_label = self.field_widgets[field_key]
+            input_field = self.input_field_cache[field_key]
+            
+            # 显示标签，隐藏输入框
+            value_label.show()
+            input_field.hide()
     
     def _save_changes(self):
-        """保存数据到数据库"""
+        """保存数据到数据库 - ✅ 优化：从缓存输入框读取值"""
         from src.services.member_service import MemberService
         
         try:
             service = MemberService()
             
-            # 更新成员数据
+            # 更新成员数据 - 从输入框缓存中读取
             def get_field_value(key: str) -> str:
-                widget = self.field_widgets.get(key)
-                if isinstance(widget, QLineEdit):
-                    return widget.text()
-                elif isinstance(widget, QLabel):
-                    return widget.text()
+                input_field = self.input_field_cache.get(key)
+                if input_field:
+                    return input_field.text()
+                # 备选：从标签读取（防御）
+                label = self.field_widgets.get(key)
+                if label and isinstance(label, QLabel):
+                    return label.text()
                 return ""
             
             self.member.name = get_field_value("name")
@@ -367,18 +372,17 @@ class MemberDetailDialog(QDialog):
             self.original_data = self._get_member_data()
             
         except Exception as e:
-            QMessageBox.critical(self, "错误", f"保存失败: {str(e)}")
+            InfoBar.error("错误", f"保存失败: {str(e)}", parent=self.window())
     
     def _confirm_delete(self):
         """确认删除"""
-        reply = QMessageBox.question(
-            self,
+        box = MessageBox(
             "确认删除",
             f"确定要删除成员 {self.member.name} 吗？",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            self.window()
         )
         
-        if reply == QMessageBox.StandardButton.Yes:
+        if box.exec():
             self._delete_member()
     
     def _delete_member(self):
@@ -389,13 +393,13 @@ class MemberDetailDialog(QDialog):
             service = MemberService()
             service.delete_member(self.member.id)
             self.member_deleted = True  # 标记删除
-            QMessageBox.information(self, "成功", "成员已删除")
+            InfoBar.success("成功", "成员已删除", parent=self.window())
             self.accept()
         except Exception as e:
-            QMessageBox.critical(self, "错误", f"删除失败: {str(e)}")
+            InfoBar.error("错误", f"删除失败: {str(e)}", parent=self.window())
     
     def _apply_theme(self):
-        """应用主题样式"""
+        """应用主题样式 - 包括对话框背景色和标题栏"""
         from ..styled_theme import ThemeManager
         
         theme_mgr = ThemeManager.instance()
@@ -403,6 +407,7 @@ class MemberDetailDialog(QDialog):
         
         # 根据主题选择颜色
         if is_dark:
+            dialog_bg = "#1c1f2e"  # 对话框背景跟随主窗口深色
             scroll_bg = "#2a2a3a"
             card_bg = "#353751"
             card_border = "rgba(138, 159, 255, 0.1)"
@@ -415,6 +420,7 @@ class MemberDetailDialog(QDialog):
             input_text = "#e0e0e0"
             btn_delete_style = "background-color: #c92a2a; color: white;"
         else:
+            dialog_bg = "#f4f6fb"  # 对话框背景跟随主窗口浅色
             scroll_bg = "#f5f5f5"
             card_bg = "#ffffff"
             card_border = "#e0e0e0"
@@ -426,6 +432,22 @@ class MemberDetailDialog(QDialog):
             input_border = "#d0d0d0"
             input_text = "#333333"
             btn_delete_style = "background-color: #ff6b6b; color: white;"
+        
+        # 首先设置中心 widget 的圆角和对话框背景色
+        self.setStyleSheet(f"""
+            #centerWidget {{
+                background-color: {dialog_bg};
+                border-radius: 12px;
+                border: 1px solid {card_border};
+            }}
+            QDialog {{
+                background-color: {dialog_bg};
+                color: {title_color};
+            }}
+            QLabel {{
+                color: {title_color};
+            }}
+        """)
         
         # 应用滚动区域样式 - 设置滚动区域和其内部 widget 的背景色
         scroll_stylesheet = f"""
@@ -529,4 +551,25 @@ class MemberDetailDialog(QDialog):
         )
         
         self.setStyleSheet(full_stylesheet)
+        
+        # ✅ 设置 Palette 使标题栏也跟随主题
+        palette = QPalette()
+        if is_dark:
+            palette.setColor(QPalette.ColorRole.Window, QColor("#1c1f2e"))
+            palette.setColor(QPalette.ColorRole.WindowText, QColor("#e0e0e0"))
+            palette.setColor(QPalette.ColorRole.Base, QColor("#2a2d3f"))
+            palette.setColor(QPalette.ColorRole.Text, QColor("#e0e0e0"))
+            palette.setColor(QPalette.ColorRole.Button, QColor("#2a2d3f"))
+            palette.setColor(QPalette.ColorRole.ButtonText, QColor("#e0e0e0"))
+        else:
+            palette.setColor(QPalette.ColorRole.Window, QColor("#f4f6fb"))
+            palette.setColor(QPalette.ColorRole.WindowText, QColor("#1a1a1a"))
+            palette.setColor(QPalette.ColorRole.Base, QColor("#ffffff"))
+            palette.setColor(QPalette.ColorRole.Text, QColor("#1a1a1a"))
+            palette.setColor(QPalette.ColorRole.Button, QColor("#ffffff"))
+            palette.setColor(QPalette.ColorRole.ButtonText, QColor("#1a1a1a"))
+        self.setPalette(palette)
+        
+        # ✅ 关键：在Windows上强制设置标题栏颜色
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
 

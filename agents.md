@@ -294,11 +294,88 @@ while parent:
 - `get_window_stylesheet()` - Complete window styling
 - `apply_theme_color(widget)` - Apply colors to widgets
 - `is_dark` - Current theme state
+- `themeChanged` - Qt signal emitted when theme changes
 
 **Color Palette:**
 - Deep theme card background: `#353751`
 - Light theme card background: `#f5f5f5`
+- Deep theme scroll area: `#1c1f2e`
+- Light theme scroll area: `#f4f6fb`
 - QSS files: `styled_light.qss` and `styled_dark.qss`
+
+### Theme Change Handling
+
+**Pattern for Pages with Dynamic Components:**
+```python
+from PySide6.QtCore import Slot
+
+class SomePage(BasePage):
+    def __init__(self, ctx, theme_manager):
+        super().__init__(ctx, theme_manager)
+        
+        # ✅ Connect signal EARLY in __init__
+        self.theme_manager.themeChanged.connect(self._on_theme_changed)
+        
+        self._build_ui()
+    
+    @Slot()  # ✅ Use @Slot() decorator
+    def _on_theme_changed(self) -> None:
+        """Theme change handler"""
+        # 1. Update page background/scroll areas
+        self._apply_theme()
+        
+        # 2. Update dynamic components (e.g., member cards)
+        for item in self.dynamic_items:
+            self._update_item_style(item)
+```
+
+**Key Points:**
+1. Connect `themeChanged` signal at **START** of `__init__` (before UI creation)
+2. Use `@Slot()` decorator on handler methods
+3. Handler should call `_apply_theme()` for page-level styles
+4. Handler should update all dynamically created components
+
+**Dynamic Component Styling:**
+```python
+def _apply_member_card_style(self, card: QWidget) -> None:
+    """Apply theme-aware styling to dynamic components"""
+    is_dark = self.theme_manager.is_dark
+    
+    # Update container
+    if is_dark:
+        card_style = "background-color: #353751; border-radius: 8px; border: 1px solid #4a4a5e;"
+        input_style = """
+            QLineEdit {
+                background-color: #2a2a3a;
+                color: #e0e0e0;
+                border: 1px solid #4a4a5e;
+            }
+        """
+    else:
+        card_style = "background-color: #f5f5f5; border-radius: 8px; border: 1px solid #e0e0e0;"
+        input_style = """
+            QLineEdit {
+                background-color: white;
+                color: #333;
+                border: 1px solid #ddd;
+            }
+        """
+    
+    card.setStyleSheet(card_style)
+    
+    # ✅ Update ALL child components
+    for line_edit in card.findChildren(QLineEdit):
+        line_edit.setStyleSheet(input_style)
+```
+
+**Pages with Theme Change Handlers:**
+- `entry_page.py` - Updates scroll area + member cards
+- `overview_page.py` - Main page updates scroll area; Dialog updates scroll area + member cards
+- `dashboard_page.py` - Recolors charts without rebuilding
+
+**Pages WITHOUT Theme Change Handlers:**
+- `settings_page.py`, `recycle_page.py`, `management_page.py`, `home_page.py`
+- Reason: All styles handled by QSS files, no dynamic components
 
 ---
 
@@ -441,6 +518,15 @@ if dialog.exec() == QDialog.Accepted:
 ### Issue: Pages loading causes startup freeze
 **Solution:** Async loading with `QTimer.singleShot(100, _load_remaining_pages)` in main window
 
+### Issue: Theme switching not working in entry/overview pages
+**Root Cause:** Dynamic member cards created at runtime, not covered by QSS
+**Solution:** 
+1. Connect `themeChanged` signal in `__init__` (before UI creation)
+2. Implement `_on_theme_changed()` with `@Slot()` decorator
+3. Call `_apply_theme()` to update scroll area background
+4. Use `findChildren()` to update all input widgets in member cards
+5. Apply both container and child component styles
+
 ### Issue: Unused imports cluttering code
 **Solution:** Regularly review imports and remove unused ones (recent cleanup removed 8 unused imports)
 
@@ -473,14 +559,19 @@ python -m src.main --debug
 4. **Member Refresh:** Enhanced detection to all 10 fields
 5. **Dashboard Simplification:** Removed edit/delete operations from recent awards
 6. **Code Quality:** Multi-phase optimization and refactoring
+7. **Theme Switching Fix (Dec 4):** Complete theme switching support for dynamic components
+   - Fixed entry_page and overview_page theme switching
+   - Added `_on_theme_changed()` handlers with `@Slot()` decorator
+   - Implemented `findChildren()` to update all input widgets
+   - Both scroll area and member cards now respond to theme changes instantly
 
 ---
 
 ## Performance Characteristics
 
-**Startup Time:** ~1.8 seconds total
-- Bootstrap: ~0.16s
-- MainWindow init: ~1.6s
+**Startup Time:** ~1.3-1.8 seconds total
+- Bootstrap: ~0.07-0.15s
+- MainWindow init: ~1.2-1.6s
 - Home page: Immediate
 - Other pages: Async (~100ms delay)
 
@@ -488,6 +579,10 @@ python -m src.main --debug
 - Local storage: `data/awards.db`
 - Transaction support: Yes
 - Backup: Auto-backup configurable
+
+**Theme Switching:** Instant, no restart required
+- All pages respond to theme changes in real-time
+- Dynamic components (member cards) update via signal handlers
 
 ---
 
@@ -543,6 +638,9 @@ loguru (Logging)
 6. **Update management_page after member changes** - Use parent traversal pattern
 7. **Test syntax after changes** - Run py_compile validation
 8. **Keep member field count at 9** - Consistent across all pages
+9. **Connect theme signals early in __init__** - Before UI creation
+10. **Use @Slot() decorator for Qt signal handlers** - Proper signal-slot connection
+11. **Update dynamic components in theme handlers** - Use findChildren() for child widgets
 
 ---
 
@@ -587,5 +685,5 @@ from src.data.database import session_scope
 
 ---
 
-**Last Updated:** 2025-12-03
-**Version:** 1.0.0
+**Last Updated:** 2025-12-04
+**Version:** 1.0.1

@@ -29,6 +29,11 @@ class DashboardPage(BasePage):
         super().__init__(ctx, theme_manager)
         self.metric_labels: dict[str, QLabel] = {}
         self._latest_awards = []
+        self.setObjectName("pageRoot")
+        
+        # ✅ 优化：缓存机制
+        self._cached_level_data = None
+        self._cached_rank_data = None
 
         # 连接主题变化信号
         self.theme_manager.themeChanged.connect(self._on_theme_changed)
@@ -49,6 +54,15 @@ class DashboardPage(BasePage):
         layout.setSpacing(28)
 
         layout.addWidget(create_page_header("仪表盘与统计", "关键指标、趋势与分布一站式总览"))
+
+        # ✅ 添加刷新按钮
+        header_layout = QHBoxLayout()
+        header_layout.addStretch()
+        refresh_btn = PrimaryPushButton("刷新所有数据")
+        refresh_btn.setFixedWidth(120)
+        refresh_btn.clicked.connect(self._refresh_all)
+        header_layout.addWidget(refresh_btn)
+        layout.addLayout(header_layout)
 
         layout.addWidget(self._build_metric_section())
         layout.addWidget(self._build_distribution_section())
@@ -193,50 +207,127 @@ class DashboardPage(BasePage):
 
         self.recent_table.setRowCount(len(self._latest_awards))
         for row, award in enumerate(self._latest_awards):
-            self.recent_table.setItem(row, 0, QTableWidgetItem(award.competition_name))
-            self.recent_table.setItem(row, 1, QTableWidgetItem(award.level))
-            self.recent_table.setItem(row, 2, QTableWidgetItem(award.rank))
-            self.recent_table.setItem(row, 3, QTableWidgetItem(str(award.award_date)))
+            item0 = QTableWidgetItem(award.competition_name)
+            item0.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.recent_table.setItem(row, 0, item0)
+            
+            item1 = QTableWidgetItem(award.level)
+            item1.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.recent_table.setItem(row, 1, item1)
+            
+            item2 = QTableWidgetItem(award.rank)
+            item2.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.recent_table.setItem(row, 2, item2)
+            
+            item3 = QTableWidgetItem(str(award.award_date))
+            item3.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.recent_table.setItem(row, 3, item3)
+            
             members = ", ".join(member.name for member in award.members)
-            self.recent_table.setItem(row, 4, QTableWidgetItem(members))
+            item4 = QTableWidgetItem(members)
+            item4.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.recent_table.setItem(row, 4, item4)
 
         level_stats = self.ctx.statistics.get_group_by_level()
         top_level = max(level_stats.items(), key=lambda x: x[1]) if level_stats else ("--", 0)
         self.level_table.setRowCount(len(level_stats))
         for row, (level, count) in enumerate(level_stats.items()):
-            self.level_table.setItem(row, 0, QTableWidgetItem(level))
-            self.level_table.setItem(row, 1, QTableWidgetItem(str(count)))
+            item0 = QTableWidgetItem(level)
+            item0.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.level_table.setItem(row, 0, item0)
+            
+            item1 = QTableWidgetItem(str(count))
+            item1.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.level_table.setItem(row, 1, item1)
 
         rank_stats = self.ctx.statistics.get_group_by_rank()
         top_rank = max(rank_stats.items(), key=lambda x: x[1]) if rank_stats else ("--", 0)
         self.rank_table.setRowCount(len(rank_stats))
         for row, (rank, count) in enumerate(rank_stats.items()):
-            self.rank_table.setItem(row, 0, QTableWidgetItem(rank))
-            self.rank_table.setItem(row, 1, QTableWidgetItem(str(count)))
+            item0 = QTableWidgetItem(rank)
+            item0.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.rank_table.setItem(row, 0, item0)
+            
+            item1 = QTableWidgetItem(str(count))
+            item1.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.rank_table.setItem(row, 1, item1)
 
         self.level_chip.setText(f"最常见级别：{top_level[0]}（{top_level[1]} 项）")
         self.rank_chip.setText(f"最常见等级：{top_rank[0]}（{top_rank[1]} 项）")
 
         self._update_charts(level_stats, rank_stats)
 
+    def _refresh_all(self) -> None:
+        """刷新所有页面的数据 - 包括当前页面和其他已加载页面
+        
+        这个方法会：
+        1. 刷新仪表板本身的数据
+        2. 尝试刷新其他已加载的页面（总览、成员管理等）
+        """
+        # 刷新当前页面
+        self.refresh()
+        
+        # 查找主窗口并刷新其他页面
+        parent = self.parent()
+        while parent:
+            if hasattr(parent, 'overview_page') and parent.overview_page:
+                parent.overview_page.refresh()
+            if hasattr(parent, 'entry_page') and parent.entry_page:
+                parent.entry_page.refresh() if hasattr(parent.entry_page, 'refresh') else None
+            if hasattr(parent, 'management_page') and parent.management_page:
+                parent.management_page.refresh()
+            break
+        
+        # 显示刷新成功提示
+        InfoBar.success(
+            title="刷新成功",
+            content="所有数据已更新",
+            orient=Qt.Orientation.Horizontal,
+            isClosable=True,
+            duration=2000,
+            parent=self.window()
+        )
+
     @Slot()
     def _on_theme_changed(self) -> None:
-        """主题变化时重新更新图表"""
-        level_stats = self.ctx.statistics.get_group_by_level()
-        rank_stats = self.ctx.statistics.get_group_by_rank()
-        self._update_charts(level_stats, rank_stats)
+        """主题变化时只重新着色，不重建图表 - ✅ 优化
+        
+        优化前：重新查询数据 → 销毁旧图表 → 创建新图表（成本高）
+        优化后：使用缓存数据 → 只改颜色（成本低）
+        """
+        if self._cached_level_data and self._cached_rank_data:
+            # 使用缓存的数据，只改颜色
+            self._recolor_charts()
+        else:
+            # 首次调用，缓存还没有，执行完整更新
+            level_stats = self.ctx.statistics.get_group_by_level()
+            rank_stats = self.ctx.statistics.get_group_by_rank()
+            self._update_charts(level_stats, rank_stats)
 
     def _update_charts(self, level_data: dict[str, int], rank_data: dict[str, int]) -> None:
+        """✅ 优化：只在数据真的改变时重建图表"""
+        
+        # 检查数据是否改变
+        if level_data == self._cached_level_data and rank_data == self._cached_rank_data:
+            # 数据未变，只改颜色（主题切换场景）
+            self._recolor_charts()
+            return
+        
+        # 数据改变了，缓存新数据并重建
+        self._cached_level_data = level_data
+        self._cached_rank_data = rank_data
+        
+        # 获取主题颜色
         is_dark = self.theme_manager.is_dark
         text_color = QColor(255, 255, 255) if is_dark else QColor(30, 39, 70)
         grid_color = QColor(255, 255, 255, 80) if is_dark else QColor(90, 108, 243, 120)
         chart_bg_color = QColor(46, 49, 72) if is_dark else QColor(255, 255, 255)
 
+        # 构建等级饼图
         level_series = QPieSeries()
         for label, count in level_data.items():
             level_series.append(label, count)
         
-        # Set pie slice labels color
         for slice in level_series.slices():
             slice.setLabelColor(text_color)
 
@@ -249,6 +340,7 @@ class DashboardPage(BasePage):
         level_chart.setBackgroundBrush(QBrush(chart_bg_color))
         self.level_chart.setChart(level_chart)
 
+        # 构建等级柱图
         bar_series = QBarSeries()
         bar_set = QBarSet("数量")
         categories = []
@@ -282,6 +374,46 @@ class DashboardPage(BasePage):
         bar_chart.setBackgroundBrush(QBrush(chart_bg_color))
         self.rank_chart.setChart(bar_chart)
 
+    def _recolor_charts(self) -> None:
+        """✅ 优化：只改变图表颜色，不重建结构"""
+        is_dark = self.theme_manager.is_dark
+        text_color = QColor(255, 255, 255) if is_dark else QColor(30, 39, 70)
+        grid_color = QColor(255, 255, 255, 80) if is_dark else QColor(90, 108, 243, 120)
+        chart_bg_color = QColor(46, 49, 72) if is_dark else QColor(255, 255, 255)
+        
+        # 修改等级图表颜色
+        level_chart = self.level_chart.chart()
+        if level_chart:
+            level_chart.setTitleBrush(QBrush(text_color))
+            level_chart.setBackgroundBrush(QBrush(chart_bg_color))
+            level_chart.legend().setLabelColor(text_color)
+            
+            # 修改饼图切片标签颜色
+            for series in level_chart.series():
+                if isinstance(series, QPieSeries):
+                    for slice in series.slices():
+                        slice.setLabelColor(text_color)
+        
+        # 修改等级图表颜色
+        rank_chart = self.rank_chart.chart()
+        if rank_chart:
+            rank_chart.setTitleBrush(QBrush(text_color))
+            rank_chart.setBackgroundBrush(QBrush(chart_bg_color))
+            rank_chart.legend().setLabelColor(text_color)
+            
+            # 修改轴颜色
+            for axis in rank_chart.axes(Qt.Horizontal):
+                if hasattr(axis, 'setLabelsColor'):
+                    axis.setLabelsColor(text_color)
+                if hasattr(axis, 'setGridLineColor'):
+                    axis.setGridLineColor(grid_color)
+            
+            for axis in rank_chart.axes(Qt.Vertical):
+                if hasattr(axis, 'setLabelsColor'):
+                    axis.setLabelsColor(text_color)
+                if hasattr(axis, 'setGridLineColor'):
+                    axis.setGridLineColor(grid_color)
+
     @Slot()
     def _open_attachment_folder(self, row: int, _column: int) -> None:
         if row >= len(self._latest_awards):
@@ -298,7 +430,7 @@ class DashboardPage(BasePage):
 
     def _do_backup(self) -> None:
         path = self.ctx.backup.perform_backup()
-        InfoBar.success("备份完成", str(path), duration=3000, parent=self)
+        InfoBar.success("备份完成", str(path), duration=3000, parent=self.window())
 
     def showEvent(self, event) -> None:
         """页面显示时启动定时器"""

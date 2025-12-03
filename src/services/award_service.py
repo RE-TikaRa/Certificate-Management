@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Iterable, Sequence
 
@@ -8,7 +8,7 @@ from sqlalchemy import select, and_, or_
 from sqlalchemy.orm import selectinload
 
 from ..data.database import Database
-from ..data.models import Award, Tag, TeamMember
+from ..data.models import Award, TeamMember
 from .attachment_manager import AttachmentManager
 
 
@@ -24,10 +24,9 @@ class AwardService:
         award_date: date,
         level: str,
         rank: str,
-        certificate_code: str | None,
-        remarks: str | None,
+        certificate_code: str,
+        remarks: str,
         member_names: Sequence[str] | Sequence[dict],
-        tag_names: Sequence[str],
         attachment_files: Sequence[Path],
     ) -> Award:
         with self.db.session_scope() as session:
@@ -41,7 +40,6 @@ class AwardService:
             )
             # 处理成员信息（可能是字符串或字典）
             award.members = [self._get_or_create_member_with_info(session, item) for item in member_names]
-            award.tags = [self._get_or_create_tag(session, name) for name in tag_names]
             session.add(award)
             session.flush()
 
@@ -130,35 +128,28 @@ class AwardService:
         session.flush()
         return member
 
-    def _get_or_create_tag(self, session, name: str) -> Tag:
-        tag = session.scalar(select(Tag).where(Tag.name == name))
-        if tag:
-            return tag
-        tag = Tag(name=name, pinyin=name)
-        session.add(tag)
-        session.flush()
-        return tag
-
     def list_awards(self) -> list[Award]:
-        """获取所有荣誉记录（按日期降序排列）"""
+        """获取所有未删除的荣誉记录（按日期降序排列）"""
         with self.db.session_scope() as session:
-            # Eager load members and tags to avoid lazy loading
+            # Eager load members to avoid lazy loading
             awards = session.scalars(
                 select(Award)
+                .where(Award.deleted == False)
                 .options(
-                    selectinload(Award.members),
-                    selectinload(Award.tags)
+                    selectinload(Award.members)
                 )
                 .order_by(Award.award_date.desc())
             ).all()
             return awards
 
     def delete_award(self, award_id: int) -> None:
-        """删除指定 ID 的荣誉"""
+        """软删除指定 ID 的荣誉（移到回收站）"""
         with self.db.session_scope() as session:
             award = session.get(Award, award_id)
             if award:
-                session.delete(award)
+                award.deleted = True
+                award.deleted_at = datetime.utcnow()
+                session.add(award)
 
     def update_award(
         self,
@@ -171,7 +162,7 @@ class AwardService:
         certificate_code: str | None = None,
         remarks: str | None = None,
         member_names: Sequence[str] | Sequence[dict] | None = None,
-        tag_names: Sequence[str] | None = None,
+        attachment_files: Sequence[Path] | None = None,
     ) -> Award:
         """
         Update an existing award with transaction support.
@@ -186,7 +177,7 @@ class AwardService:
             certificate_code: New certificate code
             remarks: New remarks
             member_names: New member list (replaces existing)
-            tag_names: New tag list (replaces existing)
+            attachment_files: New attachment files (replaces existing)
             
         Returns:
             Updated Award object
@@ -221,16 +212,18 @@ class AwardService:
                     for item in member_names
                 ]
             
-            # Update tag associations
-            if tag_names is not None:
-                award.tags.clear()
-                award.tags = [
-                    self._get_or_create_tag(session, name)
-                    for name in tag_names
-                ]
-            
             session.add(award)
             session.flush()  # Validate before commit
+            
+            # Update attachments if provided
+            if attachment_files is not None:
+                self.attachments.save_attachments(
+                    award.id,
+                    award.competition_name,
+                    attachment_files,
+                    session=session,
+                )
+            
             return award
 
 
@@ -345,3 +338,32 @@ class AwardService:
                 {Award.rank: new_rank}
             )
             return count
+
+    def list_deleted_awards(self) -> list[Award]:
+        """获取所有已删除的荣誉记录（回收站）"""
+        with self.db.session_scope() as session:
+            awards = session.scalars(
+                select(Award)
+                .where(Award.deleted == True)
+                .options(
+                    selectinload(Award.members)
+                )
+                .order_by(Award.deleted_at.desc())
+            ).all()
+            return list(awards)
+
+    def restore_award(self, award_id: int) -> None:
+        """从回收站恢复荣誉记录"""
+        with self.db.session_scope() as session:
+            award = session.get(Award, award_id)
+            if award and award.deleted:
+                award.deleted = False
+                award.deleted_at = None
+                session.add(award)
+
+    def permanently_delete_award(self, award_id: int) -> None:
+        """彻底删除荣誉记录（不可恢复）"""
+        with self.db.session_scope() as session:
+            award = session.get(Award, award_id)
+            if award:
+                session.delete(award)
