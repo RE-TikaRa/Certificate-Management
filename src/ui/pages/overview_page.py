@@ -562,12 +562,12 @@ class OverviewPage(BasePage):
     def _create_award_card(self, award) -> QWidget:
         """创建单个荣誉卡片"""
         card = QFrame()
-        card.setObjectName("awardItemCard")
+        card.setProperty("card", True)
         card.setMinimumHeight(100)
 
         card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(12, 10, 12, 10)
-        card_layout.setSpacing(6)
+        card_layout.setContentsMargins(16, 14, 16, 14)
+        card_layout.setSpacing(8)
 
         # 顶部：标题 + 级别标签
         top_layout = QHBoxLayout()

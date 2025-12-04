@@ -1089,7 +1089,7 @@ class HistoryMemberDialog(MaskDialogBase):
 
     def _init_ui(self):
         """初始化UI（美化版）"""
-        from qfluentwidgets import LineEdit, PushButton
+        from qfluentwidgets import PushButton, SearchLineEdit
 
         # 使用 MaskDialogBase 的 widget 作为容器
         container = self.widget
@@ -1104,18 +1104,13 @@ class HistoryMemberDialog(MaskDialogBase):
 
         # === 搜索框区域 ===
         search_card = QFrame()
-        search_card.setObjectName("searchCard")
+        search_card.setProperty("card", True)
         search_layout = QHBoxLayout(search_card)
         search_layout.setContentsMargins(12, 12, 12, 12)
         search_layout.setSpacing(12)
 
-        # 搜索图标
-        search_icon = QLabel("🔍")
-        search_icon.setStyleSheet("font-size: 16px;")
-        search_layout.addWidget(search_icon)
-
-        # 搜索输入框
-        self.search_input = LineEdit()
+        # 搜索输入框（带内置搜索图标）
+        self.search_input = SearchLineEdit()
         self.search_input.setPlaceholderText(
             "输入姓名、学号、手机号、邮箱或学院搜索..."
         )
@@ -1156,7 +1151,7 @@ class HistoryMemberDialog(MaskDialogBase):
         layout.addWidget(scroll)
 
         # === 底部提示 ===
-        hint_label = QLabel("💡 点击任意成员卡片即可选择")
+        hint_label = QLabel("点击任意成员卡片即可选择")
         hint_label.setStyleSheet(
             f"color: {'#808080' if is_dark else '#999'}; font-size: 11px;"
         )
@@ -1351,19 +1346,17 @@ class HistoryMemberDialog(MaskDialogBase):
         is_dark = self.theme_manager.is_dark
 
         if is_dark:
-            bg_color = "#1c1f2e"  # 与 QWidget#pageRoot 一致
-            card_bg = "#2a2d3f"   # 与 QFrame[card="true"] 一致
+            bg_color = "#1c1f2e"
+            card_bg = "#2a2d3f"
             card_hover = "#353751"
             border_color = "rgba(138, 159, 255, 0.08)"
             text_color = "#f2f4ff"
-            search_bg = "#2a2d3f"
         else:
             bg_color = "#f8f9fa"
             card_bg = "#ffffff"
             card_hover = "#f5f7fa"
             border_color = "#e0e0e0"
             text_color = "#333"
-            search_bg = "#ffffff"
 
         # 设置中心 widget 的样式
         self.widget.setStyleSheet(f"""
@@ -1371,10 +1364,8 @@ class HistoryMemberDialog(MaskDialogBase):
                 background-color: {bg_color};
                 color: {text_color};
             }}
-            QFrame#searchCard {{
-                background-color: {search_bg};
-                border: 1px solid {border_color};
-                border-radius: 8px;
+            QLabel {{
+                background-color: transparent;
             }}
             QFrame[card="true"] {{
                 background-color: {card_bg};
