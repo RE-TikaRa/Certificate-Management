@@ -14,6 +14,7 @@ from .pages.home_page import HomePage
 from .pages.management_page import ManagementPage
 from .pages.overview_page import OverviewPage
 from .pages.recycle_page import RecyclePage
+from .pages.about_page import AboutPage
 from .pages.settings_page import SettingsPage
 from .styled_theme import ThemeManager
 
@@ -157,16 +158,22 @@ class MainWindow(FluentWindow):
         logger.debug(f"ManagementPage initialized in {time.time() - page_start:.2f}s")
         
         page_start = time.time()
+        about_page = AboutPage(self.ctx, self.theme_manager)
+        logger.debug(f"AboutPage initialized in {time.time() - page_start:.2f}s")
+        
+        page_start = time.time()
         settings_page = SettingsPage(self.ctx, self.theme_manager)
         logger.debug(f"SettingsPage initialized in {time.time() - page_start:.2f}s")
         
         # 保存页面引用
         self.management_page = management_page
+        self.about_page = about_page
         self.settings_page = settings_page
         
         # 添加页面到导航栏
         pages = [
             ("management", management_page, FIF.PEOPLE, "成员管理", NavigationItemPosition.TOP),
+            ("about", about_page, FIF.INFO, "关于", NavigationItemPosition.BOTTOM),
             ("settings", settings_page, FIF.SETTING, "系统设置", NavigationItemPosition.BOTTOM),
         ]
         
@@ -175,7 +182,7 @@ class MainWindow(FluentWindow):
             key = self.addSubInterface(widget, icon, text, position=position)
             self.route_keys[route] = key
         
-        logger.debug("Normal pages (Management, Settings) loaded")
+        logger.debug("Normal pages (Management, About, Settings) loaded")
 
     def _load_heavy_pages(self) -> None:
         """加载重型页面（Dashboard, Recycle）"""
