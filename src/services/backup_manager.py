@@ -42,9 +42,17 @@ class BackupManager:
 
     @property
     def backup_root(self) -> Path:
-        root = Path(self.settings.get("backup_root", str(BACKUP_DIR)))
-        root.mkdir(parents=True, exist_ok=True)
-        return root
+        configured = Path(self.settings.get("backup_root", str(BACKUP_DIR))).expanduser()
+        try:
+            configured.mkdir(parents=True, exist_ok=True)
+            return configured
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("backup_root '%s' unavailable, fallback to default '%s': %s", configured, BACKUP_DIR, exc)
+            fallback = BACKUP_DIR
+            fallback.mkdir(parents=True, exist_ok=True)
+            # 覆盖无效配置，避免下次启动再次报错
+            self.settings.set("backup_root", str(fallback))
+            return fallback
 
     def _build_archive_name(self) -> Path:
         prefix = self.settings.get("backup_prefix", "awards")
@@ -239,4 +247,3 @@ class BackupManager:
             if backup.is_valid:
                 return backup
         return None
-
