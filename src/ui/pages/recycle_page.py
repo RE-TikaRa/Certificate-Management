@@ -1,19 +1,33 @@
 from __future__ import annotations
 
 import logging
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QHBoxLayout,
+    QScrollArea,
     QTableView,
     QVBoxLayout,
+    QWidget,
 )
-from qfluentwidgets import PrimaryPushButton, PushButton, InfoBar, MessageBox
+from qfluentwidgets import (
+    FluentIcon,
+    InfoBar,
+    MessageBox,
+    PrimaryPushButton,
+    PushButton,
+    TransparentToolButton,
+)
 
-from ..theme import apply_table_style, create_card, create_page_header, make_section_title
 from ..styled_theme import ThemeManager
 from ..table_models import ObjectTableModel
+from ..theme import (
+    apply_table_style,
+    create_card,
+    create_page_header,
+    make_section_title,
+)
 from ..utils.async_utils import run_in_thread
-
 from .base_page import BasePage
 
 logger = logging.getLogger(__name__)
@@ -22,18 +36,30 @@ logger = logging.getLogger(__name__)
 class RecyclePage(BasePage):
     def __init__(self, ctx, theme_manager: ThemeManager):
         super().__init__(ctx, theme_manager)
-        self.setObjectName("pageRoot")
-        layout = QVBoxLayout(self)
-        layout.setSpacing(18)
+
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        outer_layout.addWidget(scroll)
+
+        container = QWidget()
+        container.setObjectName("pageRoot")
+        scroll.setWidget(container)
+
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(32, 24, 32, 32)
+        layout.setSpacing(28)
+
         layout.addWidget(create_page_header("荣誉回收站", "管理已删除的荣誉记录"))
 
         card, card_layout = create_card()
-        
-        # 标题和刷新按钮
+
         header_layout = QHBoxLayout()
         header_layout.addWidget(make_section_title("已删除的荣誉列表"))
         header_layout.addStretch()
-        from qfluentwidgets import TransparentToolButton, FluentIcon
         refresh_btn = TransparentToolButton(FluentIcon.SYNC)
         refresh_btn.setToolTip("刷新数据")
         refresh_btn.clicked.connect(self.refresh)
@@ -46,7 +72,9 @@ class RecyclePage(BasePage):
             lambda a: a.level,
             lambda a: a.rank,
             lambda a: a.award_date,
-            lambda a: a.deleted_at.strftime("%Y-%m-%d %H:%M:%S") if a.deleted_at else "",
+            lambda a: a.deleted_at.strftime("%Y-%m-%d %H:%M:%S")
+            if a.deleted_at
+            else "",
         ]
         self.model = ObjectTableModel(headers, accessors, self)
         self.table = QTableView()
@@ -86,18 +114,18 @@ class RecyclePage(BasePage):
         if not ids:
             InfoBar.warning("提示", "请选择要恢复的荣誉记录", parent=self.window())
             return
-        
+
         box = MessageBox(
-            "确认恢复",
-            f"确定要恢复选中的 {len(ids)} 条荣誉记录吗？",
-            self.window()
+            "确认恢复", f"确定要恢复选中的 {len(ids)} 条荣誉记录吗？", self.window()
         )
-        
+
         if box.exec():
             for award_id in ids:
                 self.ctx.awards.restore_award(award_id)
             self.refresh()
-            InfoBar.success("成功", f"已恢复 {len(ids)} 条荣誉记录", parent=self.window())
+            InfoBar.success(
+                "成功", f"已恢复 {len(ids)} 条荣誉记录", parent=self.window()
+            )
 
     def _purge(self) -> None:
         """彻底删除选中的荣誉记录"""
@@ -105,15 +133,17 @@ class RecyclePage(BasePage):
         if not ids:
             InfoBar.warning("提示", "请选择要彻底删除的荣誉记录", parent=self.window())
             return
-        
+
         box = MessageBox(
             "确认彻底删除",
             f"确定要彻底删除选中的 {len(ids)} 条荣誉记录吗？\n\n此操作不可恢复！",
-            self.window()
+            self.window(),
         )
-        
+
         if box.exec():
             for award_id in ids:
                 self.ctx.awards.permanently_delete_award(award_id)
             self.refresh()
-            InfoBar.success("成功", f"已彻底删除 {len(ids)} 条荣誉记录", parent=self.window())
+            InfoBar.success(
+                "成功", f"已彻底删除 {len(ids)} 条荣誉记录", parent=self.window()
+            )
