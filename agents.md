@@ -33,19 +33,23 @@ src/
 │   ├── import_export.py        # CSV import/export
 │   ├── backup_manager.py       # Auto-backup functionality
 │   ├── attachment_manager.py   # File attachment handling
-│   └── settings_service.py     # Application settings
+│   ├── settings_service.py     # Application settings
+│   └── major_service.py        # Major search service
 ├── ui/
 │   ├── main_window.py          # Main window frame & navigation
 │   ├── theme.py                # UI utility functions
 │   ├── styled_theme.py         # Theme management (light/dark)
+│   ├── widgets/
+│   │   └── major_search.py     # Major search autocomplete widget
 │   └── pages/
 │       ├── base_page.py        # Page base class
 │       ├── home_page.py        # Home page
 │       ├── dashboard_page.py   # Metrics & analytics dashboard
 │       ├── entry_page.py       # Award entry form
-│       ├── overview_page.py    # Award list with editing dialog
+│       ├── overview_page.py    # Award list with filtering & sorting
 │       ├── management_page.py  # Member management & history
 │       ├── recycle_page.py     # Attachment recycle bin
+│       ├── about_page.py       # About page
 │       └── settings_page.py    # System settings
 └── resources/
     ├── styles/                 # QSS stylesheets
@@ -111,6 +115,24 @@ class TeamMember(Base):
 ```
 
 **9 Fields Total:** name, gender, id_card, phone, student_id, email, major, class_name, college
+
+### Major (专业信息)
+```python
+class Major(Base):
+    __tablename__ = 'majors'
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(128), unique=True)  # Major name
+    pinyin: Mapped[str | None] = mapped_column(String(255))      # Pinyin for search
+    category: Mapped[str | None] = mapped_column(String(64))     # Category
+    created_at: Mapped[datetime]                                 # Creation timestamp
+    updated_at: Mapped[datetime]                                 # Last update timestamp
+```
+
+**Key Features:**
+- 66 majors database from 甘肃农业大学
+- Fuzzy search support (Chinese name + pinyin)
+- Used in MajorSearchWidget for autocomplete
 
 ---
 
@@ -241,6 +263,22 @@ Column 2: email, major, class_name, college
 - Delete button with confirmation
 - AwardDetailDialog class (complete member management)
 
+**Filtering & Sorting Features (Dec 5):**
+- **5 Filter Options:**
+  - Level filter: 国家级/省级/校级
+  - Rank filter: 一等奖/二等奖/三等奖/优秀奖
+  - Date range: Start date + End date
+  - Keyword search: Competition name or certificate code
+- **8 Sorting Modes:**
+  - Date: Ascending/Descending
+  - Level: Ascending/Descending (国家级>省级>校级)
+  - Rank: Ascending/Descending (一等奖>二等奖>三等奖>优秀奖)
+  - Name: A-Z/Z-A
+- **Performance:**
+  - Debounced keyword search (500ms)
+  - Filters applied before pagination
+  - Reset button to clear all filters
+
 **AwardDetailDialog Features:**
 - Display existing award data
 - Member card system (matches entry_page)
@@ -281,6 +319,18 @@ while parent:
 - Log level configuration
 - Data directory path
 - Backup management
+
+#### AboutPage
+**Location:** `src/ui/pages/about_page.py`
+
+**Features:**
+- System name and version display (v1.0.0)
+- Project description and introduction
+- Technology stack information
+- Core features list
+- Developer information
+- GitHub repository and issue links
+- Copyright and license information
 
 ---
 
@@ -564,6 +614,21 @@ python -m src.main --debug
    - Added `_on_theme_changed()` handlers with `@Slot()` decorator
    - Implemented `findChildren()` to update all input widgets
    - Both scroll area and member cards now respond to theme changes instantly
+8. **Major Search Feature (Dec 5):** Intelligent major autocomplete
+   - Created Major model with 66 majors from 甘肃农业大学
+   - Implemented MajorService with fuzzy search (Chinese + pinyin)
+   - Built MajorSearchWidget with dropdown autocomplete
+   - Integrated into entry_page and overview_page
+   - Excel import support via tools/import_majors.py
+9. **About Page (Dec 5):** New navigation page
+   - Added about_page.py with system information
+   - Displays version, features, tech stack, and links
+   - Positioned above Settings in bottom navigation
+10. **Filtering & Sorting (Dec 5):** Enhanced overview_page
+    - 5 filter options: level, rank, date range, keyword search
+    - 8 sorting modes: date, level, rank, name (asc/desc)
+    - Real-time filtering with debounced keyword search
+    - Combined with existing pagination for performance
 
 ---
 
@@ -685,5 +750,5 @@ from src.data.database import session_scope
 
 ---
 
-**Last Updated:** 2025-12-04
+**Last Updated:** 2025-12-05
 **Version:** 1.0.1
