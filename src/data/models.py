@@ -126,3 +126,12 @@ class ImportJob(Base):
     filename: Mapped[str] = mapped_column(String(255))
     status: Mapped[str] = mapped_column(String(32), default="pending")
     message: Mapped[str | None] = mapped_column(Text)
+
+
+class Major(Base):
+    """专业名称数据库"""
+    __tablename__ = "majors"
+
+    name: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    pinyin: Mapped[str | None] = mapped_column(String(255))  # 拼音，用于搜索
+    category: Mapped[str | None] = mapped_column(String(64))  # 分类（工学、理学等）

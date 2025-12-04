@@ -24,6 +24,30 @@ from ..styled_theme import ThemeManager
 from .base_page import BasePage
 
 
+def clean_input_text(line_edit: QLineEdit) -> None:
+    """
+    为 QLineEdit 添加自动清理空白字符功能
+    自动删除用户输入中的所有空格、制表符、换行符等空白字符
+    
+    Args:
+        line_edit: 要应用清理功能的 QLineEdit 组件
+    """
+    import re
+    
+    def on_text_changed(text: str):
+        # 删除所有空白字符（空格、制表符、换行符等）
+        cleaned = re.sub(r'\s+', '', text)
+        if cleaned != text:
+            # 临时断开信号避免递归
+            line_edit.textChanged.disconnect(on_text_changed)
+            line_edit.setText(cleaned)
+            line_edit.setCursorPosition(len(cleaned))  # 保持光标位置
+            # 重新连接信号
+            line_edit.textChanged.connect(on_text_changed)
+    
+    line_edit.textChanged.connect(on_text_changed)
+
+
 class ManagementPage(BasePage):
     """成员历史页面 - 显示所有历史成员信息"""
     
@@ -281,7 +305,9 @@ class MemberDetailDialog(MaskDialogBase):
             
             # 值
             value = self.original_data.get(field_key, "")
-            value_label = QLabel(value)
+            # 确保显示文本，避免 None 或空值显示为"口"
+            display_value = str(value) if value else "-"
+            value_label = QLabel(display_value)
             value_label.setObjectName("memberDetailValue")
             value_label.setWordWrap(True)
             
@@ -290,6 +316,7 @@ class MemberDetailDialog(MaskDialogBase):
             
             # ✅ 优化：提前创建并缓存所有输入框（初始化时隐藏）
             input_field = QLineEdit()
+            clean_input_text(input_field)  # 自动删除空白字符
             input_field.setText(value)
             input_field.setObjectName("memberDetailInput")
             input_field.hide()  # 初始隐藏

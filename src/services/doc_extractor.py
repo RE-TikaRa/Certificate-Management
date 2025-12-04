@@ -144,7 +144,19 @@ class DocInfoExtractor:
     def extract_major(self):
         """提取专业"""
         patterns = [
-            r'专业[^\u4e00-\u9fa5]*([^\s\n]+(?:工程|技术|管理|科学|设计|艺术|学)(?:及其自动化)?)',
+            # 优先匹配"及其xxx"结构的完整专业名
+            r'专业[^\u4e00-\u9fa5]*([^\s\n]+及其[^\s\n]+)',
+            # 匹配"与xxx"结构的完整专业名（如"水土保持与荒漠化防治"）
+            r'专业[^\u4e00-\u9fa5]*([^\s\n]+与[^\s\n]+)',
+            # 匹配以常见专业后缀结尾的完整名称
+            r'专业[^\u4e00-\u9fa5]*([^\s\n]+(?:工程|技术|管理|科学|设计|艺术|防治|保护|栽培|鉴定))',
+            # 匹配以"学"结尾的专业（包括2字专业如"农学"、"林学"）
+            r'专业[^\u4e00-\u9fa5]*([^\s\n]+学)',
+            # 匹配2-25个中文字符（支持长专业名）
+            r'专业[^\u4e00-\u9fa5]*([一-龥]{2,25})',
+            # 匹配中英文混合（如"英语"）
+            r'专业[^\u4e00-\u9fa5]*([一-龥a-zA-Z]{2,25})',
+            # 最后尝试：专业后的非空白内容
             r'专业\s*([^\s\n]+)',
         ]
         
@@ -152,7 +164,10 @@ class DocInfoExtractor:
             match = re.search(pattern, self.text_content)
             if match:
                 major = match.group(1).strip()
-                if len(major) > 2 and '专业' not in major:
+                # 清理可能的标点符号（但保留"与"、"及"等关键字）
+                major = re.sub(r'[：:、，,。.；;！!？?（）()]', '', major)
+                # 支持2个字及以上的专业名称
+                if len(major) >= 2 and '专业' not in major:
                     self.member_info['major'] = major
                     return
         

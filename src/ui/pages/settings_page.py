@@ -20,6 +20,30 @@ from ..styled_theme import ThemeManager, ThemeMode
 from .base_page import BasePage
 
 
+def clean_input_text(line_edit: QLineEdit) -> None:
+    """
+    为 QLineEdit 添加自动清理空白字符功能
+    自动删除用户输入中的所有空格、制表符、换行符等空白字符
+    
+    Args:
+        line_edit: 要应用清理功能的 QLineEdit 组件
+    """
+    import re
+    
+    def on_text_changed(text: str):
+        # 删除所有空白字符（空格、制表符、换行符等）
+        cleaned = re.sub(r'\s+', '', text)
+        if cleaned != text:
+            # 临时断开信号避免递归
+            line_edit.textChanged.disconnect(on_text_changed)
+            line_edit.setText(cleaned)
+            line_edit.setCursorPosition(len(cleaned))  # 保持光标位置
+            # 重新连接信号
+            line_edit.textChanged.connect(on_text_changed)
+    
+    line_edit.textChanged.connect(on_text_changed)
+
+
 class SettingsPage(BasePage):
     THEME_OPTIONS = {
         "light": "浅色",
@@ -45,6 +69,7 @@ class SettingsPage(BasePage):
         self.theme_mode = ComboBox()
         self.theme_mode.addItems(list(self.THEME_OPTIONS.values()))
         self.email_suffix = QLineEdit()  # 邮箱后缀输入框
+        clean_input_text(self.email_suffix)  # 自动删除空白字符
         self.email_suffix.setPlaceholderText("例如: @st.gsau.edu.cn")
         self._build_ui()
         self.refresh()

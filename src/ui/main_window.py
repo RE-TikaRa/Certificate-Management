@@ -42,6 +42,9 @@ class MainWindow(FluentWindow):
         # ✅ 连接主题变化信号以更新标题栏颜色
         self.theme_manager.themeChanged.connect(self._on_theme_changed)
         
+        # ✅ 连接堆栈切换信号以自动刷新页面
+        self.stackedWidget.currentChanged.connect(self._on_page_changed)
+        
         # 快速初始化导航栏和首页
         self._init_navigation_fast()
         
@@ -70,6 +73,17 @@ class MainWindow(FluentWindow):
         q_theme = Theme.DARK if self.theme_manager.is_dark else Theme.LIGHT
         setTheme(q_theme, lazy=False)
         self.apply_theme_stylesheet()
+    
+    def _on_page_changed(self, index: int) -> None:
+        """页面切换时自动刷新对应页面"""
+        try:
+            current_widget = self.stackedWidget.widget(index)
+            if current_widget and hasattr(current_widget, 'refresh'):
+                # 延迟刷新，确保页面完全显示
+                QTimer.singleShot(50, current_widget.refresh)
+                logger.debug(f"Page at index {index} will be refreshed")
+        except Exception as e:
+            logger.warning(f"Failed to refresh page at index {index}: {e}")
 
     def _init_navigation_fast(self) -> None:
         """快速初始化导航栏和首页（不加载其他页面）"""

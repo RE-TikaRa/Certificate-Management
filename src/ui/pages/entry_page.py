@@ -31,8 +31,28 @@ from ...services.validators import FormValidator
 from ...services.doc_extractor import extract_member_info_from_doc
 from ..theme import create_card, create_page_header, make_section_title
 from ..styled_theme import ThemeManager
+from ..widgets.major_search import MajorSearchWidget
 
 from .base_page import BasePage
+
+
+def clean_input_text(line_edit: QLineEdit) -> None:
+    """为输入框添加自动清理空白字符功能"""
+    import re
+    
+    def on_text_changed(text: str):
+        # 移除所有空白字符（空格、制表符、换行等）
+        cleaned = re.sub(r'\s+', '', text)
+        if cleaned != text:
+            # 暂时断开信号避免递归
+            line_edit.textChanged.disconnect(on_text_changed)
+            line_edit.setText(cleaned)
+            # 恢复光标位置到末尾
+            line_edit.setCursorPosition(len(cleaned))
+            # 重新连接信号
+            line_edit.textChanged.connect(on_text_changed)
+    
+    line_edit.textChanged.connect(on_text_changed)
 
 
 class EntryPage(BasePage):
@@ -161,6 +181,7 @@ class EntryPage(BasePage):
         cert_label = QLabel("证书编号")
         cert_label.setObjectName("formLabel")
         self.certificate_input = QLineEdit()
+        clean_input_text(self.certificate_input)  # 自动删除空白字符
         cert_col.addWidget(cert_label)
         cert_col.addWidget(self.certificate_input)
         info_layout.addLayout(cert_col)
@@ -170,6 +191,7 @@ class EntryPage(BasePage):
         remark_label = QLabel("备注")
         remark_label.setObjectName("formLabel")
         self.remarks_input = QLineEdit()
+        clean_input_text(self.remarks_input)  # 自动删除空白字符
         remark_col.addWidget(remark_label)
         remark_col.addWidget(self.remarks_input)
         info_layout.addLayout(remark_col)
@@ -315,9 +337,12 @@ class EntryPage(BasePage):
         history_btn.setFixedHeight(28)   # 固定高度
         header_layout.addWidget(history_btn)
         
+        # 删除按钮
         delete_btn = PushButton("删除")
         delete_btn.setFixedWidth(60)
         delete_btn.setFixedHeight(28)
+        header_layout.addWidget(delete_btn)
+        
         member_layout.addLayout(header_layout)
         
         # 创建3列的表单布局
@@ -337,9 +362,18 @@ class EntryPage(BasePage):
         
         # 首先创建所有输入框
         for field_name, label in zip(field_names, field_labels):
-            input_widget = QLineEdit()
-            input_widget.setPlaceholderText(f"请输入{label}")
-            input_widget.setStyleSheet(input_style)
+            # 专业字段使用特殊的搜索组件
+            if field_name == 'major':
+                input_widget = MajorSearchWidget(
+                    self.ctx.majors,
+                    self.theme_manager,
+                    parent=member_card
+                )
+            else:
+                input_widget = QLineEdit()
+                clean_input_text(input_widget)  # 自动删除空白字符
+                input_widget.setPlaceholderText(f"请输入{label}")
+                input_widget.setStyleSheet(input_style)
             member_fields[field_name] = input_widget
         
         # 然后按2列布局添加到表单
@@ -363,9 +397,8 @@ class EntryPage(BasePage):
         # 从历史成员选择按钮连接
         history_btn.clicked.connect(lambda: self._select_from_history(member_fields))
         
-        # 删除按钮
+        # 删除按钮连接
         delete_btn.clicked.connect(lambda: self._remove_member_card(member_card, member_fields))
-        header_layout.addWidget(delete_btn)
         
         # 保存成员数据
         member_data = {
@@ -433,6 +466,8 @@ class EntryPage(BasePage):
         """从历史成员中选择"""
         # 获取所有历史成员
         from ...services.member_service import MemberService
+        from ..widgets.major_search import MajorSearchWidget
+        
         service = MemberService(self.ctx.db)
         members = service.list_members()
         
@@ -452,7 +487,12 @@ class EntryPage(BasePage):
                 member_fields['phone'].setText(selected_member.phone)
                 member_fields['student_id'].setText(selected_member.student_id)
                 member_fields['email'].setText(selected_member.email)
-                member_fields['major'].setText(selected_member.major)
+                # 专业字段特殊处理
+                major_widget = member_fields['major']
+                if isinstance(major_widget, MajorSearchWidget):
+                    major_widget.set_text(selected_member.major)
+                else:
+                    major_widget.setText(selected_member.major)
                 member_fields['class_name'].setText(selected_member.class_name)
                 member_fields['college'].setText(selected_member.college)
                 InfoBar.success("成功", f"已选择成员: {selected_member.name}", parent=self.window())
@@ -585,7 +625,13 @@ class EntryPage(BasePage):
             for field_key, dict_key in field_mapping.items():
                 value = member_info.get(dict_key)
                 if value and field_key in member_fields:
-                    member_fields[field_key].setText(value)
+                    widget = member_fields[field_key]
+                    # 支持MajorSearchWidget和QLineEdit
+                    from ..widgets.major_search import MajorSearchWidget
+                    if isinstance(widget, MajorSearchWidget):
+                        widget.set_text(value)
+                    else:
+                        widget.setText(value)
                     filled_fields.append(field_key)
             
             # 显示成功消息
@@ -614,6 +660,8 @@ class EntryPage(BasePage):
 
     def _get_members_data(self) -> list[dict]:
         """获取成员卡片中的成员数据"""
+        from ..widgets.major_search import MajorSearchWidget
+        
         members = []
         field_names = ['name', 'gender', 'id_card', 'phone', 'student_id',
                        'email', 'major', 'class_name', 'college']
@@ -631,10 +679,16 @@ class EntryPage(BasePage):
                     # 收集其他字段
                     for field_name in field_names[1:]:
                         widget = member_fields.get(field_name)
-                        if isinstance(widget, QLineEdit):
+                        # 支持MajorSearchWidget和QLineEdit
+                        if isinstance(widget, MajorSearchWidget):
                             value = widget.text().strip()
-                            if value:
-                                member_info[field_name] = value
+                        elif isinstance(widget, QLineEdit):
+                            value = widget.text().strip()
+                        else:
+                            value = ""
+                        
+                        if value:
+                            member_info[field_name] = value
                     
                     members.append(member_info)
         return members
@@ -1025,34 +1079,58 @@ class HistoryMemberDialog(MaskDialogBase):
         self._apply_theme()
     
     def _init_ui(self):
-        """初始化UI"""
+        """初始化UI（美化版）"""
         from qfluentwidgets import LineEdit, PrimaryPushButton, PushButton
         
         # 使用 MaskDialogBase 的 widget 作为容器
         container = self.widget
         layout = QVBoxLayout(container)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
+        layout.setContentsMargins(28, 28, 28, 28)
+        layout.setSpacing(20)
         
-        # 搜索框
-        search_layout = QHBoxLayout()
-        search_label = QLabel("搜索:")
+        # === 标题 ===
+        title_label = QLabel("选择历史成员")
+        title_label.setStyleSheet("font-size: 18px; font-weight: bold;")
+        layout.addWidget(title_label)
+        
+        # === 搜索框区域 ===
+        search_card = QFrame()
+        search_card.setObjectName("searchCard")
+        search_layout = QHBoxLayout(search_card)
+        search_layout.setContentsMargins(12, 12, 12, 12)
+        search_layout.setSpacing(12)
+        
+        # 搜索图标
+        search_icon = QLabel("🔍")
+        search_icon.setStyleSheet("font-size: 16px;")
+        search_layout.addWidget(search_icon)
+        
+        # 搜索输入框
         self.search_input = LineEdit()
-        self.search_input.setPlaceholderText("输入姓名、学号或手机号搜索...")
-        self.search_input.textChanged.connect(self._filter_members)
-        search_layout.addWidget(search_label)
+        self.search_input.setPlaceholderText("输入姓名、学号、手机号、邮箱或学院搜索...")
+        self.search_input.textChanged.connect(self._on_search_text_changed)
+        self.search_input.setMinimumHeight(36)
         search_layout.addWidget(self.search_input)
-        layout.addLayout(search_layout)
         
-        # 成员列表（滚动区域）
+        layout.addWidget(search_card)
+        
+        # === 结果计数提示 ===
+        self.result_label = QLabel(f"共 {len(self.members)} 位成员")
+        is_dark = self.theme_manager.is_dark
+        self.result_label.setStyleSheet(f"color: {'#a0a0a0' if is_dark else '#666'}; font-size: 12px;")
+        layout.addWidget(self.result_label)
+        
+        # === 成员列表（滚动区域）===
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setMinimumHeight(400)
-        scroll.setMinimumWidth(600)
+        scroll.setMinimumHeight(420)
+        scroll.setMinimumWidth(650)
+        scroll.setObjectName("memberScrollArea")
         
         scroll_widget = QWidget()
         self.members_layout = QVBoxLayout(scroll_widget)
-        self.members_layout.setSpacing(8)
+        self.members_layout.setSpacing(10)
+        self.members_layout.setContentsMargins(0, 0, 8, 0)  # 右边留点空间给滚动条
         
         # 创建成员卡片
         for member in self.members:
@@ -1064,16 +1142,23 @@ class HistoryMemberDialog(MaskDialogBase):
         scroll.setWidget(scroll_widget)
         layout.addWidget(scroll)
         
-        # 按钮
+        # === 底部提示 ===
+        hint_label = QLabel("💡 点击任意成员卡片即可选择")
+        hint_label.setStyleSheet(f"color: {'#808080' if is_dark else '#999'}; font-size: 11px;")
+        hint_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(hint_label)
+        
+        # === 按钮区域 ===
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
         cancel_btn = PushButton("取消")
+        cancel_btn.setMinimumWidth(100)
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
         layout.addLayout(btn_layout)
     
     def _create_member_card(self, member) -> QWidget:
-        """创建成员卡片"""
+        """创建美化的成员卡片"""
         card = QFrame()
         card.setObjectName("memberCard")
         card.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
@@ -1088,81 +1173,168 @@ class HistoryMemberDialog(MaskDialogBase):
         card.mousePressEvent = lambda e: select_member() if e.button() == Qt.MouseButton.LeftButton else None
         
         layout = QVBoxLayout(card)
-        layout.setContentsMargins(12, 10, 12, 10)
-        layout.setSpacing(6)
+        layout.setContentsMargins(16, 14, 16, 14)
+        layout.setSpacing(12)
         
-        # 姓名和学号（标题行）
+        # === 头部：姓名 + 学号标签 ===
         header = QHBoxLayout()
-        name_label = QLabel(f"<b>{member.name}</b>")
-        name_label.setStyleSheet("font-size: 14px;")
-        student_id_label = QLabel(f"学号: {member.student_id}")
-        student_id_label.setStyleSheet("color: #666; font-size: 12px;")
+        header.setSpacing(12)
+        
+        # 姓名（加粗 + 大字体）
+        name_label = QLabel(f"<b>{member.name or '未知'}</b>")
+        name_label.setStyleSheet("font-size: 15px; font-weight: 600;")
         header.addWidget(name_label)
+        
         header.addStretch()
-        header.addWidget(student_id_label)
+        
+        # 学号标签（蓝色背景徽章）
+        if member.student_id:
+            student_badge = QLabel(f" {member.student_id} ")
+            is_dark = self.theme_manager.is_dark
+            if is_dark:
+                badge_style = """
+                    background-color: #2d4a7c;
+                    color: #5fa3ef;
+                    border-radius: 4px;
+                    padding: 4px 10px;
+                    font-size: 11px;
+                    font-weight: 500;
+                """
+            else:
+                badge_style = """
+                    background-color: #e6f4ff;
+                    color: #1890ff;
+                    border-radius: 4px;
+                    padding: 4px 10px;
+                    font-size: 11px;
+                    font-weight: 500;
+                """
+            student_badge.setStyleSheet(badge_style)
+            header.addWidget(student_badge)
+        
         layout.addLayout(header)
         
-        # 详细信息
+        # === 分隔线 ===
+        separator = QFrame()
+        separator.setFrameShape(QFrame.HLine)
+        is_dark = self.theme_manager.is_dark
+        separator.setStyleSheet(f"background-color: {'#4a4a5e' if is_dark else '#e8e8e8'}; max-height: 1px;")
+        layout.addWidget(separator)
+        
+        # === 详细信息网格（2列布局）===
         info_layout = QGridLayout()
-        info_layout.setSpacing(8)
+        info_layout.setSpacing(10)
+        info_layout.setColumnStretch(1, 1)
+        info_layout.setColumnStretch(3, 1)
         
         info_data = [
-            ("性别", member.gender),
-            ("手机", member.phone),
-            ("学院", member.college),
-            ("专业", member.major),
-            ("班级", member.class_name),
-            ("邮箱", member.email),
+            ("性别", member.gender or "-"),
+            ("手机", member.phone or "-"),
+            ("学院", member.college or "-"),
+            ("专业", member.major or "-"),
+            ("班级", member.class_name or "-"),
+            ("邮箱", member.email or "-"),
         ]
         
         for idx, (label, value) in enumerate(info_data):
             row = idx // 2
             col = (idx % 2) * 2
             
-            label_widget = QLabel(f"{label}:")
-            label_widget.setStyleSheet("color: #888; font-size: 11px;")
-            value_widget = QLabel(value or "-")
-            value_widget.setStyleSheet("font-size: 11px;")
+            # 标签（灰色小字）
+            label_widget = QLabel(f"{label}")
+            if is_dark:
+                label_widget.setStyleSheet("color: #a0a0a0; font-size: 11px; min-width: 36px;")
+            else:
+                label_widget.setStyleSheet("color: #888; font-size: 11px; min-width: 36px;")
             
-            info_layout.addWidget(label_widget, row, col)
+            # 值（正常字体）
+            value_widget = QLabel(str(value))
+            if is_dark:
+                value_widget.setStyleSheet("color: #e0e0e0; font-size: 12px;")
+            else:
+                value_widget.setStyleSheet("color: #333; font-size: 12px;")
+            value_widget.setWordWrap(True)
+            
+            info_layout.addWidget(label_widget, row, col, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
             info_layout.addWidget(value_widget, row, col + 1)
         
         layout.addLayout(info_layout)
         
         return card
     
-    def _filter_members(self, text: str):
-        """根据搜索文本过滤成员"""
-        text = text.lower().strip()
+    def _on_search_text_changed(self, text: str) -> None:
+        """搜索框文本变化时自动清理并过滤"""
+        import re
         
-        for member, card in self.member_widgets:
-            if not text:
+        # 自动移除所有空白字符
+        cleaned_text = re.sub(r'\s+', '', text)
+        
+        # 如果清理后文本变化了，更新输入框（避免递归）
+        if cleaned_text != text:
+            # 暂时断开信号避免递归
+            self.search_input.textChanged.disconnect(self._on_search_text_changed)
+            self.search_input.setText(cleaned_text)
+            # 重新连接信号
+            self.search_input.textChanged.connect(self._on_search_text_changed)
+        
+        # 执行过滤
+        self._filter_members(cleaned_text)
+    
+    def _filter_members(self, text: str):
+        """根据搜索文本过滤成员（去除所有空白字符）"""
+        import re
+        
+        # 移除所有空白字符（空格、制表符、换行符等）
+        text = re.sub(r'\s+', '', text).lower()
+        
+        if not text:
+            # 空文本显示所有
+            for member, card in self.member_widgets:
                 card.show()
-            else:
-                # 搜索姓名、学号、手机号
-                match = (
-                    text in member.name.lower() or
-                    text in member.student_id.lower() or
-                    text in member.phone.lower()
-                )
-                card.setVisible(match)
+            self.result_label.setText(f"共 {len(self.members)} 位成员")
+            return
+        
+        visible_count = 0
+        for member, card in self.member_widgets:
+            # 对所有字段也去除空白字符后再比较
+            def clean(s):
+                return re.sub(r'\s+', '', (s or "")).lower()
+            
+            match = (
+                text in clean(member.name) or
+                text in clean(member.student_id) or
+                text in clean(member.phone) or
+                text in clean(member.email) or
+                text in clean(member.id_card) or
+                text in clean(member.college) or
+                text in clean(member.major) or
+                text in clean(member.class_name)
+            )
+            card.setVisible(match)
+            if match:
+                visible_count += 1
+        
+        # 更新结果计数
+        self.result_label.setText(f"找到 {visible_count} 位成员")
     
     def _apply_theme(self):
-        """应用主题样式"""
+        """应用主题样式（美化版）"""
         is_dark = self.theme_manager.is_dark
         
         if is_dark:
-            bg_color = "#2a2a3a"
+            bg_color = "#1c1f2e"
             card_bg = "#353751"
             card_hover = "#3d3f5e"
             border_color = "#4a4a5e"
             text_color = "#e0e0e0"
+            search_bg = "#2a2a3a"
         else:
-            bg_color = "#f5f5f5"
+            bg_color = "#f8f9fa"
             card_bg = "#ffffff"
-            card_hover = "#f0f0f0"
+            card_hover = "#f5f7fa"
             border_color = "#e0e0e0"
             text_color = "#333"
+            search_bg = "#ffffff"
         
         # 设置中心 widget 的样式
         self.widget.setStyleSheet(f"""
@@ -1170,19 +1342,42 @@ class HistoryMemberDialog(MaskDialogBase):
                 background-color: {bg_color};
                 color: {text_color};
             }}
+            QFrame#searchCard {{
+                background-color: {search_bg};
+                border: 1px solid {border_color};
+                border-radius: 8px;
+            }}
             QFrame#memberCard {{
                 background-color: {card_bg};
                 border: 1px solid {border_color};
-                border-radius: 6px;
+                border-radius: 8px;
             }}
             QFrame#memberCard:hover {{
                 background-color: {card_hover};
                 border: 2px solid #1890ff;
             }}
             QScrollArea {{
-                border: 1px solid {border_color};
-                border-radius: 4px;
+                border: none;
+                background-color: transparent;
+            }}
+            QScrollArea > QWidget > QWidget {{
+                background-color: transparent;
+            }}
+            QScrollBar:vertical {{
                 background-color: {bg_color};
+                width: 8px;
+                border-radius: 4px;
+            }}
+            QScrollBar::handle:vertical {{
+                background-color: {border_color};
+                border-radius: 4px;
+                min-height: 30px;
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background-color: #1890ff;
+            }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                height: 0px;
             }}
         """)
         

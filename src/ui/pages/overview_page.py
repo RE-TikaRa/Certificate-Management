@@ -21,8 +21,33 @@ from ...services.doc_extractor import extract_member_info_from_doc
 from .base_page import BasePage
 from ..styled_theme import ThemeManager
 from ..theme import create_card, create_page_header, make_section_title
+from ..widgets.major_search import MajorSearchWidget
 
 logger = logging.getLogger(__name__)
+
+
+def clean_input_text(line_edit: QLineEdit) -> None:
+    """
+    为 QLineEdit 添加自动清理空白字符功能
+    自动删除用户输入中的所有空格、制表符、换行符等空白字符
+    
+    Args:
+        line_edit: 要应用清理功能的 QLineEdit 组件
+    """
+    import re
+    
+    def on_text_changed(text: str):
+        # 删除所有空白字符（空格、制表符、换行符等）
+        cleaned = re.sub(r'\s+', '', text)
+        if cleaned != text:
+            # 临时断开信号避免递归
+            line_edit.textChanged.disconnect(on_text_changed)
+            line_edit.setText(cleaned)
+            line_edit.setCursorPosition(len(cleaned))  # 保持光标位置
+            # 重新连接信号
+            line_edit.textChanged.connect(on_text_changed)
+    
+    line_edit.textChanged.connect(on_text_changed)
 
 
 class OverviewPage(BasePage):
@@ -31,6 +56,12 @@ class OverviewPage(BasePage):
     def __init__(self, ctx, theme_manager: ThemeManager):
         super().__init__(ctx, theme_manager)
         self.awards_list = []
+        
+        # ✅ 性能优化：分批加载
+        self.PAGE_SIZE = 20  # 每页显示20条
+        self.current_page = 0
+        self.total_awards = 0
+        self.load_more_btn = None  # 保存加载更多按钮引用
         
         # 连接主题变化信号
         self.theme_manager.themeChanged.connect(self._on_theme_changed)
@@ -88,7 +119,6 @@ class OverviewPage(BasePage):
         self.refresh_timer.start(5000)  # 5秒更新一次
         
         self._apply_theme()
-        self.refresh()
     
     def _auto_refresh(self) -> None:
         """✅ 优化：快速数据变化检测 - 只用 ID 比较，不用创建完整对象
@@ -124,63 +154,133 @@ class OverviewPage(BasePage):
             logger.debug(f"自动刷新失败: {e}")
     
     def refresh(self) -> None:
-        """刷新荣誉列表"""
+        """刷新荣誉列表（优化版：分批加载）"""
         try:
-            # 清空现有项目
-            while self.awards_layout.count():
-                item = self.awards_layout.takeAt(0)
-                if item.widget():
-                    widget = item.widget()
-                    if widget:
-                        widget.hide()
-                        widget.deleteLater()
+            # ✅ 优化1：快速清空UI
+            self._clear_awards_layout()
             
-            # 获取所有荣誉
+            # ✅ 优化2：获取所有数据
             self.awards_list = self.ctx.awards.list_awards()
+            self.total_awards = len(self.awards_list)
             
             if not self.awards_list:
-                # 空状态：显示提示
-                self.awards_layout.addStretch()
-                
-                empty_container = QWidget()
-                empty_layout = QVBoxLayout(empty_container)
-                empty_layout.setContentsMargins(0, 0, 0, 0)
-                empty_layout.setSpacing(12)
-                empty_layout.addStretch()
-                
-                # 图标 - 使用 QLabel 并设置大字体
-                empty_icon = QLabel("📋")
-                icon_font = QFont()
-                icon_font.setPointSize(72)
-                empty_icon.setFont(icon_font)
-                empty_layout.addWidget(empty_icon, alignment=Qt.AlignCenter)
-                
-                empty_text = BodyLabel("暂无项目数据")
-                empty_layout.addWidget(empty_text, alignment=Qt.AlignCenter)
-                
-                empty_hint = CaptionLabel("点击「录入」页添加新项目")
-                empty_layout.addWidget(empty_hint, alignment=Qt.AlignCenter)
-                
-                empty_layout.addStretch()
-                self.awards_layout.addWidget(empty_container)
-                
-                self.awards_layout.addStretch()
+                self._show_empty_state()
                 return
             
-            # 按日期排序（最新优先）
-            sorted_awards = sorted(self.awards_list, key=lambda a: a.award_date, reverse=True)
+            # ✅ 优化3：首次只加载20条
+            self.current_page = 0
+            self._load_more_awards()
             
-            # 创建每个荣誉的卡片
-            for award in sorted_awards:
-                card = self._create_award_card(award)
-                self.awards_layout.addWidget(card)
+            # ✅ 优化4：如果有更多数据，显示"加载更多"按钮
+            if self.total_awards > self.PAGE_SIZE:
+                self._add_load_more_button()
+            else:
+                self.awards_layout.addStretch()
             
-            self.awards_layout.addStretch()
-            
-            logger.debug(f"已加载 {len(self.awards_list)} 个荣誉项目")
+            logger.debug(f"已加载 {min(self.PAGE_SIZE, self.total_awards)}/{self.total_awards} 个荣誉项目")
         except Exception as e:
-            logger.exception(f"刷新荣誉列表失败: {e}")
-            InfoBar.error("错误", f"刷新失败: {str(e)}", parent=self.window())
+            logger.error(f"刷新失败: {e}", exc_info=True)
+    
+    def _clear_awards_layout(self) -> None:
+        """快速清空布局"""
+        widgets_to_delete = []
+        while self.awards_layout.count():
+            item = self.awards_layout.takeAt(0)
+            if item.widget():
+                widget = item.widget()
+                if widget:
+                    widget.setVisible(False)
+                    widgets_to_delete.append(widget)
+        
+        for widget in widgets_to_delete:
+            widget.deleteLater()
+    
+    def _show_empty_state(self) -> None:
+        """显示空状态"""
+        self.awards_layout.addStretch()
+        
+        empty_container = QWidget()
+        empty_layout = QVBoxLayout(empty_container)
+        empty_layout.setContentsMargins(0, 0, 0, 0)
+        empty_layout.setSpacing(12)
+        empty_layout.addStretch()
+        
+        empty_icon = QLabel("📋")
+        icon_font = QFont()
+        icon_font.setPointSize(48)  # 减小字体大小避免负值警告
+        empty_icon.setFont(icon_font)
+        empty_layout.addWidget(empty_icon, alignment=Qt.AlignCenter)
+        
+        empty_text = BodyLabel("暂无项目数据")
+        empty_layout.addWidget(empty_text, alignment=Qt.AlignCenter)
+        
+        empty_hint = CaptionLabel("点击「录入」页添加新项目")
+        empty_layout.addWidget(empty_hint, alignment=Qt.AlignCenter)
+        
+        empty_layout.addStretch()
+        self.awards_layout.addWidget(empty_container)
+        self.awards_layout.addStretch()
+    
+    def _load_more_awards(self) -> None:
+        """分批加载荣誉卡片"""
+        start_idx = self.current_page * self.PAGE_SIZE
+        end_idx = min(start_idx + self.PAGE_SIZE, self.total_awards)
+        
+        # 批量创建卡片
+        for award in self.awards_list[start_idx:end_idx]:
+            card = self._create_award_card(award)
+            insert_pos = self.awards_layout.count()
+            if insert_pos > 0 and self.awards_layout.itemAt(insert_pos - 1).spacerItem():
+                insert_pos -= 1
+            self.awards_layout.insertWidget(insert_pos, card)
+        
+        self.current_page += 1
+        logger.debug(f"当前已加载 {end_idx}/{self.total_awards} 条")
+    
+    def _add_load_more_button(self) -> None:
+        """添加加载更多按钮"""
+        self.awards_layout.addStretch()
+        
+        btn_container = QWidget()
+        btn_layout = QHBoxLayout(btn_container)
+        btn_layout.setContentsMargins(0, 16, 0, 16)
+        
+        self.load_more_btn = PrimaryPushButton("加载更多")
+        self.load_more_btn.setFixedWidth(160)
+        self.load_more_btn.clicked.connect(self._on_load_more_clicked)
+        btn_layout.addStretch()
+        btn_layout.addWidget(self.load_more_btn)
+        btn_layout.addStretch()
+        
+        self.awards_layout.addWidget(btn_container)
+        self.awards_layout.addStretch()
+    
+    def _on_load_more_clicked(self) -> None:
+        """加载更多数据"""
+        try:
+            # 移除"加载更多"按钮和stretch
+            for _ in range(2):
+                if self.awards_layout.count() > 0:
+                    item = self.awards_layout.takeAt(self.awards_layout.count() - 1)
+                    if item.widget():
+                        item.widget().deleteLater()
+            
+            # 加载下一批
+            self._load_more_awards()
+            
+            # 检查是否还有更多
+            if self.current_page * self.PAGE_SIZE < self.total_awards:
+                self._add_load_more_button()
+            else:
+                # 全部加载完成
+                self.awards_layout.addStretch()
+                done_label = CaptionLabel(f"✓ 已加载全部 {self.total_awards} 条记录")
+                done_label.setAlignment(Qt.AlignCenter)
+                self.awards_layout.addWidget(done_label)
+                self.awards_layout.addStretch()
+        except Exception as e:
+            logger.exception(f"加载更多失败: {e}")
+            InfoBar.error("错误", f"加载失败: {str(e)}", parent=self.window())
     
     def _create_award_card(self, award) -> QWidget:
         """创建单个荣誉卡片"""
@@ -642,8 +742,11 @@ class AwardDetailDialog(MaskDialogBase):
         history_btn.setFixedHeight(28)
         header_layout.addWidget(history_btn)
         
+        # 删除按钮
         delete_btn = PushButton("删除")
-        delete_btn.setMaximumWidth(60)
+        delete_btn.setFixedWidth(60)
+        delete_btn.setFixedHeight(28)
+        header_layout.addWidget(delete_btn)
         
         # 表单布局
         form_grid = QGridLayout()
@@ -658,15 +761,29 @@ class AwardDetailDialog(MaskDialogBase):
         
         member_fields = {}
         for field_name, label in zip(field_names, field_labels):
-            input_widget = QLineEdit()
-            input_widget.setPlaceholderText(f"请输入{label}")
-            input_widget.setStyleSheet(input_style)
-            
-            # 如果是编辑现有成员，填充数据
-            if member:
-                value = getattr(member, field_name, "")
-                if value:
-                    input_widget.setText(str(value))
+            # 专业字段使用特殊的搜索组件
+            if field_name == 'major':
+                input_widget = MajorSearchWidget(
+                    self.ctx.majors,
+                    self.theme_manager,
+                    parent=member_card
+                )
+                # 如果是编辑现有成员，填充数据
+                if member:
+                    value = getattr(member, field_name, "")
+                    if value:
+                        input_widget.set_text(str(value))
+            else:
+                input_widget = QLineEdit()
+                clean_input_text(input_widget)  # 自动删除空白字符
+                input_widget.setPlaceholderText(f"请输入{label}")
+                input_widget.setStyleSheet(input_style)
+                
+                # 如果是编辑现有成员，填充数据
+                if member:
+                    value = getattr(member, field_name, "")
+                    if value:
+                        input_widget.setText(str(value))
             
             member_fields[field_name] = input_widget
         
@@ -884,7 +1001,12 @@ class AwardDetailDialog(MaskDialogBase):
             for field_key, dict_key in field_mapping.items():
                 value = member_info.get(dict_key)
                 if value and field_key in member_fields:
-                    member_fields[field_key].setText(value)
+                    widget = member_fields[field_key]
+                    # 支持MajorSearchWidget和QLineEdit
+                    if isinstance(widget, MajorSearchWidget):
+                        widget.set_text(value)
+                    else:
+                        widget.setText(value)
                     filled_fields.append(field_key)
             
             # 显示成功消息
@@ -913,23 +1035,37 @@ class AwardDetailDialog(MaskDialogBase):
     
     def _select_from_history(self, member_fields: dict) -> None:
         """从历史成员中选择"""
-        from ...ui.pages.management_page import MemberSelectionDialog
+        # 获取所有历史成员
+        from ...services.member_service import MemberService
+        from .entry_page import HistoryMemberDialog
+        
+        service = MemberService(self.ctx.db)
+        members = service.list_members()
+        
+        if not members:
+            InfoBar.warning("提示", "暂无历史成员记录", parent=self)
+            return
         
         # 创建历史成员选择对话框
-        dialog = MemberSelectionDialog(self, self.ctx)
+        dialog = HistoryMemberDialog(members, self.theme_manager, self)
         if dialog.exec():
             selected_member = dialog.selected_member
             if selected_member:
                 # 填充所有字段
-                member_fields['name'].setText(selected_member.name)
-                member_fields['gender'].setText(selected_member.gender)
-                member_fields['id_card'].setText(selected_member.id_card)
-                member_fields['phone'].setText(selected_member.phone)
-                member_fields['student_id'].setText(selected_member.student_id)
-                member_fields['email'].setText(selected_member.email)
-                member_fields['major'].setText(selected_member.major)
-                member_fields['class_name'].setText(selected_member.class_name)
-                member_fields['college'].setText(selected_member.college)
+                member_fields['name'].setText(selected_member.name or "")
+                member_fields['gender'].setText(selected_member.gender or "")
+                member_fields['id_card'].setText(selected_member.id_card or "")
+                member_fields['phone'].setText(selected_member.phone or "")
+                member_fields['student_id'].setText(selected_member.student_id or "")
+                member_fields['email'].setText(selected_member.email or "")
+                # 专业字段特殊处理
+                major_widget = member_fields['major']
+                if isinstance(major_widget, MajorSearchWidget):
+                    major_widget.set_text(selected_member.major or "")
+                else:
+                    major_widget.setText(selected_member.major or "")
+                member_fields['class_name'].setText(selected_member.class_name or "")
+                member_fields['college'].setText(selected_member.college or "")
                 InfoBar.success("成功", f"已选择成员: {selected_member.name}", parent=self)
     
     def _pick_files(self) -> None:
@@ -1060,10 +1196,16 @@ class AwardDetailDialog(MaskDialogBase):
                     member_info = {'name': name}
                     for field_name in field_names[1:]:
                         widget = member_fields.get(field_name)
-                        if isinstance(widget, QLineEdit):
+                        # 支持MajorSearchWidget和QLineEdit
+                        if isinstance(widget, MajorSearchWidget):
                             value = widget.text().strip()
-                            if value:
-                                member_info[field_name] = value
+                        elif isinstance(widget, QLineEdit):
+                            value = widget.text().strip()
+                        else:
+                            value = ""
+                        
+                        if value:
+                            member_info[field_name] = value
                     members.append(member_info)
         return members
     
