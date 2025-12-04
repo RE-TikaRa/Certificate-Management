@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QHBoxLayout,
     QApplication,
+    QLineEdit,
 )
 from qfluentwidgets import CheckBox, InfoBar, PrimaryPushButton, PushButton, ComboBox
 

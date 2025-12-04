@@ -955,7 +955,7 @@ class EntryPage(BasePage):
             member_fields = member_data['fields']
             self._remove_member_card(member_card, member_fields)
         # 添加一个空白成员卡片
-        self._add_member_card()
+        self._add_member_row()
         from qfluentwidgets import InfoBar
         InfoBar.success("成功", "表单已清空", duration=2000, parent=self.window())
     
