@@ -229,6 +229,7 @@ class OverviewPage(BasePage):
         self.start_date_edit.dateChanged.connect(self._on_filter_changed)
         self.start_date_edit.setFixedWidth(150)
         self.start_date_edit.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
+        self.start_date_edit.setSymbolVisible(False)
         row2.addWidget(self.start_date_edit)
 
         row2.addSpacing(20)
@@ -243,6 +244,7 @@ class OverviewPage(BasePage):
         self.end_date_edit.dateChanged.connect(self._on_filter_changed)
         self.end_date_edit.setFixedWidth(150)
         self.end_date_edit.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
+        self.end_date_edit.setSymbolVisible(False)
         row2.addWidget(self.end_date_edit)
 
         row2.addSpacing(20)
