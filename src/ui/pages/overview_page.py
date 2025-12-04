@@ -677,7 +677,7 @@ class AwardDetailDialog(MaskDialogBase):
         self.members_data = []  # 存储成员卡片数据
         self.selected_files: list[Path] = []  # 存储选中的附件文件
         
-        self.setWindowTitle(f"编辑荣誉 - {award.competition_name}")
+        self.setWindowTitle(f"📝 荣誉详情 - {award.competition_name}")
         self.setMinimumWidth(700)
         self.setMinimumHeight(600)
         
@@ -717,14 +717,14 @@ class AwardDetailDialog(MaskDialogBase):
         row1 = QHBoxLayout()
         row1.setSpacing(16)
         name_col = QVBoxLayout()
-        name_label = QLabel("比赛名称")
+        name_label = QLabel("🏆 竞赛名称")
         name_label.setObjectName("formLabel")
         self.name_input = QLineEdit(self.award.competition_name)
         name_col.addWidget(name_label)
         name_col.addWidget(self.name_input)
         
         date_col = QVBoxLayout()
-        date_label = QLabel("获奖日期")
+        date_label = QLabel("📅 获奖日期")
         date_label.setObjectName("formLabel")
         date_row = QHBoxLayout()
         date_row.setSpacing(8)
@@ -763,7 +763,7 @@ class AwardDetailDialog(MaskDialogBase):
         row2 = QHBoxLayout()
         row2.setSpacing(16)
         level_col = QVBoxLayout()
-        level_label = QLabel("赛事级别")
+        level_label = QLabel("🎯 竞赛级别")
         level_label.setObjectName("formLabel")
         self.level_input = QComboBox()
         self.level_input.addItems(["国家级", "省级", "校级"])
@@ -772,7 +772,7 @@ class AwardDetailDialog(MaskDialogBase):
         level_col.addWidget(self.level_input)
         
         rank_col = QVBoxLayout()
-        rank_label = QLabel("奖项等级")
+        rank_label = QLabel("🥇 获奖等级")
         rank_label.setObjectName("formLabel")
         self.rank_input = QComboBox()
         self.rank_input.addItems(["一等奖", "二等奖", "三等奖", "优秀奖"])
@@ -786,7 +786,7 @@ class AwardDetailDialog(MaskDialogBase):
         
         # Row 3: 证书编号
         cert_col = QVBoxLayout()
-        cert_label = QLabel("证书编号")
+        cert_label = QLabel("🔖 证书编号")
         cert_label.setObjectName("formLabel")
         self.cert_input = QLineEdit(self.award.certificate_code or "")
         cert_col.addWidget(cert_label)
@@ -795,7 +795,7 @@ class AwardDetailDialog(MaskDialogBase):
         
         # Row 4: 备注
         remark_col = QVBoxLayout()
-        remark_label = QLabel("备注")
+        remark_label = QLabel("📝 备注信息")
         remark_label.setObjectName("formLabel")
         self.remarks_input = QLineEdit(self.award.remarks or "")
         remark_col.addWidget(remark_label)
@@ -806,7 +806,7 @@ class AwardDetailDialog(MaskDialogBase):
         
         # === 成员卡片 ===
         members_card, members_layout = create_card()
-        members_layout.addWidget(make_section_title("参与成员"))
+        members_layout.addWidget(make_section_title("👥 参赛成员"))
         
         self.members_container = QWidget()
         self.members_container.setStyleSheet("QWidget { background-color: transparent; }")
@@ -822,7 +822,7 @@ class AwardDetailDialog(MaskDialogBase):
             self._add_member_card(member)
         
         # 添加成员按钮
-        add_member_btn = PrimaryPushButton("添加成员")
+        add_member_btn = PrimaryPushButton("➕ 添加成员")
         add_member_btn.clicked.connect(self._add_member_row)
         members_layout.addWidget(add_member_btn)
         
@@ -833,9 +833,9 @@ class AwardDetailDialog(MaskDialogBase):
         
         # 标题和添加按钮
         attach_header = QHBoxLayout()
-        attach_header.addWidget(make_section_title("附件"))
+        attach_header.addWidget(make_section_title("📎 证书附件"))
         attach_header.addStretch()
-        attach_btn = PrimaryPushButton("添加文件")
+        attach_btn = PrimaryPushButton("📁 选择文件")
         attach_btn.clicked.connect(self._pick_files)
         attach_header.addWidget(attach_btn)
         attachment_layout.addLayout(attach_header)
@@ -843,7 +843,7 @@ class AwardDetailDialog(MaskDialogBase):
         # 附件表格
         self.attach_table = QTableWidget()
         self.attach_table.setColumnCount(5)
-        self.attach_table.setHorizontalHeaderLabels(["序号", "附件名", "MD5", "大小", "操作"])
+        self.attach_table.setHorizontalHeaderLabels(["#", "文件名称", "MD5校验值", "文件大小", "操作"])
         self.attach_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.attach_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.attach_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
@@ -867,11 +867,11 @@ class AwardDetailDialog(MaskDialogBase):
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
         
-        save_btn = PrimaryPushButton("保存")
+        save_btn = PrimaryPushButton("💾 保存修改")
         save_btn.clicked.connect(self._save)
         btn_layout.addWidget(save_btn)
         
-        cancel_btn = PushButton("取消")
+        cancel_btn = PushButton("✖ 取消")
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
         
@@ -964,20 +964,20 @@ class AwardDetailDialog(MaskDialogBase):
         header_layout.addStretch()
         
         # 导入文档按钮
-        import_btn = PushButton("导入文档")
-        import_btn.setMinimumWidth(85)
+        import_btn = PushButton("📄 导入文档")
+        import_btn.setMinimumWidth(95)
         import_btn.setFixedHeight(28)
         header_layout.addWidget(import_btn)
         
         # 从历史成员选择按钮
-        history_btn = PushButton("从历史选择")
+        history_btn = PushButton("📋 历史成员")
         history_btn.setMinimumWidth(95)
         history_btn.setFixedHeight(28)
         header_layout.addWidget(history_btn)
         
         # 删除按钮
-        delete_btn = PushButton("删除")
-        delete_btn.setFixedWidth(60)
+        delete_btn = PushButton("🗑 移除")
+        delete_btn.setFixedWidth(70)
         delete_btn.setFixedHeight(28)
         header_layout.addWidget(delete_btn)
         
@@ -1303,7 +1303,7 @@ class AwardDetailDialog(MaskDialogBase):
     
     def _pick_files(self) -> None:
         """选择附件文件并添加到表格"""
-        files, _ = QFileDialog.getOpenFileNames(self, "选择附件")
+        files, _ = QFileDialog.getOpenFileNames(self, "📁 选择证书附件")
         if not files:
             return
         
@@ -1345,7 +1345,7 @@ class AwardDetailDialog(MaskDialogBase):
             
             # 删除按钮
             delete_btn = TransparentToolButton(FluentIcon.DELETE)
-            delete_btn.setToolTip("删除")
+            delete_btn.setToolTip("删除此附件")
             delete_btn.clicked.connect(lambda checked, r=row: self._remove_attachment(r))
             
             # 创建容器居中按钮
