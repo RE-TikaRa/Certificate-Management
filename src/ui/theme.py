@@ -32,13 +32,13 @@ def make_section_title(text: str) -> QLabel:
     return label
 
 
-def create_card(shadow: bool = True) -> tuple[QFrame, QVBoxLayout]:
+def create_card(shadow: bool = False) -> tuple[QFrame, QVBoxLayout]:
     frame = QFrame()
     frame.setProperty("card", True)
     layout = QVBoxLayout(frame)
     layout.setContentsMargins(24, 24, 24, 24)
     layout.setSpacing(16)
-    if shadow:
+    if shadow:  # 模糊效果会导致性能下降很多，请不要使用
         effect = QGraphicsDropShadowEffect(frame)
         effect.setBlurRadius(28)
         effect.setOffset(0, 8)
