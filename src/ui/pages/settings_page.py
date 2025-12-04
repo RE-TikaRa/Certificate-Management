@@ -43,6 +43,8 @@ class SettingsPage(BasePage):
         self.include_logs = CheckBox("包含日志")
         self.theme_mode = ComboBox()
         self.theme_mode.addItems(list(self.THEME_OPTIONS.values()))
+        self.email_suffix = QLineEdit()  # 邮箱后缀输入框
+        self.email_suffix.setPlaceholderText("例如: @st.gsau.edu.cn")
         self._build_ui()
         self.refresh()
 
@@ -65,6 +67,7 @@ class SettingsPage(BasePage):
         form.addRow(self.include_attachments)
         form.addRow(self.include_logs)
         form.addRow("主题模式", self.theme_mode)
+        form.addRow("默认邮箱后缀", self.email_suffix)
         settings_layout.addLayout(form)
 
         action_row = QHBoxLayout()
@@ -105,6 +108,9 @@ class SettingsPage(BasePage):
         stored_theme = self.ctx.settings.get("theme_mode", "light")
         display_text = self.THEME_OPTIONS.get(stored_theme, "浅色")
         self.theme_mode.setCurrentText(display_text)
+        # Load email suffix
+        email_suffix = self.ctx.settings.get("email_suffix", "@st.gsau.edu.cn")
+        self.email_suffix.setText(email_suffix)
 
     def _choose_attach_dir(self) -> None:
         path = QFileDialog.getExistingDirectory(self, "选择附件目录", self.attach_dir.text())
@@ -131,6 +137,12 @@ class SettingsPage(BasePage):
             
             self.ctx.settings.set("include_attachments", str(self.include_attachments.isChecked()).lower())
             self.ctx.settings.set("include_logs", str(self.include_logs.isChecked()).lower())
+            
+            # Save email suffix
+            email_suffix = self.email_suffix.text().strip()
+            if not email_suffix:
+                email_suffix = "@st.gsau.edu.cn"  # 默认值
+            self.ctx.settings.set("email_suffix", email_suffix)
             
             # Convert display text back to theme value
             display_text = self.theme_mode.currentText()

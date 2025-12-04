@@ -20,6 +20,7 @@ DEFAULT_SETTINGS: Final[dict[str, str]] = {
     "include_logs": "true",
     "theme_mode": "light",
     "backup_retention": "5",
+    "email_suffix": "@st.gsau.edu.cn",  # 默认邮箱后缀
 }
 
 for directory in (DATA_DIR, ATTACHMENTS_DIR, BACKUP_DIR, LOG_DIR, TEMPLATES_DIR):

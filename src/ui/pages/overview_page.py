@@ -8,7 +8,8 @@ from PySide6.QtCore import Qt, QTimer, QSize, QDate, Slot
 from PySide6.QtWidgets import (
     QLabel, QVBoxLayout, QHBoxLayout, QScrollArea, QWidget, 
     QGridLayout, QFrame, QDialog, QLineEdit, QSpinBox, QComboBox,
-    QTableWidget, QTableWidgetItem, QHeaderView, QFileDialog
+    QTableWidget, QTableWidgetItem, QHeaderView, QFileDialog,
+    QProgressDialog, QApplication
 )
 from PySide6.QtGui import QFont, QColor, QPalette
 from qfluentwidgets import (
@@ -16,6 +17,7 @@ from qfluentwidgets import (
     MaskDialogBase, MessageBox, InfoBar, TransparentToolButton, FluentIcon
 )
 
+from ...services.doc_extractor import extract_member_info_from_doc
 from .base_page import BasePage
 from ..styled_theme import ThemeManager
 from ..theme import create_card, create_page_header, make_section_title
@@ -593,6 +595,18 @@ class AwardDetailDialog(MaskDialogBase):
         header_layout.addWidget(member_label)
         header_layout.addStretch()
         
+        # 导入文档按钮
+        import_btn = PushButton("导入文档")
+        import_btn.setMinimumWidth(85)
+        import_btn.setFixedHeight(28)
+        header_layout.addWidget(import_btn)
+        
+        # 从历史成员选择按钮
+        history_btn = PushButton("从历史选择")
+        history_btn.setMinimumWidth(95)
+        history_btn.setFixedHeight(28)
+        header_layout.addWidget(history_btn)
+        
         delete_btn = PushButton("删除")
         delete_btn.setMaximumWidth(60)
         
@@ -638,8 +652,10 @@ class AwardDetailDialog(MaskDialogBase):
         member_layout.addLayout(header_layout)
         member_layout.addLayout(form_grid)
         
+        # 连接按钮信号
+        import_btn.clicked.connect(lambda: self._import_from_doc(member_fields))
+        history_btn.clicked.connect(lambda: self._select_from_history(member_fields))
         delete_btn.clicked.connect(lambda: self._remove_member_card(member_card, member_fields))
-        header_layout.addWidget(delete_btn)
         
         member_data = {
             'card': member_card,
@@ -707,6 +723,179 @@ class AwardDetailDialog(MaskDialogBase):
                 self.members_data.pop(idx)
                 break
         member_card.deleteLater()
+    
+    def _import_from_doc(self, member_fields: dict) -> None:
+        """从 .doc 文档导入成员信息"""
+        # 打开文件选择对话框
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "选择成员信息文档",
+            "",
+            "Word 文档 (*.doc);;所有文件 (*.*)"
+        )
+        
+        if not file_path:
+            return
+        
+        # 创建美化的进度对话框（适配主题）
+        progress = QProgressDialog(self)
+        progress.setWindowTitle("📄 导入成员信息")
+        
+        # 根据主题设置文本颜色
+        is_dark = self.theme_manager.is_dark
+        if is_dark:
+            text_color = "#e0e0e0"
+            desc_color = "#a0a0a0"
+            hint_color = "#808080"
+        else:
+            text_color = "#333"
+            desc_color = "#666"
+            hint_color = "#999"
+        
+        progress.setLabelText(
+            f"<div style='padding: 10px;'>" 
+            f"<p style='font-size: 14px; margin-bottom: 8px; color: {text_color};'><b>🔄 正在处理文档...</b></p>"
+            f"<p style='font-size: 12px; color: {desc_color};'>正在打开 Word 文档并提取成员信息</p>"
+            f"<p style='font-size: 12px; color: {hint_color};'>这可能需要几秒钟，请耐心等待 ☕</p>"
+            "</div>"
+        )
+        progress.setRange(0, 0)  # 不确定进度，显示滚动条
+        progress.setMinimumWidth(400)
+        progress.setMinimumHeight(150)
+        progress.setCancelButton(None)  # 不可取消
+        progress.setWindowModality(Qt.WindowModality.WindowModal)
+        
+        # 根据主题应用美化样式
+        if is_dark:
+            progress.setStyleSheet("""
+                QProgressDialog {
+                    background-color: #2b2b2b;
+                    border-radius: 8px;
+                }
+                QLabel {
+                    color: #e0e0e0;
+                    padding: 15px;
+                }
+                QProgressBar {
+                    border: 2px solid #3a3a3a;
+                    border-radius: 5px;
+                    text-align: center;
+                    background-color: #1e1e1e;
+                    color: #e0e0e0;
+                    height: 20px;
+                }
+                QProgressBar::chunk {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                        stop:0 #4a90e2, stop:0.5 #5fa3ef, stop:1 #4a90e2);
+                    border-radius: 3px;
+                }
+            """)
+        else:
+            progress.setStyleSheet("""
+                QProgressDialog {
+                    background-color: white;
+                    border-radius: 8px;
+                }
+                QLabel {
+                    color: #333;
+                    padding: 15px;
+                }
+                QProgressBar {
+                    border: 2px solid #e0e0e0;
+                    border-radius: 5px;
+                    text-align: center;
+                    background-color: #f5f5f5;
+                    height: 20px;
+                }
+                QProgressBar::chunk {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                        stop:0 #4a90e2, stop:0.5 #5fa3ef, stop:1 #4a90e2);
+                    border-radius: 3px;
+                }
+            """)
+        
+        progress.show()
+        QApplication.processEvents()  # 强制显示对话框
+        
+        try:
+            # 提取文档信息（传入邮箱后缀）
+            email_suffix = self.ctx.settings.get("email_suffix", "@st.gsau.edu.cn")
+            member_info = extract_member_info_from_doc(file_path, email_suffix)
+            
+            # 关闭进度对话框
+            progress.close()
+            
+            # 统计成功提取的字段数量
+            extracted_count = sum(1 for v in member_info.values() if v is not None)
+            
+            if extracted_count == 0:
+                InfoBar.warning("提取失败", "未能从文档中提取到任何信息", parent=self)
+                logger.warning(f"未从文档中提取到信息: {file_path}")
+                return
+            
+            # 填充字段（不包括姓名，姓名需要用户手动输入）
+            field_mapping = {
+                'gender': 'gender',
+                'id_card': 'id_card',
+                'phone': 'phone',
+                'student_id': 'student_id',
+                'email': 'email',
+                'major': 'major',
+                'class_name': 'class_name',
+                'college': 'college'
+            }
+            
+            filled_fields = []
+            for field_key, dict_key in field_mapping.items():
+                value = member_info.get(dict_key)
+                if value and field_key in member_fields:
+                    member_fields[field_key].setText(value)
+                    filled_fields.append(field_key)
+            
+            # 显示成功消息
+            if filled_fields:
+                InfoBar.success(
+                    "导入成功",
+                    f"已自动填充 {len(filled_fields)} 个字段，请手动输入姓名",
+                    parent=self
+                )
+                logger.info(f"成功导入 {len(filled_fields)} 个字段: {', '.join(filled_fields)}")
+                
+                # 聚焦到姓名输入框
+                if 'name' in member_fields:
+                    member_fields['name'].setFocus()
+            else:
+                InfoBar.warning("提取失败", "未能从文档中提取到有效信息", parent=self)
+                
+        except FileNotFoundError as e:
+            progress.close()
+            InfoBar.error("文件错误", str(e), parent=self)
+            logger.error(f"文件不存在: {file_path}")
+        except Exception as e:
+            progress.close()
+            InfoBar.error("导入失败", f"提取文档信息时出错: {str(e)}", parent=self)
+            logger.error(f"导入文档失败: {e}", exc_info=True)
+    
+    def _select_from_history(self, member_fields: dict) -> None:
+        """从历史成员中选择"""
+        from ...ui.pages.management_page import MemberSelectionDialog
+        
+        # 创建历史成员选择对话框
+        dialog = MemberSelectionDialog(self, self.ctx)
+        if dialog.exec():
+            selected_member = dialog.selected_member
+            if selected_member:
+                # 填充所有字段
+                member_fields['name'].setText(selected_member.name)
+                member_fields['gender'].setText(selected_member.gender)
+                member_fields['id_card'].setText(selected_member.id_card)
+                member_fields['phone'].setText(selected_member.phone)
+                member_fields['student_id'].setText(selected_member.student_id)
+                member_fields['email'].setText(selected_member.email)
+                member_fields['major'].setText(selected_member.major)
+                member_fields['class_name'].setText(selected_member.class_name)
+                member_fields['college'].setText(selected_member.college)
+                InfoBar.success("成功", f"已选择成员: {selected_member.name}", parent=self)
     
     def _pick_files(self) -> None:
         """选择附件文件并添加到表格"""
