@@ -299,20 +299,19 @@ class EntryPage(BasePage):
 
         logger = logging.getLogger(__name__)
 
-        # 创建成员卡片
-        member_card = QWidget()
-        # 应用成员卡片样式
-        self._apply_member_card_style(member_card)
+        # 创建成员卡片 - 使用 QFrame 并设置 card 属性以使用 QSS 定义的样式
+        member_card = QFrame()
+        member_card.setProperty("card", True)
 
         # 获取当前样式用于标签
         is_dark = self.theme_manager.is_dark
         if is_dark:
-            label_style = "color: #a0a0a0; font-size: 12px;"
+            label_style = "color: #a6aabb; font-size: 12px;"
         else:
             label_style = "color: #666; font-size: 12px;"
         member_layout = QVBoxLayout(member_card)
-        member_layout.setContentsMargins(12, 12, 12, 12)
-        member_layout.setSpacing(10)
+        member_layout.setContentsMargins(16, 16, 16, 16)
+        member_layout.setSpacing(12)
 
         # 成员编号和删除按钮
         header_layout = QHBoxLayout()
@@ -425,15 +424,6 @@ class EntryPage(BasePage):
         self.members_list_layout.addWidget(member_card)
 
         logger.debug(f"成员 #{member_index} 已添加，总成员数：{len(self.members_data)}")
-
-    def _apply_member_card_style(self, card: QWidget) -> None:
-        """应用成员卡片样式（支持主题切换）"""
-        is_dark = self.theme_manager.is_dark
-        if is_dark:
-            card_style = "background-color: #353751; border-radius: 8px; border: 1px solid #4a4a5e;"
-        else:
-            card_style = "background-color: #f5f5f5; border-radius: 8px; border: 1px solid #e0e0e0;"
-        card.setStyleSheet(card_style)
 
     def _remove_member_card(self, member_card: QWidget, member_fields: dict) -> None:
         """删除一个成员卡片"""
@@ -1067,13 +1057,8 @@ class EntryPage(BasePage):
     @Slot()
     def _on_theme_changed(self) -> None:
         """主题切换时重新应用样式"""
-        # 1. 更新滚动区域背景
+        # 更新滚动区域背景 - 卡片样式由 QSS 自动处理
         self._apply_theme()
-
-        # 2. 重新应用所有成员卡片的样式（包括内部组件）
-        for member_data in self.members_data:
-            card = member_data["card"]
-            self._apply_member_card_style(card)
 
 
 class HistoryMemberDialog(MaskDialogBase):
@@ -1190,7 +1175,7 @@ class HistoryMemberDialog(MaskDialogBase):
     def _create_member_card(self, member) -> QWidget:
         """创建美化的成员卡片"""
         card = QFrame()
-        card.setObjectName("memberCard")
+        card.setProperty("card", True)  # 使用 QSS 定义的 Fluent 卡片样式
         card.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
 
         # 点击选择
@@ -1362,16 +1347,16 @@ class HistoryMemberDialog(MaskDialogBase):
         self.result_label.setText(f"找到 {visible_count} 位成员")
 
     def _apply_theme(self):
-        """应用主题样式（美化版）"""
+        """应用主题样式（使用统一的 QSS 颜色）"""
         is_dark = self.theme_manager.is_dark
 
         if is_dark:
-            bg_color = "#1c1f2e"
-            card_bg = "#353751"
-            card_hover = "#3d3f5e"
-            border_color = "#4a4a5e"
-            text_color = "#e0e0e0"
-            search_bg = "#2a2a3a"
+            bg_color = "#1c1f2e"  # 与 QWidget#pageRoot 一致
+            card_bg = "#2a2d3f"   # 与 QFrame[card="true"] 一致
+            card_hover = "#353751"
+            border_color = "rgba(138, 159, 255, 0.08)"
+            text_color = "#f2f4ff"
+            search_bg = "#2a2d3f"
         else:
             bg_color = "#f8f9fa"
             card_bg = "#ffffff"
@@ -1391,14 +1376,14 @@ class HistoryMemberDialog(MaskDialogBase):
                 border: 1px solid {border_color};
                 border-radius: 8px;
             }}
-            QFrame#memberCard {{
+            QFrame[card="true"] {{
                 background-color: {card_bg};
                 border: 1px solid {border_color};
-                border-radius: 8px;
+                border-radius: 12px;
             }}
-            QFrame#memberCard:hover {{
+            QFrame[card="true"]:hover {{
                 background-color: {card_hover};
-                border: 2px solid #1890ff;
+                border: 1px solid #5a80f3;
             }}
             QScrollArea {{
                 border: none;
@@ -1408,17 +1393,17 @@ class HistoryMemberDialog(MaskDialogBase):
                 background-color: transparent;
             }}
             QScrollBar:vertical {{
-                background-color: {bg_color};
+                background-color: transparent;
                 width: 8px;
                 border-radius: 4px;
             }}
             QScrollBar::handle:vertical {{
-                background-color: {border_color};
+                background-color: rgba(138, 159, 255, 0.3);
                 border-radius: 4px;
                 min-height: 30px;
             }}
             QScrollBar::handle:vertical:hover {{
-                background-color: #1890ff;
+                background-color: rgba(138, 159, 255, 0.5);
             }}
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
                 height: 0px;

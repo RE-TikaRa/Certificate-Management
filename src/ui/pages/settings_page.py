@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from qfluentwidgets import CheckBox, ComboBox, InfoBar, PrimaryPushButton, PushButton
+from qfluentwidgets import CheckBox, ComboBox, InfoBar, LineEdit, PrimaryPushButton, PushButton
 
 from ..styled_theme import ThemeManager
 from ..theme import create_card, create_page_header, make_section_title
@@ -66,7 +66,7 @@ class SettingsPage(BasePage):
         self.include_logs = CheckBox("包含日志")
         self.theme_mode = ComboBox()
         self.theme_mode.addItems(list(self.THEME_OPTIONS.values()))
-        self.email_suffix = QLineEdit()
+        self.email_suffix = LineEdit()
         clean_input_text(self.email_suffix)
         self.email_suffix.setPlaceholderText("例如: @st.gsau.edu.cn")
         self._build_ui()

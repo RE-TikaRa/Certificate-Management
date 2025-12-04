@@ -9,12 +9,12 @@ from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QVBoxLayout,
     QWidget,
 )
+from qfluentwidgets import LineEdit
 
 from src.data.models import Major
 from src.services.major_service import MajorService
@@ -44,8 +44,8 @@ class MajorSearchWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
         
-        # 输入框
-        self.input = QLineEdit()
+        # 输入框 - 使用 Fluent LineEdit
+        self.input = LineEdit()
         self.input.setPlaceholderText("输入专业名称搜索...")
         self.input.textChanged.connect(self._on_text_changed)
         layout.addWidget(self.input)
@@ -57,28 +57,15 @@ class MajorSearchWidget(QWidget):
         self.results_list.itemClicked.connect(self._on_item_clicked)
         layout.addWidget(self.results_list)
         
-        # 应用主题
+        # 应用主题（仅针对列表，LineEdit 已是 Fluent 组件）
         self._apply_theme()
         self.theme_manager.themeChanged.connect(self._apply_theme)
         
     def _apply_theme(self):
-        """应用主题样式"""
+        """应用主题样式（仅列表，LineEdit 使用 Fluent 自带样式）"""
         is_dark = self.theme_manager.is_dark
         
         if is_dark:
-            input_style = """
-                QLineEdit {
-                    background-color: #2a2a3a;
-                    color: #e0e0e0;
-                    border: 1px solid #4a4a5e;
-                    border-radius: 4px;
-                    padding: 6px 10px;
-                    font-size: 13px;
-                }
-                QLineEdit:focus {
-                    border: 1px solid #5a80f3;
-                }
-            """
             list_style = """
                 QListWidget {
                     background-color: #2a2a3a;
@@ -100,19 +87,6 @@ class MajorSearchWidget(QWidget):
                 }
             """
         else:
-            input_style = """
-                QLineEdit {
-                    background-color: white;
-                    color: #333;
-                    border: 1px solid #ddd;
-                    border-radius: 4px;
-                    padding: 6px 10px;
-                    font-size: 13px;
-                }
-                QLineEdit:focus {
-                    border: 1px solid #1890ff;
-                }
-            """
             list_style = """
                 QListWidget {
                     background-color: white;
@@ -134,7 +108,6 @@ class MajorSearchWidget(QWidget):
                 }
             """
         
-        self.input.setStyleSheet(input_style)
         self.results_list.setStyleSheet(list_style)
     
     def _on_text_changed(self, text: str):

@@ -7,6 +7,7 @@ from pathlib import Path
 from PySide6.QtCore import QDate, Qt, QTimer, Slot
 from PySide6.QtGui import QColor, QFont, QPalette
 from PySide6.QtWidgets import (
+    QAbstractSpinBox,
     QApplication,
     QFileDialog,
     QFrame,
@@ -227,6 +228,7 @@ class OverviewPage(BasePage):
         self.start_date_edit.setDate(QDate(2020, 1, 1))  # 默认起始日期
         self.start_date_edit.dateChanged.connect(self._on_filter_changed)
         self.start_date_edit.setFixedWidth(150)
+        self.start_date_edit.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
         row2.addWidget(self.start_date_edit)
 
         row2.addSpacing(20)
@@ -240,6 +242,7 @@ class OverviewPage(BasePage):
         self.end_date_edit.setDate(QDate.currentDate())  # 默认当前日期
         self.end_date_edit.dateChanged.connect(self._on_filter_changed)
         self.end_date_edit.setFixedWidth(150)
+        self.end_date_edit.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
         row2.addWidget(self.end_date_edit)
 
         row2.addSpacing(20)
@@ -987,20 +990,20 @@ class AwardDetailDialog(MaskDialogBase):
 
         logger = logging.getLogger(__name__)
 
-        member_card = QWidget()
-        # 应用成员卡片样式
-        self._apply_member_card_style(member_card)
+        # 使用 QFrame 并设置 card 属性以使用 QSS 定义的样式
+        member_card = QFrame()
+        member_card.setProperty("card", True)
 
         # 获取当前样式用于标签
         is_dark = self.theme_manager.is_dark
         if is_dark:
-            label_style = "color: #a0a0a0; font-size: 12px;"
+            label_style = "color: #a6aabb; font-size: 12px;"
         else:
             label_style = "color: #666; font-size: 12px;"
 
         member_layout = QVBoxLayout(member_card)
-        member_layout.setContentsMargins(12, 12, 12, 12)
-        member_layout.setSpacing(10)
+        member_layout.setContentsMargins(16, 16, 16, 16)
+        member_layout.setSpacing(12)
 
         # 头部：成员编号和删除按钮
         header_layout = QHBoxLayout()
@@ -1118,15 +1121,6 @@ class AwardDetailDialog(MaskDialogBase):
     def _add_member_row(self):
         """添加空白成员卡片"""
         self._add_member_card()
-
-    def _apply_member_card_style(self, card: QWidget) -> None:
-        """应用成员卡片样式（支持主题切换）"""
-        is_dark = self.theme_manager.is_dark
-        if is_dark:
-            card_style = "background-color: #353751; border-radius: 8px; border: 1px solid #4a4a5e;"
-        else:
-            card_style = "background-color: #f5f5f5; border-radius: 8px; border: 1px solid #e0e0e0;"
-        card.setStyleSheet(card_style)
 
     @Slot()
     def _on_dialog_theme_changed(self) -> None:
