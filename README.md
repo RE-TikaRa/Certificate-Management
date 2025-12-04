@@ -1,6 +1,6 @@
 # 荣誉证书管理系统
 
-![Python](https://img.shields.io/badge/Python-3.9+-blue)
+![Python](https://img.shields.io/badge/Python-3.13+-blue)
 ![PySide6](https://img.shields.io/badge/PySide6-6.10.1-green)
 ![License](https://img.shields.io/badge/License-MIT-orange)
 
