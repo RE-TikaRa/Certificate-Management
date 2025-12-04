@@ -43,8 +43,12 @@ class MainWindow(FluentWindow):
         # ✅ 连接主题变化信号以更新标题栏颜色
         self.theme_manager.themeChanged.connect(self._on_theme_changed)
         
-        # ✅ 连接堆栈切换信号以自动刷新页面
+        # ✅ 连接堆栈切换信号：记录即将显示的页，动画结束再刷新
+        self._pending_refresh_index: int | None = None
         self.stackedWidget.currentChanged.connect(self._on_page_changed)
+        # qfluentwidgets 使用 PopUpAniStackedWidget，动画结束信号为 aniFinished
+        if hasattr(self.stackedWidget, "view") and hasattr(self.stackedWidget.view, "aniFinished"):
+            self.stackedWidget.view.aniFinished.connect(self._on_page_animation_finished)
         
         # 快速初始化导航栏和首页
         self._init_navigation_fast()
@@ -76,15 +80,24 @@ class MainWindow(FluentWindow):
         self.apply_theme_stylesheet()
     
     def _on_page_changed(self, index: int) -> None:
-        """页面切换时自动刷新对应页面"""
+        """记录即将显示的页索引，等待动画结束后再刷新"""
+        self._pending_refresh_index = index
+
+    def _on_page_animation_finished(self) -> None:
+        """动画完成后再刷新当前页面，避免动画阶段卡顿"""
+        index = self._pending_refresh_index
+        if index is None:
+            index = self.stackedWidget.currentIndex()
         try:
             current_widget = self.stackedWidget.widget(index)
-            if current_widget and hasattr(current_widget, 'refresh'):
-                # 延迟刷新，确保页面完全显示
-                QTimer.singleShot(50, current_widget.refresh)
-                logger.debug(f"Page at index {index} will be refreshed")
+            if current_widget and hasattr(current_widget, "refresh"):
+                # 动画结束立即刷新，可按需再加微小延迟
+                QTimer.singleShot(0, current_widget.refresh)
+                logger.debug(f"Page at index {index} refreshed after animation")
         except Exception as e:
             logger.warning(f"Failed to refresh page at index {index}: {e}")
+        finally:
+            self._pending_refresh_index = None
 
     def _init_navigation_fast(self) -> None:
         """快速初始化导航栏和首页（不加载其他页面）"""
