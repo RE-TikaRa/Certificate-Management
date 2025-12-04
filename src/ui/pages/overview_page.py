@@ -14,7 +14,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QFont, QColor, QPalette
 from qfluentwidgets import (
     PrimaryPushButton, PushButton, TitleLabel, BodyLabel, CaptionLabel, 
-    MaskDialogBase, MessageBox, InfoBar, TransparentToolButton, FluentIcon
+    MaskDialogBase, MessageBox, InfoBar, TransparentToolButton, FluentIcon,
+    DateEdit, ComboBox
 )
 
 from ...services.doc_extractor import extract_member_info_from_doc
@@ -63,6 +64,16 @@ class OverviewPage(BasePage):
         self.total_awards = 0
         self.load_more_btn = None  # 保存加载更多按钮引用
         
+        # 筛选条件
+        self.filter_level = "全部"  # 等级筛选
+        self.filter_rank = "全部"  # 奖项筛选
+        self.filter_start_date = None  # 开始日期
+        self.filter_end_date = None  # 结束日期
+        self.filter_keyword = ""  # 关键词搜索
+        
+        # 排序条件
+        self.sort_by = "日期降序"  # 默认按日期降序
+        
         # 连接主题变化信号
         self.theme_manager.themeChanged.connect(self._on_theme_changed)
         
@@ -84,6 +95,11 @@ class OverviewPage(BasePage):
         
         # 页面标题
         layout.addWidget(create_page_header("所有荣誉项目", "查看和管理已输入的所有荣誉信息"))
+        
+        # 筛选区域
+        filter_card, filter_layout = create_card()
+        self._create_filter_section(filter_layout)
+        layout.addWidget(filter_card)
         
         # 荣誉项目卡片
         card, card_layout = create_card()
@@ -120,6 +136,217 @@ class OverviewPage(BasePage):
         
         self._apply_theme()
     
+    def _create_filter_section(self, parent_layout: QVBoxLayout) -> None:
+        """创建筛选区域"""
+        # 标题
+        parent_layout.addWidget(make_section_title("筛选条件"))
+        
+        # 第一行：等级、奖项、关键词搜索
+        row1 = QHBoxLayout()
+        row1.setSpacing(16)
+        
+        # 等级筛选
+        level_label = BodyLabel("等级:")
+        level_label.setFixedWidth(60)
+        row1.addWidget(level_label)
+        
+        self.level_combo = ComboBox()
+        self.level_combo.addItems(["全部", "国家级", "省级", "校级"])
+        self.level_combo.setCurrentText(self.filter_level)
+        self.level_combo.currentTextChanged.connect(self._on_filter_changed)
+        self.level_combo.setFixedWidth(150)
+        row1.addWidget(self.level_combo)
+        
+        row1.addSpacing(20)
+        
+        # 奖项筛选
+        rank_label = BodyLabel("奖项:")
+        rank_label.setFixedWidth(60)
+        row1.addWidget(rank_label)
+        
+        self.rank_combo = ComboBox()
+        self.rank_combo.addItems(["全部", "一等奖", "二等奖", "三等奖", "优秀奖"])
+        self.rank_combo.setCurrentText(self.filter_rank)
+        self.rank_combo.currentTextChanged.connect(self._on_filter_changed)
+        self.rank_combo.setFixedWidth(150)
+        row1.addWidget(self.rank_combo)
+        
+        row1.addSpacing(20)
+        
+        # 关键词搜索
+        keyword_label = BodyLabel("关键词:")
+        keyword_label.setFixedWidth(60)
+        row1.addWidget(keyword_label)
+        
+        self.keyword_input = QLineEdit()
+        self.keyword_input.setPlaceholderText("输入竞赛名称或证书编号...")
+        self.keyword_input.textChanged.connect(self._on_keyword_changed)
+        self.keyword_input.setFixedWidth(250)
+        row1.addWidget(self.keyword_input)
+        
+        row1.addStretch()
+        parent_layout.addLayout(row1)
+        
+        parent_layout.addSpacing(12)
+        
+        # 第二行：日期范围
+        row2 = QHBoxLayout()
+        row2.setSpacing(16)
+        
+        # 开始日期
+        start_label = BodyLabel("开始日期:")
+        start_label.setFixedWidth(60)
+        row2.addWidget(start_label)
+        
+        self.start_date_edit = DateEdit()
+        self.start_date_edit.setDate(QDate(2020, 1, 1))  # 默认起始日期
+        self.start_date_edit.dateChanged.connect(self._on_filter_changed)
+        self.start_date_edit.setFixedWidth(150)
+        row2.addWidget(self.start_date_edit)
+        
+        row2.addSpacing(20)
+        
+        # 结束日期
+        end_label = BodyLabel("结束日期:")
+        end_label.setFixedWidth(60)
+        row2.addWidget(end_label)
+        
+        self.end_date_edit = DateEdit()
+        self.end_date_edit.setDate(QDate.currentDate())  # 默认当前日期
+        self.end_date_edit.dateChanged.connect(self._on_filter_changed)
+        self.end_date_edit.setFixedWidth(150)
+        row2.addWidget(self.end_date_edit)
+        
+        row2.addSpacing(20)
+        
+        # 排序方式
+        sort_label = BodyLabel("排序:")
+        sort_label.setFixedWidth(60)
+        row2.addWidget(sort_label)
+        
+        self.sort_combo = ComboBox()
+        self.sort_combo.addItems([
+            "日期降序", "日期升序",
+            "等级降序", "等级升序",
+            "奖项降序", "奖项升序",
+            "名称A-Z", "名称Z-A"
+        ])
+        self.sort_combo.setCurrentText(self.sort_by)
+        self.sort_combo.currentTextChanged.connect(self._on_sort_changed)
+        self.sort_combo.setFixedWidth(150)
+        row2.addWidget(self.sort_combo)
+        
+        row2.addSpacing(20)
+        
+        # 重置按钮
+        reset_btn = PushButton("重置筛选")
+        reset_btn.setIcon(FluentIcon.SYNC)
+        reset_btn.clicked.connect(self._reset_filters)
+        reset_btn.setFixedWidth(120)
+        row2.addWidget(reset_btn)
+        
+        row2.addStretch()
+        parent_layout.addLayout(row2)
+    
+    def _on_filter_changed(self) -> None:
+        """筛选条件改变时触发"""
+        self.filter_level = self.level_combo.currentText()
+        self.filter_rank = self.rank_combo.currentText()
+        self.filter_start_date = self.start_date_edit.date().toPython()
+        self.filter_end_date = self.end_date_edit.date().toPython()
+        self.refresh()
+    
+    def _on_sort_changed(self, text: str) -> None:
+        """排序方式改变时触发"""
+        self.sort_by = text
+        self.refresh()
+    
+    def _on_keyword_changed(self, text: str) -> None:
+        """关键词搜索（防抖处理）"""
+        self.filter_keyword = text.strip()
+        # 使用定时器防抖，500ms后触发搜索
+        if hasattr(self, '_search_timer'):
+            self._search_timer.stop()
+        else:
+            self._search_timer = QTimer()
+            self._search_timer.setSingleShot(True)
+            self._search_timer.timeout.connect(self.refresh)
+        self._search_timer.start(500)
+    
+    def _reset_filters(self) -> None:
+        """重置所有筛选条件"""
+        self.level_combo.setCurrentText("全部")
+        self.rank_combo.setCurrentText("全部")
+        self.start_date_edit.setDate(QDate(2020, 1, 1))
+        self.end_date_edit.setDate(QDate.currentDate())
+        self.keyword_input.clear()
+        self.sort_combo.setCurrentText("日期降序")
+        self.filter_level = "全部"
+        self.filter_rank = "全部"
+        self.filter_start_date = self.start_date_edit.date().toPython()
+        self.filter_end_date = self.end_date_edit.date().toPython()
+        self.filter_keyword = ""
+        self.sort_by = "日期降序"
+        self.refresh()
+    
+    def _apply_filters(self, awards: list) -> list:
+        """应用筛选条件"""
+        filtered = awards
+        
+        # 等级筛选
+        if self.filter_level != "全部":
+            filtered = [a for a in filtered if a.level == self.filter_level]
+        
+        # 奖项筛选
+        if self.filter_rank != "全部":
+            filtered = [a for a in filtered if a.rank == self.filter_rank]
+        
+        # 日期范围筛选
+        if self.filter_start_date and self.filter_end_date:
+            filtered = [
+                a for a in filtered 
+                if self.filter_start_date <= a.award_date <= self.filter_end_date
+            ]
+        
+        # 关键词搜索（竞赛名称或证书编号）
+        if self.filter_keyword:
+            keyword_lower = self.filter_keyword.lower()
+            filtered = [
+                a for a in filtered
+                if keyword_lower in (a.competition_name or '').lower() or
+                   keyword_lower in (a.certificate_code or '').lower()
+            ]
+        
+        return filtered
+    
+    def _apply_sorting(self, awards: list) -> list:
+        """应用排序"""
+        if not awards:
+            return awards
+        
+        # 等级优先级映射（用于排序）
+        level_priority = {"国家级": 3, "省级": 2, "校级": 1}
+        rank_priority = {"一等奖": 4, "二等奖": 3, "三等奖": 2, "优秀奖": 1}
+        
+        if self.sort_by == "日期降序":
+            return sorted(awards, key=lambda a: a.award_date, reverse=True)
+        elif self.sort_by == "日期升序":
+            return sorted(awards, key=lambda a: a.award_date)
+        elif self.sort_by == "等级降序":
+            return sorted(awards, key=lambda a: level_priority.get(a.level, 0), reverse=True)
+        elif self.sort_by == "等级升序":
+            return sorted(awards, key=lambda a: level_priority.get(a.level, 0))
+        elif self.sort_by == "奖项降序":
+            return sorted(awards, key=lambda a: rank_priority.get(a.rank, 0), reverse=True)
+        elif self.sort_by == "奖项升序":
+            return sorted(awards, key=lambda a: rank_priority.get(a.rank, 0))
+        elif self.sort_by == "名称A-Z":
+            return sorted(awards, key=lambda a: a.competition_name or '')
+        elif self.sort_by == "名称Z-A":
+            return sorted(awards, key=lambda a: a.competition_name or '', reverse=True)
+        
+        return awards
+    
     def _auto_refresh(self) -> None:
         """✅ 优化：快速数据变化检测 - 只用 ID 比较，不用创建完整对象
         
@@ -154,13 +381,19 @@ class OverviewPage(BasePage):
             logger.debug(f"自动刷新失败: {e}")
     
     def refresh(self) -> None:
-        """刷新荣誉列表（优化版：分批加载）"""
+        """刷新荣誉列表（优化版：分批加载 + 筛选 + 排序）"""
         try:
             # ✅ 优化1：快速清空UI
             self._clear_awards_layout()
             
             # ✅ 优化2：获取所有数据
-            self.awards_list = self.ctx.awards.list_awards()
+            all_awards = self.ctx.awards.list_awards()
+            
+            # ✅ 应用筛选条件
+            filtered_awards = self._apply_filters(all_awards)
+            
+            # ✅ 应用排序
+            self.awards_list = self._apply_sorting(filtered_awards)
             self.total_awards = len(self.awards_list)
             
             if not self.awards_list:
