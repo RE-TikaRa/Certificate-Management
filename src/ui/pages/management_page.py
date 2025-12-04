@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import logging
+
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QVBoxLayout,
     QWidget,
     QLabel,
-    QTableWidget,
-    QTableWidgetItem,
+    QTableView,
     QScrollArea,
     QFrame,
     QDialog,
@@ -20,8 +21,12 @@ from qfluentwidgets import PushButton, MaskDialogBase, MessageBox, InfoBar
 
 from ..theme import create_card, create_page_header, make_section_title, apply_table_style
 from ..styled_theme import ThemeManager
+from ..table_models import MembersTableModel
+from ..utils.async_utils import run_in_thread
 
 from .base_page import BasePage
+
+logger = logging.getLogger(__name__)
 
 
 def clean_input_text(line_edit: QLineEdit) -> None:
@@ -93,17 +98,18 @@ class ManagementPage(BasePage):
         card_layout.addLayout(header_layout)
         
         # 创建表格
-        self.members_table = QTableWidget()
-        self.members_table.setColumnCount(6)
-        self.members_table.setHorizontalHeaderLabels([
-            "姓名", "性别", "电话", "学院", "班级", "详情"
-        ])
+        self.members_model = MembersTableModel(self)
+        self.members_table = QTableView()
+        self.members_table.setModel(self.members_model)
         apply_table_style(self.members_table)
         self.members_table.setMinimumHeight(400)
-        self.members_table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        
-        # 设置列宽
-        widths = [80, 60, 120, 100, 80, 70]
+        self.members_table.horizontalHeader().setStretchLastSection(False)
+        self.members_table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
+        self.members_table.setSelectionMode(QTableView.SelectionMode.SingleSelection)
+        self.members_table.horizontalHeader().setDefaultSectionSize(110)
+        self.members_table.verticalHeader().setDefaultSectionSize(44)
+        self.members_table.clicked.connect(self._on_table_clicked)
+        widths = [80, 60, 120, 120, 90, 80]
         for i, w in enumerate(widths):
             self.members_table.setColumnWidth(i, w)
         
@@ -133,35 +139,18 @@ class ManagementPage(BasePage):
             logger.debug(f"成员自动刷新失败: {e}")
     
     def refresh(self) -> None:
-        """刷新成员表格"""
-        self.members_table.setRowCount(0)
-        members = self.ctx.awards.list_members()
-        
-        # ✅ 优化：更新缓存
+        """异步刷新成员表格"""
+        run_in_thread(self.ctx.awards.list_members, self._on_members_loaded)
+
+    def _on_members_loaded(self, members) -> None:
         self._cached_member_ids = {m.id for m in members}
-        
-        for row, member in enumerate(members):
-            self.members_table.insertRow(row)
-            
-            # 基本信息 - 只显示关键字段
-            fields = [
-                member.name or "",
-                member.gender or "",
-                member.phone or "",
-                member.college or "",
-                member.class_name or "",
-            ]
-            
-            # 填充信息字段
-            for col, value in enumerate(fields):
-                item = QTableWidgetItem(value)
-                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                self.members_table.setItem(row, col, item)
-            
-            # 详情按钮
-            detail_btn = PushButton("详情")
-            detail_btn.clicked.connect(lambda checked, m=member: self._show_member_detail(m))
-            self.members_table.setCellWidget(row, 5, detail_btn)
+        self.members_model.set_objects(members)
+        self.members_table.resizeColumnsToContents()
+
+    def _on_table_clicked(self, index):
+        if index.column() == 5:
+            member = self.members_model.object_at(index.row())
+            self._show_member_detail(member)
     
     def _show_member_detail(self, member) -> None:
         """显示成员详情对话框"""
@@ -599,4 +588,3 @@ class MemberDetailDialog(MaskDialogBase):
         
         # ✅ 关键：在Windows上强制设置标题栏颜色
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-

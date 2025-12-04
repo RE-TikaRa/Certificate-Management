@@ -1,18 +1,22 @@
 from __future__ import annotations
 
+import logging
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QHBoxLayout,
-    QTableWidget,
-    QTableWidgetItem,
+    QTableView,
     QVBoxLayout,
 )
 from qfluentwidgets import PrimaryPushButton, PushButton, InfoBar, MessageBox
 
 from ..theme import apply_table_style, create_card, create_page_header, make_section_title
 from ..styled_theme import ThemeManager
+from ..table_models import ObjectTableModel
+from ..utils.async_utils import run_in_thread
 
 from .base_page import BasePage
+
+logger = logging.getLogger(__name__)
 
 
 class RecyclePage(BasePage):
@@ -35,9 +39,21 @@ class RecyclePage(BasePage):
         refresh_btn.clicked.connect(self.refresh)
         header_layout.addWidget(refresh_btn)
         card_layout.addLayout(header_layout)
-        self.table = QTableWidget(0, 6)
-        self.table.setHorizontalHeaderLabels(["ID", "比赛名称", "级别", "奖项等级", "获奖日期", "删除时间"])
+        headers = ["ID", "比赛名称", "级别", "奖项等级", "获奖日期", "删除时间"]
+        accessors = [
+            lambda a: a.id,
+            lambda a: a.competition_name,
+            lambda a: a.level,
+            lambda a: a.rank,
+            lambda a: a.award_date,
+            lambda a: a.deleted_at.strftime("%Y-%m-%d %H:%M:%S") if a.deleted_at else "",
+        ]
+        self.model = ObjectTableModel(headers, accessors, self)
+        self.table = QTableView()
+        self.table.setModel(self.model)
         apply_table_style(self.table)
+        self.table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QTableView.SelectionMode.ExtendedSelection)
         card_layout.addWidget(self.table)
         btns = QHBoxLayout()
         restore_btn = PrimaryPushButton("恢复")
@@ -53,33 +69,7 @@ class RecyclePage(BasePage):
 
     def refresh(self) -> None:
         """刷新已删除的荣誉列表"""
-        awards = self.ctx.awards.list_deleted_awards()
-        self.table.setRowCount(len(awards))
-        for row, award in enumerate(awards):
-            item0 = QTableWidgetItem(str(award.id))
-            item0.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.table.setItem(row, 0, item0)
-            
-            item1 = QTableWidgetItem(award.competition_name)
-            item1.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.table.setItem(row, 1, item1)
-            
-            item2 = QTableWidgetItem(award.level)
-            item2.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.table.setItem(row, 2, item2)
-            
-            item3 = QTableWidgetItem(award.rank)
-            item3.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.table.setItem(row, 3, item3)
-            
-            item4 = QTableWidgetItem(str(award.award_date))
-            item4.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.table.setItem(row, 4, item4)
-            
-            deleted_time = award.deleted_at.strftime("%Y-%m-%d %H:%M:%S") if award.deleted_at else ""
-            item5 = QTableWidgetItem(deleted_time)
-            item5.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.table.setItem(row, 5, item5)
+        run_in_thread(self.ctx.awards.list_deleted_awards, self.model.set_objects)
 
     def _selected_ids(self) -> list[int]:
         ids = []
@@ -87,7 +77,7 @@ class RecyclePage(BasePage):
         if selection is None:
             return ids
         for index in selection.selectedRows():
-            ids.append(int(self.table.item(index.row(), 0).text()))
+            ids.append(int(self.model.object_at(index.row()).id))
         return ids
 
     def _restore(self) -> None:

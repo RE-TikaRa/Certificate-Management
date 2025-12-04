@@ -19,8 +19,7 @@ from PySide6.QtWidgets import (
     QMenu,
     QFrame,
     QSpinBox,
-    QTableWidget,
-    QTableWidgetItem,
+    QTableView,
     QHeaderView,
     QProgressDialog,
     QApplication,
@@ -32,6 +31,8 @@ from ...services.doc_extractor import extract_member_info_from_doc
 from ..theme import create_card, create_page_header, make_section_title
 from ..styled_theme import ThemeManager
 from ..widgets.major_search import MajorSearchWidget
+from ..table_models import AttachmentTableModel
+from ..utils.async_utils import run_in_thread
 
 from .base_page import BasePage
 
@@ -236,9 +237,9 @@ class EntryPage(BasePage):
         attachment_layout.addLayout(attach_header)
         
         # 附件表格
-        self.attach_table = QTableWidget()
-        self.attach_table.setColumnCount(5)
-        self.attach_table.setHorizontalHeaderLabels(["序号", "附件名", "MD5", "大小", "操作"])
+        self.attach_model = AttachmentTableModel(self)
+        self.attach_table = QTableView()
+        self.attach_table.setModel(self.attach_model)
         self.attach_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)  # 序号
         self.attach_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)  # 附件名
         self.attach_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)  # MD5
@@ -247,8 +248,8 @@ class EntryPage(BasePage):
         self.attach_table.setMaximumHeight(200)
         self.attach_table.setMinimumHeight(100)
         self.attach_table.verticalHeader().setVisible(False)
-        self.attach_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.attach_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.attach_table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
+        self.attach_table.setSelectionMode(QTableView.SelectionMode.SingleSelection)
         from ..theme import apply_table_style
         apply_table_style(self.attach_table)
         attachment_layout.addWidget(self.attach_table)
@@ -709,44 +710,37 @@ class EntryPage(BasePage):
         self._update_attachment_table()
     
     def _update_attachment_table(self) -> None:
-        """更新附件表格显示"""
-        self.attach_table.setRowCount(len(self.selected_files))
-        
-        for row, file_path in enumerate(self.selected_files):
-            # 序号
-            item0 = QTableWidgetItem(str(row + 1))
-            item0.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.attach_table.setItem(row, 0, item0)
-            
-            # 文件名
-            item1 = QTableWidgetItem(file_path.name)
-            item1.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.attach_table.setItem(row, 1, item1)
-            
-            # MD5
-            md5_hash = self._calculate_md5(file_path)
-            item2 = QTableWidgetItem(md5_hash[:16] + "...")  # 显示前16位
-            item2.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.attach_table.setItem(row, 2, item2)
-            
-            # 大小
-            size_str = self._format_file_size(file_path.stat().st_size)
-            item3 = QTableWidgetItem(size_str)
-            item3.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.attach_table.setItem(row, 3, item3)
-            
-            # 删除按钮
+        """更新附件表格显示（异步计算 MD5/大小）"""
+        def build_rows():
+            rows = []
+            for idx, file_path in enumerate(self.selected_files, start=1):
+                md5_hash = self._calculate_md5(file_path)
+                size_str = self._format_file_size(file_path.stat().st_size)
+                rows.append({
+                    "index": idx,
+                    "name": file_path.name,
+                    "md5": md5_hash[:16] + "...",
+                    "size": size_str,
+                    "path": file_path,
+                })
+            return rows
+
+        run_in_thread(build_rows, self._on_attachments_ready)
+
+    def _on_attachments_ready(self, rows: list[dict]) -> None:
+        self.attach_model.set_objects(rows)
+        # 设置操作按钮
+        for row_idx, row in enumerate(rows):
             delete_btn = TransparentToolButton(FluentIcon.DELETE)
             delete_btn.setToolTip("删除")
-            delete_btn.clicked.connect(lambda checked, r=row: self._remove_attachment(r))
-            
-            # 创建容器居中按钮
+            delete_btn.clicked.connect(lambda checked, r=row_idx: self._remove_attachment(r))
             btn_widget = QWidget()
             btn_layout = QHBoxLayout(btn_widget)
             btn_layout.setContentsMargins(4, 0, 4, 0)
             btn_layout.addWidget(delete_btn)
             btn_layout.setAlignment(Qt.AlignCenter)
-            self.attach_table.setCellWidget(row, 4, btn_widget)
+            index = self.attach_model.index(row_idx, 4)
+            self.attach_table.setIndexWidget(index, btn_widget)
     
     def _calculate_md5(self, file_path: Path) -> str:
         """计算文件MD5值"""

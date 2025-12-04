@@ -10,8 +10,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QScrollArea,
-    QTableWidget,
-    QTableWidgetItem,
+    QTableView,
     QVBoxLayout,
     QWidget,
     QSizePolicy,
@@ -20,6 +19,8 @@ from qfluentwidgets import InfoBar, PrimaryPushButton, PushButton
 
 from ..theme import apply_table_style, create_card, create_page_header, make_section_title
 from ..styled_theme import ThemeManager
+from ..table_models import ObjectTableModel
+from ..utils.async_utils import run_in_thread
 
 from .base_page import BasePage
 
@@ -155,8 +156,9 @@ class DashboardPage(BasePage):
 
         left = QVBoxLayout()
         left.addWidget(make_section_title("级别汇总"))
-        self.level_table = QTableWidget(0, 2)
-        self.level_table.setHorizontalHeaderLabels(["级别", "数量"])
+        self.level_model = ObjectTableModel(["级别", "数量"], [lambda r: r[0], lambda r: r[1]], self)
+        self.level_table = QTableView()
+        self.level_table.setModel(self.level_model)
         apply_table_style(self.level_table)
         self.level_table.setMinimumHeight(220)
         left.addWidget(self.level_table)
@@ -164,8 +166,9 @@ class DashboardPage(BasePage):
 
         right = QVBoxLayout()
         right.addWidget(make_section_title("等级汇总"))
-        self.rank_table = QTableWidget(0, 2)
-        self.rank_table.setHorizontalHeaderLabels(["等级", "数量"])
+        self.rank_model = ObjectTableModel(["等级", "数量"], [lambda r: r[0], lambda r: r[1]], self)
+        self.rank_table = QTableView()
+        self.rank_table.setModel(self.rank_model)
         apply_table_style(self.rank_table)
         self.rank_table.setMinimumHeight(220)
         right.addWidget(self.rank_table)
@@ -176,10 +179,18 @@ class DashboardPage(BasePage):
     def _build_recent_section(self) -> QWidget:
         card, card_layout = create_card()
         card_layout.addWidget(make_section_title("最近录入"))
-        self.recent_table = QTableWidget(0, 5)
-        self.recent_table.setHorizontalHeaderLabels(["比赛", "级别", "等级", "日期", "成员"])
+        headers = ["比赛", "级别", "等级", "日期", "成员"]
+        accessors = [
+            lambda a: a.competition_name,
+            lambda a: a.level,
+            lambda a: a.rank,
+            lambda a: str(a.award_date),
+            lambda a: ", ".join(member.name for member in a.members),
+        ]
+        self.recent_model = ObjectTableModel(headers, accessors, self)
+        self.recent_table = QTableView()
+        self.recent_table.setModel(self.recent_model)
         apply_table_style(self.recent_table)
-        self.recent_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.recent_table.setMinimumHeight(220)
         card_layout.addWidget(self.recent_table)
         return card
@@ -194,7 +205,17 @@ class DashboardPage(BasePage):
         super().closeEvent(event)
 
     def refresh(self) -> None:
-        stats = self.ctx.statistics.get_overview()
+        """异步刷新仪表盘数据"""
+        def load_all():
+            stats = self.ctx.statistics.get_overview()
+            level_stats = self.ctx.statistics.get_group_by_level()
+            rank_stats = self.ctx.statistics.get_group_by_rank()
+            return stats, level_stats, rank_stats
+
+        run_in_thread(load_all, self._on_data_loaded)
+
+    def _on_data_loaded(self, payload) -> None:
+        stats, level_stats, rank_stats = payload
         self._latest_awards = stats["latest_awards"]
         self.metric_labels["总荣誉数"].setText(str(stats["total"]))
         self.metric_labels["国家级"].setText(str(stats["national"]))
@@ -205,52 +226,15 @@ class DashboardPage(BasePage):
         self.metric_labels["三等奖"].setText(str(stats["third_prize"]))
         self.metric_labels["优秀奖"].setText(str(stats["excellent_prize"]))
 
-        self.recent_table.setRowCount(len(self._latest_awards))
-        for row, award in enumerate(self._latest_awards):
-            item0 = QTableWidgetItem(award.competition_name)
-            item0.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.recent_table.setItem(row, 0, item0)
-            
-            item1 = QTableWidgetItem(award.level)
-            item1.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.recent_table.setItem(row, 1, item1)
-            
-            item2 = QTableWidgetItem(award.rank)
-            item2.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.recent_table.setItem(row, 2, item2)
-            
-            item3 = QTableWidgetItem(str(award.award_date))
-            item3.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.recent_table.setItem(row, 3, item3)
-            
-            members = ", ".join(member.name for member in award.members)
-            item4 = QTableWidgetItem(members)
-            item4.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.recent_table.setItem(row, 4, item4)
+        self.recent_model.set_objects(self._latest_awards)
 
-        level_stats = self.ctx.statistics.get_group_by_level()
-        top_level = max(level_stats.items(), key=lambda x: x[1]) if level_stats else ("--", 0)
-        self.level_table.setRowCount(len(level_stats))
-        for row, (level, count) in enumerate(level_stats.items()):
-            item0 = QTableWidgetItem(level)
-            item0.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.level_table.setItem(row, 0, item0)
-            
-            item1 = QTableWidgetItem(str(count))
-            item1.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.level_table.setItem(row, 1, item1)
+        level_pairs = list(level_stats.items())
+        rank_pairs = list(rank_stats.items())
+        self.level_model.set_objects(level_pairs)
+        self.rank_model.set_objects(rank_pairs)
 
-        rank_stats = self.ctx.statistics.get_group_by_rank()
-        top_rank = max(rank_stats.items(), key=lambda x: x[1]) if rank_stats else ("--", 0)
-        self.rank_table.setRowCount(len(rank_stats))
-        for row, (rank, count) in enumerate(rank_stats.items()):
-            item0 = QTableWidgetItem(rank)
-            item0.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.rank_table.setItem(row, 0, item0)
-            
-            item1 = QTableWidgetItem(str(count))
-            item1.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.rank_table.setItem(row, 1, item1)
+        top_level = max(level_pairs, key=lambda x: x[1]) if level_pairs else ("--", 0)
+        top_rank = max(rank_pairs, key=lambda x: x[1]) if rank_pairs else ("--", 0)
 
         self.level_chip.setText(f"最常见级别：{top_level[0]}（{top_level[1]} 项）")
         self.rank_chip.setText(f"最常见等级：{top_rank[0]}（{top_rank[1]} 项）")
