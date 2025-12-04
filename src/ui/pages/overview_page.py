@@ -543,6 +543,41 @@ class AwardDetailDialog(MaskDialogBase):
         btn_layout.addWidget(cancel_btn)
         
         layout.addLayout(btn_layout)
+        
+        # ✅ 加载现有附件
+        self._load_existing_attachments()
+    
+    def _load_existing_attachments(self) -> None:
+        """加载现有荣誉的附件到表格"""
+        try:
+            # 从数据库重新查询 award，预加载附件关系
+            from sqlalchemy.orm import joinedload
+            from ...data.models import Award
+            
+            with self.ctx.db.session_scope() as session:
+                # 使用 joinedload 预加载附件
+                award = session.query(Award).options(
+                    joinedload(Award.attachments)
+                ).filter(Award.id == self.award.id).first()
+                
+                if award and award.attachments:
+                    # 获取附件根目录
+                    root = Path(self.ctx.settings.get("attachment_root", "attachments"))
+                    
+                    # 将附件路径添加到 selected_files
+                    for attachment in award.attachments:
+                        file_path = root / attachment.relative_path
+                        if file_path.exists():
+                            self.selected_files.append(file_path)
+                        else:
+                            logger.warning(f"附件文件不存在: {file_path}")
+                    
+                    # 更新表格显示
+                    self._update_attachment_table()
+                    
+                    logger.info(f"已加载 {len(self.selected_files)} 个附件")
+        except Exception as e:
+            logger.error(f"加载附件失败: {e}", exc_info=True)
     
     def _add_member_card(self, member=None):
         """添加成员卡片"""
