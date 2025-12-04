@@ -8,7 +8,6 @@ from PySide6.QtCore import QDate, Qt, QTimer, Slot
 from PySide6.QtGui import QColor, QFont, QPalette
 from PySide6.QtWidgets import (
     QApplication,
-    QComboBox,
     QFileDialog,
     QFrame,
     QGridLayout,
@@ -18,7 +17,6 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QProgressDialog,
     QScrollArea,
-    QSpinBox,
     QTableView,
     QVBoxLayout,
     QWidget,
@@ -30,10 +28,12 @@ from qfluentwidgets import (
     DateEdit,
     FluentIcon,
     InfoBar,
+    LineEdit,
     MaskDialogBase,
     MessageBox,
     PrimaryPushButton,
     PushButton,
+    SpinBox,
     TitleLabel,
     TransparentToolButton,
 )
@@ -203,7 +203,7 @@ class OverviewPage(BasePage):
         keyword_label.setFixedWidth(60)
         row1.addWidget(keyword_label)
 
-        self.keyword_input = QLineEdit()
+        self.keyword_input = LineEdit()
         self.keyword_input.setPlaceholderText("输入竞赛名称或证书编号...")
         self.keyword_input.textChanged.connect(self._on_keyword_changed)
         self.keyword_input.setFixedWidth(250)
@@ -762,7 +762,8 @@ class AwardDetailDialog(MaskDialogBase):
         name_col = QVBoxLayout()
         name_label = QLabel("🏆 竞赛名称")
         name_label.setObjectName("formLabel")
-        self.name_input = QLineEdit(self.award.competition_name)
+        self.name_input = LineEdit()
+        self.name_input.setText(self.award.competition_name)
         name_col.addWidget(name_label)
         name_col.addWidget(self.name_input)
 
@@ -772,20 +773,20 @@ class AwardDetailDialog(MaskDialogBase):
         date_row = QHBoxLayout()
         date_row.setSpacing(8)
 
-        self.year_input = QSpinBox()
+        self.year_input = SpinBox()
         self.year_input.setRange(1900, 2100)
         self.year_input.setValue(self.award.award_date.year)
-        self.year_input.setMaximumWidth(80)
+        self.year_input.setMinimumWidth(100)
 
-        self.month_input = QSpinBox()
+        self.month_input = SpinBox()
         self.month_input.setRange(1, 12)
         self.month_input.setValue(self.award.award_date.month)
-        self.month_input.setMaximumWidth(80)
+        self.month_input.setMinimumWidth(80)
 
-        self.day_input = QSpinBox()
+        self.day_input = SpinBox()
         self.day_input.setRange(1, 31)
         self.day_input.setValue(self.award.award_date.day)
-        self.day_input.setMaximumWidth(80)
+        self.day_input.setMinimumWidth(80)
 
         date_row.addWidget(self.year_input)
         date_row.addWidget(QLabel("年"))
@@ -808,7 +809,7 @@ class AwardDetailDialog(MaskDialogBase):
         level_col = QVBoxLayout()
         level_label = QLabel("🎯 竞赛级别")
         level_label.setObjectName("formLabel")
-        self.level_input = QComboBox()
+        self.level_input = ComboBox()
         self.level_input.addItems(["国家级", "省级", "校级"])
         self.level_input.setCurrentText(self.award.level)
         level_col.addWidget(level_label)
@@ -817,7 +818,7 @@ class AwardDetailDialog(MaskDialogBase):
         rank_col = QVBoxLayout()
         rank_label = QLabel("🥇 获奖等级")
         rank_label.setObjectName("formLabel")
-        self.rank_input = QComboBox()
+        self.rank_input = ComboBox()
         self.rank_input.addItems(["一等奖", "二等奖", "三等奖", "优秀奖"])
         self.rank_input.setCurrentText(self.award.rank)
         rank_col.addWidget(rank_label)
@@ -831,7 +832,8 @@ class AwardDetailDialog(MaskDialogBase):
         cert_col = QVBoxLayout()
         cert_label = QLabel("🔖 证书编号")
         cert_label.setObjectName("formLabel")
-        self.cert_input = QLineEdit(self.award.certificate_code or "")
+        self.cert_input = LineEdit()
+        self.cert_input.setText(self.award.certificate_code or "")
         cert_col.addWidget(cert_label)
         cert_col.addWidget(self.cert_input)
         info_layout.addLayout(cert_col)
@@ -840,7 +842,8 @@ class AwardDetailDialog(MaskDialogBase):
         remark_col = QVBoxLayout()
         remark_label = QLabel("📝 备注信息")
         remark_label.setObjectName("formLabel")
-        self.remarks_input = QLineEdit(self.award.remarks or "")
+        self.remarks_input = LineEdit()
+        self.remarks_input.setText(self.award.remarks or "")
         remark_col.addWidget(remark_label)
         remark_col.addWidget(self.remarks_input)
         info_layout.addLayout(remark_col)
@@ -869,7 +872,8 @@ class AwardDetailDialog(MaskDialogBase):
             self._add_member_card(member)
 
         # 添加成员按钮
-        add_member_btn = PrimaryPushButton("➕ 添加成员")
+        add_member_btn = PrimaryPushButton("添加成员")
+        add_member_btn.setIcon(FluentIcon.ADD)
         add_member_btn.clicked.connect(self._add_member_row)
         members_layout.addWidget(add_member_btn)
 
@@ -882,7 +886,8 @@ class AwardDetailDialog(MaskDialogBase):
         attach_header = QHBoxLayout()
         attach_header.addWidget(make_section_title("📎 证书附件"))
         attach_header.addStretch()
-        attach_btn = PrimaryPushButton("📁 选择文件")
+        attach_btn = PrimaryPushButton("选择文件")
+        attach_btn.setIcon(FluentIcon.FOLDER)
         attach_btn.clicked.connect(self._pick_files)
         attach_header.addWidget(attach_btn)
         attachment_layout.addLayout(attach_header)
@@ -925,11 +930,13 @@ class AwardDetailDialog(MaskDialogBase):
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
 
-        save_btn = PrimaryPushButton("💾 保存修改")
+        save_btn = PrimaryPushButton("保存修改")
+        save_btn.setIcon(FluentIcon.SAVE)
         save_btn.clicked.connect(self._save)
         btn_layout.addWidget(save_btn)
 
-        cancel_btn = PushButton("✖ 取消")
+        cancel_btn = PushButton("取消")
+        cancel_btn.setIcon(FluentIcon.CLOSE)
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
 
@@ -984,36 +991,13 @@ class AwardDetailDialog(MaskDialogBase):
         # 应用成员卡片样式
         self._apply_member_card_style(member_card)
 
-        # 获取当前样式用于标签和输入框
+        # 获取当前样式用于标签
         is_dark = self.theme_manager.is_dark
         if is_dark:
             label_style = "color: #a0a0a0; font-size: 12px;"
-            input_style = """
-                QLineEdit {
-                    border: 1px solid #4a4a5e;
-                    border-radius: 4px;
-                    padding: 6px;
-                    background-color: #2a2a3a;
-                    color: #e0e0e0;
-                }
-                QLineEdit:focus {
-                    border: 2px solid #4a90e2;
-                }
-            """
         else:
             label_style = "color: #666; font-size: 12px;"
-            input_style = """
-                QLineEdit {
-                    border: 1px solid #ddd;
-                    border-radius: 4px;
-                    padding: 6px;
-                    background-color: white;
-                    color: #333;
-                }
-                QLineEdit:focus {
-                    border: 2px solid #1890ff;
-                }
-            """
+
         member_layout = QVBoxLayout(member_card)
         member_layout.setContentsMargins(12, 12, 12, 12)
         member_layout.setSpacing(10)
@@ -1027,20 +1011,23 @@ class AwardDetailDialog(MaskDialogBase):
         header_layout.addStretch()
 
         # 导入文档按钮
-        import_btn = PushButton("📄 导入文档")
+        import_btn = PushButton("导入文档")
+        import_btn.setIcon(FluentIcon.DOCUMENT)
         import_btn.setMinimumWidth(95)
         import_btn.setFixedHeight(28)
         header_layout.addWidget(import_btn)
 
         # 从历史成员选择按钮
-        history_btn = PushButton("📋 历史成员")
+        history_btn = PushButton("历史成员")
+        history_btn.setIcon(FluentIcon.HISTORY)
         history_btn.setMinimumWidth(95)
         history_btn.setFixedHeight(28)
         header_layout.addWidget(history_btn)
 
         # 删除按钮
-        delete_btn = PushButton("🗑 移除")
-        delete_btn.setFixedWidth(70)
+        delete_btn = PushButton("移除")
+        delete_btn.setIcon(FluentIcon.DELETE)
+        delete_btn.setFixedWidth(80)
         delete_btn.setFixedHeight(28)
         header_layout.addWidget(delete_btn)
 
@@ -1086,10 +1073,9 @@ class AwardDetailDialog(MaskDialogBase):
                     if value:
                         input_widget.set_text(str(value))
             else:
-                input_widget = QLineEdit()
+                input_widget = LineEdit()
                 clean_input_text(input_widget)  # 自动删除空白字符
                 input_widget.setPlaceholderText(f"请输入{label}")
-                input_widget.setStyleSheet(input_style)
 
                 # 如果是编辑现有成员，填充数据
                 if member:
@@ -1138,37 +1124,9 @@ class AwardDetailDialog(MaskDialogBase):
         is_dark = self.theme_manager.is_dark
         if is_dark:
             card_style = "background-color: #353751; border-radius: 8px; border: 1px solid #4a4a5e;"
-            input_style = """
-                QLineEdit {
-                    border: 1px solid #4a4a5e;
-                    border-radius: 4px;
-                    padding: 6px;
-                    background-color: #2a2a3a;
-                    color: #e0e0e0;
-                }
-                QLineEdit:focus {
-                    border: 2px solid #4a90e2;
-                }
-            """
         else:
             card_style = "background-color: #f5f5f5; border-radius: 8px; border: 1px solid #e0e0e0;"
-            input_style = """
-                QLineEdit {
-                    border: 1px solid #ddd;
-                    border-radius: 4px;
-                    padding: 6px;
-                    background-color: white;
-                    color: #333;
-                }
-                QLineEdit:focus {
-                    border: 2px solid #1890ff;
-                }
-            """
         card.setStyleSheet(card_style)
-
-        # 更新所有输入框的样式
-        for line_edit in card.findChildren(QLineEdit):
-            line_edit.setStyleSheet(input_style)
 
     @Slot()
     def _on_dialog_theme_changed(self) -> None:

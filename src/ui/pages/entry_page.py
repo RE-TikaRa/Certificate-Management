@@ -128,7 +128,7 @@ class EntryPage(BasePage):
         self.year_input.setRange(1900, 2100)
         today = QDate.currentDate()
         self.year_input.setValue(today.year())
-        self.year_input.setMaximumWidth(80)
+        self.year_input.setMinimumWidth(100)
 
         # Month input
         month_label = QLabel("月")
@@ -137,7 +137,7 @@ class EntryPage(BasePage):
         self.month_input = SpinBox()
         self.month_input.setRange(1, 12)
         self.month_input.setValue(today.month())
-        self.month_input.setMaximumWidth(80)
+        self.month_input.setMinimumWidth(80)
 
         # Day input
         day_label = QLabel("日")
@@ -146,7 +146,7 @@ class EntryPage(BasePage):
         self.day_input = SpinBox()
         self.day_input.setRange(1, 31)
         self.day_input.setValue(today.day())
-        self.day_input.setMaximumWidth(80)
+        self.day_input.setMinimumWidth(80)
 
         date_row.addWidget(self.year_input)
         date_row.addWidget(year_label)
@@ -431,39 +431,9 @@ class EntryPage(BasePage):
         is_dark = self.theme_manager.is_dark
         if is_dark:
             card_style = "background-color: #353751; border-radius: 8px; border: 1px solid #4a4a5e;"
-            input_style = """
-                QLineEdit {
-                    border: 1px solid #4a4a5e;
-                    border-radius: 4px;
-                    padding: 6px;
-                    background-color: #2a2a3a;
-                    color: #e0e0e0;
-                }
-                QLineEdit:focus {
-                    border: 2px solid #4a90e2;
-                    color: #e0e0e0;
-                }
-            """
         else:
             card_style = "background-color: #f5f5f5; border-radius: 8px; border: 1px solid #e0e0e0;"
-            input_style = """
-                QLineEdit {
-                    border: 1px solid #ddd;
-                    border-radius: 4px;
-                    padding: 6px;
-                    background-color: white;
-                    color: #333;
-                }
-                QLineEdit:focus {
-                    border: 2px solid #1890ff;
-                    color: #333;
-                }
-            """
         card.setStyleSheet(card_style)
-
-        # 更新所有输入框的样式
-        for line_edit in card.findChildren(QLineEdit):
-            line_edit.setStyleSheet(input_style)
 
     def _remove_member_card(self, member_card: QWidget, member_fields: dict) -> None:
         """删除一个成员卡片"""
