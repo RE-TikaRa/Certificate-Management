@@ -1076,14 +1076,6 @@ class HistoryMemberDialog(MaskDialogBase):
         self.setMinimumWidth(650)
         self.setMinimumHeight(500)
 
-        # 设置主题
-        from qfluentwidgets import Theme, setTheme
-
-        if theme_manager.is_dark:
-            setTheme(Theme.DARK)
-        else:
-            setTheme(Theme.LIGHT)
-
         self._init_ui()
         self._apply_theme()
 
