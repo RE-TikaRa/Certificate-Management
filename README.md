@@ -1,7 +1,7 @@
 # 荣誉证书管理系统
 
-![Python](https://img.shields.io/badge/Python-3.13+-blue)
-![PySide6](https://img.shields.io/badge/PySide6-6.10.1-green)
+![Python](https://img.shields.io/badge/Python-3.14+-blue)
+![PySide6](https://img.shields.io/badge/PySide6-latest-green)
 ![License](https://img.shields.io/badge/License-MIT-orange)
 
 一款功能完整、界面精美的荣誉证书管理桌面应用。基于 **PySide6** + **qfluentwidgets** 框架开发，采用现代化 Fluent Design 设计风格。支持荣誉证书的全生命周期管理：从录入、统计分析、成员管理到附件管理，一应俱全。
@@ -94,7 +94,7 @@
 
 ### 系统要求
 - **操作系统**：Windows / macOS / Linux
-- **Python 版本**：3.13 或更高版本
+- **Python 版本**：3.14 或更高版本
 - **内存**：建议 4GB 以上
 - **磁盘**：至少 200MB 可用空间
 
@@ -108,7 +108,14 @@ cd Certificate-Management
 
 2. **安装依赖**
 ```bash
-pip install -r requirements.txt
+# 若未安装 uv（可选）
+# pip install uv
+
+# 创建/同步虚拟环境（默认包含 dev 依赖与 Ruff）
+uv sync
+
+# 仅安装运行时依赖（不含 dev）
+# uv sync --no-dev
 ```
 
 3. **运行应用**
@@ -121,6 +128,8 @@ main.bat
 或使用 Python 命令：
 ```bash
 python -m src.main
+# 或使用 uv 运行（使用 uv 创建的虚拟环境）
+uv run python -m src.main
 ```
 
 调试模式（输出详细日志）：
@@ -135,7 +144,8 @@ python -m src.main --debug
 ```
 Certificate-Management/
 ├── README.md                    # 本文件
-├── requirements.txt             # Python 依赖清单
+├── pyproject.toml               # 依赖与构建配置
+├── uv.lock                      # uv 生成的锁定文件
 ├── main.bat                     # Windows 启动脚本
 ├── .gitignore                   # Git 忽略规则
 │
@@ -339,30 +349,32 @@ Certificate-Management/
 
 ### 运行测试与验证
 
-验证 Python 语法：
+使用 Ruff 进行检查与格式化：
 ```bash
-python -m py_compile src/
+uv run ruff check .
+uv run ruff format .
 ```
 
 ---
 
 ## 📦 依赖列表
 
-主要依赖包括：
+主要依赖通过 `pyproject.toml` 管理，安装时会自动获取最新的兼容版本：
 
-| 包名 | 版本 | 说明 |
-|------|------|------|
-| PySide6 | 6.10.1 | Qt 6 Python 绑定，GUI 框架 |
-| PySide6-Fluent-Widgets | 1.9.2 | Fluent Design 风格组件库 |
-| SQLAlchemy | 2.0.32 | ORM 框架，数据库抽象 |
-| pandas | 2.2.2 | 数据处理和分析 |
-| openpyxl | 3.1.5 | Excel 文件读写 |
-| APScheduler | 3.10.4 | 定时任务调度 |
-| loguru | 0.7.2 | 日志记录库 |
-| alembic | 1.13.2 | 数据库迁移工具 |
-| python-dateutil | 2.9.0 | 日期时间处理 |
+| 包名 | 说明 |
+|------|------|
+| PySide6 | Qt 6 Python 绑定，GUI 框架 |
+| PySide6-Fluent-Widgets | Fluent Design 风格组件库 |
+| SQLAlchemy | ORM 框架，数据库抽象 |
+| pandas | 数据处理和分析 |
+| openpyxl | Excel 文件读写 |
+| APScheduler | 定时任务调度 |
+| loguru | 日志记录库 |
+| alembic | 数据库迁移工具 |
+| python-dateutil | 日期时间处理 |
+| pypinyin | 拼音转换工具，用于专业搜索 |
 
-完整依赖详见 `requirements.txt`。
+完整依赖与版本策略请见 `pyproject.toml`，精确解析版本记录在 `uv.lock`（如需保持一致可运行 `uv sync --locked`）。
 
 ---
 
