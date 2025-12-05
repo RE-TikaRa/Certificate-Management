@@ -58,7 +58,7 @@ class ManagementPage(BasePage):
     
     def __init__(self, ctx, theme_manager: ThemeManager):
         super().__init__(ctx, theme_manager)
-        # ✅ 优化：使用 ID 集合替代完整数据比较
+        # 优化：使用 ID 集合替代完整数据比较
         self._cached_member_ids = set()
         self.setObjectName("pageRoot")
         
@@ -120,7 +120,7 @@ class ManagementPage(BasePage):
         self.refresh()
     
     def _auto_refresh(self):
-        """✅ 优化：快速成员变化检测 - 仅比较 ID 集合"""
+        """优化：快速成员变化检测 - 仅比较 ID 集合"""
         try:
             from sqlalchemy import select
             from ..data.models import TeamMember
@@ -170,7 +170,7 @@ class MemberDetailDialog(MaskDialogBase):
         self.original_data = self._get_member_data()
         self.is_editing = False
         self.field_widgets = {}  # 存储字段 widget
-        # ✅ 优化:提前缓存所有输入框,而不是动态创建
+        # 优化:提前缓存所有输入框,而不是动态创建
         self.input_field_cache = {}  # 缓存所有 QLineEdit 实例
         self.member_deleted = False  # 标记成员是否被删除
         
@@ -180,7 +180,7 @@ class MemberDetailDialog(MaskDialogBase):
         self.setMinimumHeight(600)
         self.widget.setGraphicsEffect(None)
         
-        # ✅ 设置中心 widget 的圆角
+        # 设置中心 widget 的圆角
         self.widget.setObjectName("centerWidget")
         
         self._init_ui()
@@ -201,7 +201,7 @@ class MemberDetailDialog(MaskDialogBase):
         }
     
     def _init_ui(self):
-        layout = QVBoxLayout(self.widget)  # ✅ 添加到 self.widget 而不是 self
+        layout = QVBoxLayout(self.widget)  # 添加到 self.widget 而不是 self
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(16)
         
@@ -304,7 +304,7 @@ class MemberDetailDialog(MaskDialogBase):
             # 存储 widget
             self.field_widgets[field_key] = value_label
             
-            # ✅ 优化：提前创建并缓存所有输入框（初始化时隐藏）
+            # 优化：提前创建并缓存所有输入框（初始化时隐藏）
             input_field = QLineEdit()
             clean_input_text(input_field)  # 自动删除空白字符
             input_field.setText(value)
@@ -320,7 +320,7 @@ class MemberDetailDialog(MaskDialogBase):
         return section
     
     def _toggle_edit_mode(self):
-        """切换编辑模式 - ✅ 优化：仅改 show/hide 状态，不创建/销毁 widget"""
+        """切换编辑模式 - 优化：仅改 show/hide 状态，不创建/销毁 widget"""
         self.is_editing = not self.is_editing
         
         if self.is_editing:
@@ -332,7 +332,7 @@ class MemberDetailDialog(MaskDialogBase):
             self._disable_edit()
     
     def _enable_edit(self):
-        """启用编辑模式 - ✅ 优化：只改状态，不创建新 widget"""
+        """启用编辑模式 - 优化：只改状态，不创建新 widget"""
         for field_key in list(self.field_widgets.keys()):
             value_label = self.field_widgets[field_key]
             input_field = self.input_field_cache[field_key]
@@ -345,7 +345,7 @@ class MemberDetailDialog(MaskDialogBase):
             input_field.show()
     
     def _disable_edit(self):
-        """禁用编辑模式 - ✅ 优化：只改状态，不销毁 widget"""
+        """禁用编辑模式 - 优化：只改状态，不销毁 widget"""
         for field_key in list(self.field_widgets.keys()):
             value_label = self.field_widgets[field_key]
             input_field = self.input_field_cache[field_key]
@@ -355,7 +355,7 @@ class MemberDetailDialog(MaskDialogBase):
             input_field.hide()
     
     def _save_changes(self):
-        """保存数据到数据库 - ✅ 优化：从缓存输入框读取值"""
+        """保存数据到数据库 - 优化：从缓存输入框读取值"""
         from src.services.member_service import MemberService
         
         try:
@@ -569,7 +569,7 @@ class MemberDetailDialog(MaskDialogBase):
         
         self.setStyleSheet(full_stylesheet)
         
-        # ✅ 设置 Palette 使标题栏也跟随主题
+        # 设置 Palette 使标题栏也跟随主题
         palette = QPalette()
         if is_dark:
             palette.setColor(QPalette.ColorRole.Window, QColor("#1c1f2e"))
@@ -587,5 +587,5 @@ class MemberDetailDialog(MaskDialogBase):
             palette.setColor(QPalette.ColorRole.ButtonText, QColor("#1a1a1a"))
         self.setPalette(palette)
         
-        # ✅ 关键：在Windows上强制设置标题栏颜色
+        # 关键：在Windows上强制设置标题栏颜色
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)

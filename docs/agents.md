@@ -63,7 +63,7 @@ src/
 
 ## Data Models
 
-### Award (荣誉记录)
+### 荣誉记录
 ```python
 # src/data/models.py
 class Award(Base):
@@ -91,21 +91,21 @@ class Award(Base):
 - `rank`: Accepts "一等奖", "二等奖", "三等奖", "优秀奖"
 - `member_names`: JSON field storing member information
 
-### TeamMember (参与成员)
+### 参与成员
 ```python
 class TeamMember(Base):
     __tablename__ = 'team_members'
     
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str]               # Name
-    gender: Mapped[str]             # Gender
-    id_card: Mapped[str]            # ID card number
-    phone: Mapped[str]              # Phone
-    student_id: Mapped[str]         # Student ID
-    email: Mapped[str]              # Email
-    major: Mapped[str]              # Major
-    class_name: Mapped[str]         # Class
-    college: Mapped[str]            # College
+    name: Mapped[str]
+    gender: Mapped[str]
+    id_card: Mapped[str]
+    phone: Mapped[str]
+    student_id: Mapped[str]
+    email: Mapped[str]
+    major: Mapped[str]
+    class_name: Mapped[str]
+    college: Mapped[str]
     
     # Relationships
     awards: Mapped[list['Award']] = relationship(
@@ -116,7 +116,7 @@ class TeamMember(Base):
 
 **9 Fields Total:** name, gender, id_card, phone, student_id, email, major, class_name, college
 
-### Major (专业信息)
+### 专业信息
 ```python
 class Major(Base):
     __tablename__ = 'majors'
@@ -363,12 +363,12 @@ class SomePage(BasePage):
     def __init__(self, ctx, theme_manager):
         super().__init__(ctx, theme_manager)
         
-        # ✅ Connect signal EARLY in __init__
+        # Connect signal EARLY in __init__
         self.theme_manager.themeChanged.connect(self._on_theme_changed)
         
         self._build_ui()
     
-    @Slot()  # ✅ Use @Slot() decorator
+    @Slot()  # Use @Slot() decorator
     def _on_theme_changed(self) -> None:
         """Theme change handler"""
         # 1. Update page background/scroll areas
@@ -413,7 +413,7 @@ def _apply_member_card_style(self, card: QWidget) -> None:
     
     card.setStyleSheet(card_style)
     
-    # ✅ Update ALL child components
+    # Update ALL child components
     for line_edit in card.findChildren(QLineEdit):
         line_edit.setStyleSheet(input_style)
 ```

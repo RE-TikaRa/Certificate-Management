@@ -815,7 +815,7 @@ class EntryPage(BasePage):
         pass
 
     def _submit(self) -> None:
-        # ✅ 优化：快速失败机制 - 第一个错误立即返回
+        # 优化：快速失败机制 - 第一个错误立即返回
         issues = self._validate_form()
         if issues:
             # 只显示第一个错误（快速反馈）
@@ -905,19 +905,19 @@ class EntryPage(BasePage):
         """
         Validate the entire award form using FormValidator.
         Returns list of error messages (empty if valid).
-        ✅ 优化：提前退出机制 + 快速失败检测
+        优化：提前退出机制 + 快速失败检测
         """
         issues: list[str] = []
 
-        # 1️⃣ 验证比赛名称（必填）
+        # 1. 验证比赛名称（必填）
         name = self.name_input.text().strip()
         valid, msg = FormValidator.validate_competition_name(name)
         if not valid:
             issues.append(msg)
             self._highlight_field_error(self.name_input)
-            return issues  # ✅ 快速失败：基本信息错误立即返回
+            return issues  # 快速失败：基本信息错误立即返回
 
-        # 2️⃣ 验证获奖日期（必填）
+        # 2. 验证获奖日期（必填）
         try:
             award_date = QDate(
                 self.year_input.value(),
@@ -934,7 +934,7 @@ class EntryPage(BasePage):
             issues.append("获奖日期不合法。")
             return issues
 
-        # 3️⃣ 验证证书号和备注（可选，轻量检查）
+        # 3. 验证证书号和备注（可选）
         code = self.certificate_input.text().strip()
         valid, msg = FormValidator.validate_certificate_code(code)
         if not valid:
@@ -949,16 +949,16 @@ class EntryPage(BasePage):
             self._highlight_field_error(self.remarks_input)
             return issues
 
-        # 4️⃣ 验证成员（最后验证，因为最复杂）
+        # 4. 验证成员
         members_data = self._get_members_data()
         if not members_data:
             issues.append("请至少添加一名成员。")
-            return issues  # ✅ 快速失败
+            return issues  # 快速失败
 
         # 批量验证成员，但在第一个错误时停止
         for i, member in enumerate(members_data, 1):
             member_errors = FormValidator.validate_member_info(member)
-            if member_errors:  # ✅ 找到错误立即返回
+            if member_errors:  # 找到错误立即返回
                 issues.append(f"成员 {i} - {member_errors[0]}")
                 # 高亮错误的成员卡片
                 if i - 1 < len(self.members_data):

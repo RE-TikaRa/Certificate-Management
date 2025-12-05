@@ -43,7 +43,7 @@ class DashboardPage(BasePage):
         self._latest_awards = []
         self.setObjectName("pageRoot")
 
-        # ✅ 优化：缓存机制
+        # 优化：缓存机制
         self._cached_level_data = None
         self._cached_rank_data = None
 
@@ -293,7 +293,7 @@ class DashboardPage(BasePage):
 
     @Slot()
     def _on_theme_changed(self) -> None:
-        """主题变化时只重新着色，不重建图表 - ✅ 优化
+        """主题变化时只重新着色，不重建图表 - 优化
 
         优化前：重新查询数据 → 销毁旧图表 → 创建新图表（成本高）
         优化后：使用缓存数据 → 只改颜色（成本低）
@@ -310,7 +310,7 @@ class DashboardPage(BasePage):
     def _update_charts(
         self, level_data: dict[str, int], rank_data: dict[str, int]
     ) -> None:
-        """✅ 优化：只在数据真的改变时重建图表"""
+        """优化：只在数据真的改变时重建图表"""
 
         # 检查数据是否改变
         if (
@@ -383,7 +383,7 @@ class DashboardPage(BasePage):
         self.rank_chart.setChart(bar_chart)
 
     def _recolor_charts(self) -> None:
-        """✅ 优化：只改变图表颜色，不重建结构"""
+        """优化：只改变图表颜色，不重建结构"""
         is_dark = self.theme_manager.is_dark
         text_color = QColor(255, 255, 255) if is_dark else QColor(30, 39, 70)
         grid_color = QColor(255, 255, 255, 80) if is_dark else QColor(90, 108, 243, 120)

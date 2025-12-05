@@ -40,10 +40,10 @@ class MainWindow(FluentWindow):
         # This overrides FluentWindow's default transparent AcrylicWindow background
         self.apply_theme_stylesheet()
         
-        # ✅ 连接主题变化信号以更新标题栏颜色
+        # 连接主题变化信号以更新标题栏颜色
         self.theme_manager.themeChanged.connect(self._on_theme_changed)
         
-        # ✅ 连接堆栈切换信号：记录即将显示的页，动画结束再刷新
+        # 连接堆栈切换信号：记录即将显示的页，动画结束再刷新
         self._pending_refresh_index: int | None = None
         self.stackedWidget.currentChanged.connect(self._on_page_changed)
         # qfluentwidgets 使用 PopUpAniStackedWidget，动画结束信号为 aniFinished
@@ -123,7 +123,7 @@ class MainWindow(FluentWindow):
     def _load_remaining_pages(self) -> None:
         """在后台加载其他页面 - 分阶段优化
         
-        ✅ 优化：按优先级分三个阶段加载
+        优化：按优先级分三个阶段加载
         - 阶段 1（100ms）：快速页面（Overview, Entry）
         - 阶段 2（500ms）：中等页面（Management, Settings）
         - 阶段 3（1000ms）：重型页面（Dashboard, Recycle）
@@ -225,15 +225,15 @@ class MainWindow(FluentWindow):
         logger.debug("Heavy pages (Dashboard, Recycle) loaded")
 
 
-    def navigate(self, route: str) -> None:
+    def navigate_to(self, route: str) -> None:
         """导航到指定页面，并自动刷新该页面的数据
         
-        ✅ 优化：点击任何页面标签时，该页面会自动刷新数据
+        优化：点击任何页面标签时，该页面会自动刷新数据
         """
         if route in self.route_keys:
             self.navigationInterface.setCurrentItem(self.route_keys[route])
             
-            # ✅ 自动刷新该页面 - 获取对应的页面对象并调用 refresh()
+            # 自动刷新该页面 - 获取对应的页面对象并调用 refresh()
             page_map = {
                 "home": self.home_page if hasattr(self, 'home_page') else None,
                 "overview": self.overview_page,

@@ -81,7 +81,7 @@ class OverviewPage(BasePage):
         super().__init__(ctx, theme_manager)
         self.awards_list = []
 
-        # ✅ 性能优化：分批加载
+        # 性能优化：分批加载
         self.PAGE_SIZE = 20  # 每页显示20条
         self.current_page = 0
         self.total_awards = 0
@@ -152,7 +152,7 @@ class OverviewPage(BasePage):
         layout.addWidget(card)
         layout.addStretch()
 
-        # ✅ 优化：缓存机制用于快速比较
+        # 优化：缓存机制用于快速比较
         self._cached_award_ids = set()  # 缓存的荣誉 ID 集合
 
         # 自动刷新定时器（每5秒检查一次数据）
@@ -388,7 +388,7 @@ class OverviewPage(BasePage):
         return awards
 
     def _auto_refresh(self) -> None:
-        """✅ 优化：快速数据变化检测 - 只用 ID 比较，不用创建完整对象
+        """优化：快速数据变化检测 - 只用 ID 比较，不用创建完整对象
 
         优化前：
         - 全量查询所有荣誉
@@ -422,16 +422,16 @@ class OverviewPage(BasePage):
     def refresh(self) -> None:
         """刷新荣誉列表（优化版：分批加载 + 筛选 + 排序）"""
         try:
-            # ✅ 优化1：快速清空UI
+            # 优化1：快速清空UI
             self._clear_awards_layout()
 
-            # ✅ 优化2：获取所有数据
+            # 优化2：获取所有数据
             all_awards = self.ctx.awards.list_awards()
 
-            # ✅ 应用筛选条件
+            # 应用筛选条件
             filtered_awards = self._apply_filters(all_awards)
 
-            # ✅ 应用排序
+            # 应用排序
             self.awards_list = self._apply_sorting(filtered_awards)
             self.total_awards = len(self.awards_list)
 
@@ -439,11 +439,11 @@ class OverviewPage(BasePage):
                 self._show_empty_state()
                 return
 
-            # ✅ 优化3：首次只加载20条
+            # 优化3：首次只加载20条
             self.current_page = 0
             self._load_more_awards()
 
-            # ✅ 优化4：如果有更多数据，显示"加载更多"按钮
+            # 优化4：如果有更多数据，显示"加载更多"按钮
             if self.total_awards > self.PAGE_SIZE:
                 self._add_load_more_button()
             else:
@@ -725,12 +725,12 @@ class AwardDetailDialog(MaskDialogBase):
         self.members_data = []  # 存储成员卡片数据
         self.selected_files: list[Path] = []  # 存储选中的附件文件
 
-        self.setWindowTitle(f"📝 荣誉详情 - {award.competition_name}")
+        self.setWindowTitle(f"荣誉详情 - {award.competition_name}")
         self.setMinimumWidth(700)
         self.setMinimumHeight(600)
         self.widget.setGraphicsEffect(None)
 
-        # ✅ 设置中心 widget 的圆角
+        # 设置中心 widget 的圆角
         self.widget.setObjectName("centerWidget")
 
         self._init_ui()
@@ -742,7 +742,7 @@ class AwardDetailDialog(MaskDialogBase):
     def _init_ui(self):
         from ..theme import create_card, make_section_title
 
-        layout = QVBoxLayout(self.widget)  # ✅ 添加到 self.widget 而不是 self
+        layout = QVBoxLayout(self.widget)  # 添加到 self.widget 而不是 self
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(16)
 
@@ -813,7 +813,7 @@ class AwardDetailDialog(MaskDialogBase):
         row2 = QHBoxLayout()
         row2.setSpacing(16)
         level_col = QVBoxLayout()
-        level_label = QLabel("🎯 竞赛级别")
+        level_label = QLabel("竞赛级别")
         level_label.setObjectName("formLabel")
         self.level_input = ComboBox()
         self.level_input.addItems(["国家级", "省级", "校级"])
@@ -822,7 +822,7 @@ class AwardDetailDialog(MaskDialogBase):
         level_col.addWidget(self.level_input)
 
         rank_col = QVBoxLayout()
-        rank_label = QLabel("🥇 获奖等级")
+        rank_label = QLabel("获奖等级")
         rank_label.setObjectName("formLabel")
         self.rank_input = ComboBox()
         self.rank_input.addItems(["一等奖", "二等奖", "三等奖", "优秀奖"])
@@ -836,7 +836,7 @@ class AwardDetailDialog(MaskDialogBase):
 
         # Row 3: 证书编号
         cert_col = QVBoxLayout()
-        cert_label = QLabel("🔖 证书编号")
+        cert_label = QLabel("证书编号")
         cert_label.setObjectName("formLabel")
         self.cert_input = LineEdit()
         self.cert_input.setText(self.award.certificate_code or "")
@@ -846,7 +846,7 @@ class AwardDetailDialog(MaskDialogBase):
 
         # Row 4: 备注
         remark_col = QVBoxLayout()
-        remark_label = QLabel("📝 备注信息")
+        remark_label = QLabel("备注信息")
         remark_label.setObjectName("formLabel")
         self.remarks_input = LineEdit()
         self.remarks_input.setText(self.award.remarks or "")
@@ -858,7 +858,7 @@ class AwardDetailDialog(MaskDialogBase):
 
         # === 成员卡片 ===
         members_card, members_layout = create_card()
-        members_layout.addWidget(make_section_title("👥 参赛成员"))
+        members_layout.addWidget(make_section_title("参赛成员"))
 
         self.members_container = QWidget()
         self.members_container.setStyleSheet(
@@ -890,7 +890,7 @@ class AwardDetailDialog(MaskDialogBase):
 
         # 标题和添加按钮
         attach_header = QHBoxLayout()
-        attach_header.addWidget(make_section_title("📎 证书附件"))
+        attach_header.addWidget(make_section_title("证书附件"))
         attach_header.addStretch()
         attach_btn = PrimaryPushButton("选择文件")
         attach_btn.setIcon(FluentIcon.FOLDER)
@@ -948,7 +948,7 @@ class AwardDetailDialog(MaskDialogBase):
 
         layout.addLayout(btn_layout)
 
-        # ✅ 加载现有附件
+        # 加载现有附件
         self._load_existing_attachments()
 
     def _load_existing_attachments(self) -> None:
@@ -1339,7 +1339,7 @@ class AwardDetailDialog(MaskDialogBase):
 
     def _pick_files(self) -> None:
         """选择附件文件并添加到表格"""
-        files, _ = QFileDialog.getOpenFileNames(self, "📁 选择证书附件")
+        files, _ = QFileDialog.getOpenFileNames(self, "选择证书附件")
         if not files:
             return
 
@@ -1543,7 +1543,7 @@ class AwardDetailDialog(MaskDialogBase):
             }}
         """)
 
-        # ✅ 设置 Palette 使标题栏也跟随主题
+        # 设置 Palette 使标题栏也跟随主题
         palette = QPalette()
         if is_dark:
             palette.setColor(QPalette.ColorRole.Window, QColor("#1c1f2e"))
@@ -1561,6 +1561,6 @@ class AwardDetailDialog(MaskDialogBase):
             palette.setColor(QPalette.ColorRole.ButtonText, QColor("#1e2746"))
         self.setPalette(palette)
 
-        # ✅ 关键：在Windows上强制设置标题栏颜色
+        # 关键：在Windows上强制设置标题栏颜色
         # 通过设置WA_NoSystemBackground来禁用系统默认背景，然后自己绘制
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)

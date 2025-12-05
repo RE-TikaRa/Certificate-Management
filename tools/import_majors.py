@@ -66,7 +66,7 @@ def main():
         print("❌ 错误: Excel文件中没有找到专业数据")
         return
     
-    print(f"✅ 成功读取 {len(majors)} 个专业")
+    print(f"成功读取 {len(majors)} 个专业")
     
     # 初始化数据库
     db = Database()
@@ -75,17 +75,17 @@ def main():
     service = MajorService(db)
     
     # 清空并重新导入专业
-    print(f"\n🔄 正在清空现有专业数据并重新导入...")
+    print(f"\n正在清空现有专业数据并重新导入...")
     count = service.replace_all_majors(majors)
     
-    print(f"✅ 成功导入 {count} 个专业")
+    print(f"成功导入 {count} 个专业")
     
     # 验证
     all_majors = service.get_all_majors()
-    print(f"\n📊 数据库中共有 {len(all_majors)} 个专业")
+    print(f"\n数据库中共有 {len(all_majors)} 个专业")
     
     # 测试搜索
-    print("\n🔍 测试搜索功能:")
+    print("\n测试搜索功能:")
     test_queries = ["机械", "农", "经济", "林"]
     for query in test_queries:
         results = service.search_majors(query, limit=5)

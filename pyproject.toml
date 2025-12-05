@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "certificate-management"
 version = "1.0.0"
-description = "荣誉证书管理桌面应用（PySide6 + Fluent Design）"
+description = "荣誉证书管理桌面应用"
 readme = "README.md"
 requires-python = ">=3.14"
 license = { text = "MIT" }
