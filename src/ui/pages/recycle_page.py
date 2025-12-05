@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import logging
 
 from PySide6.QtCore import Qt

@@ -2,8 +2,6 @@
 Form validators for data integrity and consistency.
 """
 
-from __future__ import annotations
-
 import re
 from typing import Any
 

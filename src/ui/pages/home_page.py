@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from PySide6.QtCore import QByteArray, Qt
 from PySide6.QtSvgWidgets import QSvgWidget
 from PySide6.QtWidgets import QLabel, QVBoxLayout

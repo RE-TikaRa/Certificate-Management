@@ -2,8 +2,6 @@
 Audit logging system for tracking user operations and changes.
 """
 
-from __future__ import annotations
-
 import logging
 from datetime import datetime
 from enum import Enum
