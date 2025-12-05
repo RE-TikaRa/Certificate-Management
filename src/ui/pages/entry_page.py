@@ -704,7 +704,7 @@ class EntryPage(BasePage):
         """计算文件MD5值"""
         try:
             md5_hash = hashlib.md5()
-            with open(file_path, "rb") as f:
+            with file_path.open("rb") as f:
                 for chunk in iter(lambda: f.read(4096), b""):
                     md5_hash.update(chunk)
             return md5_hash.hexdigest()

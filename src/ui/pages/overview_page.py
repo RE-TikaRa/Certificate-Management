@@ -939,10 +939,6 @@ class AwardDetailDialog(MaskDialogBase):
 
     def _add_member_card(self, member=None):
         """添加成员卡片"""
-        import logging
-
-        logger = logging.getLogger(__name__)
-
         # 使用 QFrame 并设置 card 属性以使用 QSS 定义的样式
         member_card = QFrame()
         member_card.setProperty("card", True)
@@ -1329,7 +1325,7 @@ class AwardDetailDialog(MaskDialogBase):
         """计算文件MD5值"""
         try:
             md5_hash = hashlib.md5()
-            with open(file_path, "rb") as f:
+            with file_path.open("rb") as f:
                 for chunk in iter(lambda: f.read(4096), b""):
                     md5_hash.update(chunk)
             return md5_hash.hexdigest()

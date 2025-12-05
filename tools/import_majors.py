@@ -10,8 +10,8 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.data.database import Database
-from src.services.major_service import MajorService
+from src.data.database import Database  # noqa: E402
+from src.services.major_service import MajorService  # noqa: E402
 
 
 def read_majors_from_excel(excel_path: Path) -> list[str]:

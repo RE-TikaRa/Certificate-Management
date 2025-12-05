@@ -8,7 +8,7 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import selectinload
 
 from ..data.database import Database
-from ..data.models import Award, TeamMember
+from ..data.models import Award, Tag, TeamMember
 from .attachment_manager import AttachmentManager
 
 
@@ -134,7 +134,7 @@ class AwardService:
             # Eager load members to avoid lazy loading
             awards = session.scalars(
                 select(Award)
-                .where(Award.deleted == False)
+                .where(Award.deleted.is_(False))
                 .options(selectinload(Award.members))
                 .order_by(Award.award_date.desc())
             ).all()
@@ -334,7 +334,7 @@ class AwardService:
         with self.db.session_scope() as session:
             awards = session.scalars(
                 select(Award)
-                .where(Award.deleted == True)
+                .where(Award.deleted.is_(True))
                 .options(selectinload(Award.members))
                 .order_by(Award.deleted_at.desc())
             ).all()

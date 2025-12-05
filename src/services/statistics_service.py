@@ -58,12 +58,12 @@ class StatisticsService:
     def get_group_by_level(self) -> dict[str, int]:
         with self.db.session_scope() as session:
             rows = session.execute(select(Award.level, func.count(Award.id)).group_by(Award.level)).all()
-        return {level: count for level, count in rows}
+        return dict(rows)
 
     def get_group_by_rank(self) -> dict[str, int]:
         with self.db.session_scope() as session:
             rows = session.execute(select(Award.rank, func.count(Award.id)).group_by(Award.rank)).all()
-        return {rank: count for rank, count in rows}
+        return dict(rows)
 
     def get_recent_by_month(self, months: int = 6) -> dict[str, int]:
         threshold = date.today().replace(day=1)
@@ -74,7 +74,7 @@ class StatisticsService:
                 .group_by(func.strftime("%Y-%m", Award.award_date))
                 .order_by(func.strftime("%Y-%m", Award.award_date))
             ).all()
-        return {month: count for month, count in rows}
+        return dict(rows)
 
     def get_award_level_statistics(self) -> dict[str, int]:
         """按等级详细分类统计荣誉"""

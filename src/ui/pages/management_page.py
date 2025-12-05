@@ -154,10 +154,8 @@ class ManagementPage(BasePage):
     def _show_member_detail(self, member) -> None:
         """显示成员详情对话框"""
         dialog = MemberDetailDialog(member, parent=self)
-        if dialog.exec():
-            # 如果删除了成员，刷新表格
-            if dialog.member_deleted:
-                self.refresh()
+        if dialog.exec() and dialog.member_deleted:
+            self.refresh()
 
 
 class MemberDetailDialog(MaskDialogBase):

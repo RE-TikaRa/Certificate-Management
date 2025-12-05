@@ -42,7 +42,7 @@ class AttachmentManager:
     def _calculate_md5(self, file_path: Path) -> str:
         """计算文件的MD5哈希值"""
         md5_hash = hashlib.md5()
-        with open(file_path, "rb") as f:
+        with file_path.open("rb") as f:
             for chunk in iter(lambda: f.read(4096), b""):
                 md5_hash.update(chunk)
         return md5_hash.hexdigest()

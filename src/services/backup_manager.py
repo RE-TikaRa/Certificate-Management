@@ -4,6 +4,7 @@ import logging
 import shutil
 import sqlite3
 import tempfile
+import zipfile
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -164,22 +165,21 @@ class BackupManager:
         if not backup_path.exists():
             return False, "备份文件不存在"
 
-        if not backup_path.suffix.lower() == ".zip":
+        if backup_path.suffix.lower() != ".zip":
             return False, "备份文件格式不正确"
 
         try:
-            import zipfile
-
             with zipfile.ZipFile(backup_path, "r") as zip_ref:
                 # Check if database exists in backup
                 if "data/awards.db" not in zip_ref.namelist():
                     return False, "备份中不包含数据库文件"
 
                 # Verify SQLite database integrity
-                with zip_ref.open("data/awards.db") as db_file:
-                    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
-                        tmp.write(db_file.read())
-                        tmp_path = tmp.name
+                with zip_ref.open("data/awards.db") as db_file, tempfile.NamedTemporaryFile(
+                    suffix=".db", delete=False
+                ) as tmp:
+                    tmp.write(db_file.read())
+                    tmp_path = Path(tmp.name)
 
                 try:
                     conn = sqlite3.connect(tmp_path)
@@ -193,7 +193,7 @@ class BackupManager:
 
                     return True, ""
                 finally:
-                    Path(tmp_path).unlink(missing_ok=True)
+                    tmp_path.unlink(missing_ok=True)
 
         except Exception as exc:
             return False, f"验证失败: {exc!s}"

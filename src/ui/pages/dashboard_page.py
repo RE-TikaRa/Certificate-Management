@@ -204,15 +204,6 @@ class DashboardPage(BasePage):
         card_layout.addWidget(self.recent_table)
         return card
 
-    def showEvent(self, event) -> None:
-        """页面显示时刷新数据"""
-        super().showEvent(event)
-        self.refresh()
-
-    def closeEvent(self, event) -> None:
-        """页面关闭时的清理"""
-        super().closeEvent(event)
-
     def refresh(self) -> None:
         """异步刷新仪表盘数据"""
 
@@ -423,8 +414,9 @@ class DashboardPage(BasePage):
         InfoBar.success("备份完成", str(path), duration=3000, parent=self.window())
 
     def showEvent(self, event) -> None:
-        """页面显示时启动定时器"""
+        """页面显示时启动定时器并刷新数据"""
         super().showEvent(event)
+        self.refresh()
         if hasattr(self, "refresh_timer"):
             self.refresh_timer.start(5000)
 

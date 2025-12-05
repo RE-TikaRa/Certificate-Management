@@ -270,7 +270,7 @@ _audit_logger: AuditLogger | None = None
 
 def get_audit_logger() -> AuditLogger:
     """Get the global audit logger instance."""
-    global _audit_logger
+    global _audit_logger  # noqa: PLW0603
     if _audit_logger is None:
         _audit_logger = AuditLogger()
     return _audit_logger

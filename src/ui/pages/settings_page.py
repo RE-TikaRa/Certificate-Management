@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import ClassVar
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QFileDialog,
@@ -43,13 +45,13 @@ def clean_input_text(line_edit: QLineEdit) -> None:
 
 
 class SettingsPage(BasePage):
-    THEME_OPTIONS = {
+    THEME_OPTIONS: ClassVar[dict[str, str]] = {
         "light": "浅色",
         "dark": "深色",
         "auto": "跟随系统",
     }
 
-    FREQUENCY_OPTIONS = {
+    FREQUENCY_OPTIONS: ClassVar[dict[str, str]] = {
         "manual": "手动",
         "startup": "启动时",
         "daily": "每天",

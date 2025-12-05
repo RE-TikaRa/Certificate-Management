@@ -95,6 +95,22 @@ ignore = [
   "COM819",
   "ISC001",
   "ISC002",
+  "RUF001",  # allow full-width punctuation in strings
+  "RUF002",
+  "RUF003",
+  "PLR0913", # allow more than 5 args (Qt/service APIs)
+  "PLC0415", # allow local imports when needed
+  "N802",    # Qt method naming
+  "N815",    # Qt signal naming
+  "N814",    # FluentIcon alias naming
+  "PLR0911", # many returns in Qt handlers
+  "PLR0912", # many branches in Qt handlers
+  "PLR0915", # many statements in Qt widgets
+  "PLR2004", # magic numbers (UI/layout constants)
+  "B008",    # Qt default QModelIndex usage
+  "B007",    # loop vars unused in UI setup
+  "SIM101",  # simple isinstance merges (Qt widgets)
+  "SIM108",  # ternary suggestion
 ]
 
 [tool.ruff.lint.isort]

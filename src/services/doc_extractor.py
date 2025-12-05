@@ -3,23 +3,24 @@
 从.doc文档中提取关键学生信息用于成员录入
 """
 
-import os
+import logging
 import re
 import subprocess
+from pathlib import Path
 
 
 class DocInfoExtractor:
     """文档信息提取器 - 用于从.doc文件提取成员信息"""
 
     def __init__(self, doc_path):
-        self.doc_path = doc_path
+        self.doc_path = Path(doc_path)
         self.text_content = ""
         self.member_info = {}
 
     def extract_text_from_doc(self):
         """使用PowerShell和Word COM对象提取.doc文件文本"""
         # 转换路径为绝对路径并规范化
-        abs_path = os.path.abspath(self.doc_path).replace("/", "\\")
+        abs_path = str(self.doc_path.resolve())
 
         # 使用 -EncodedCommand 避免路径中的特殊字符问题
         ps_script = f"""
@@ -60,14 +61,12 @@ class DocInfoExtractor:
             else:
                 # 记录详细错误信息
                 error_msg = result.stderr.strip() if result.stderr else "未知错误"
-                import logging
-
                 logging.getLogger(__name__).error(f"PowerShell 错误: {error_msg}")
                 return False
         except subprocess.TimeoutExpired:
-            raise Exception("文档处理超时（30秒），文件可能过大或损坏")
+            raise Exception("文档处理超时（30秒），文件可能过大或损坏") from None
         except Exception as e:
-            raise Exception(f"提取文本时出错: {e}")
+            raise Exception(f"提取文本时出错: {e}") from e
 
     def extract_gender(self):
         """提取性别"""
@@ -231,8 +230,6 @@ class DocInfoExtractor:
         Raises:
             Exception: 文档读取失败时抛出异常
         """
-        import logging
-
         logger = logging.getLogger(__name__)
 
         # 提取文本
@@ -247,7 +244,7 @@ class DocInfoExtractor:
                     "建议：尝试在 Word 中打开文件确认是否正常"
                 )
         except subprocess.TimeoutExpired:
-            raise Exception("文档处理超时，文件可能过大")
+            raise Exception("文档处理超时，文件可能过大") from None
         except Exception as e:
             logger.error(f"提取文档失败: {e}", exc_info=True)
             raise
@@ -288,7 +285,8 @@ def extract_member_info_from_doc(doc_path, email_suffix=None):
         FileNotFoundError: 文件不存在
         Exception: 提取失败
     """
-    if not os.path.exists(doc_path):
+    doc_path = Path(doc_path)
+    if not doc_path.exists():
         raise FileNotFoundError(f"文件不存在: {doc_path}")
 
     extractor = DocInfoExtractor(doc_path)
