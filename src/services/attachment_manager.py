@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import logging
 import shutil
-import contextlib
+from collections.abc import Iterable, Sequence
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable, Sequence
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session

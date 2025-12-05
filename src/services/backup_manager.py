@@ -4,9 +4,9 @@ import logging
 import shutil
 import sqlite3
 import tempfile
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from dataclasses import dataclass
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -47,7 +47,7 @@ class BackupManager:
         try:
             configured.mkdir(parents=True, exist_ok=True)
             return configured
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning("backup_root '%s' unavailable, fallback to default '%s': %s", configured, BACKUP_DIR, exc)
             fallback = BACKUP_DIR
             fallback.mkdir(parents=True, exist_ok=True)
@@ -97,7 +97,7 @@ class BackupManager:
             self.settings.set("last_backup_time", datetime.utcnow().isoformat())
             self._cleanup_old_archives()
             return archive_path
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.exception("Backup failed: %s", exc)
             with self.db.session_scope() as session:
                 session.add(
@@ -148,7 +148,7 @@ class BackupManager:
             try:
                 extra.unlink()
                 logger.info("Removed old backup %s", extra)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.warning("Failed to remove old backup %s", extra)
 
     def verify_backup(self, backup_path: Path) -> tuple[bool, str]:
@@ -196,7 +196,7 @@ class BackupManager:
                     Path(tmp_path).unlink(missing_ok=True)
 
         except Exception as exc:
-            return False, f"验证失败: {str(exc)}"
+            return False, f"验证失败: {exc!s}"
 
     def list_backups(self) -> list[BackupInfo]:
         """

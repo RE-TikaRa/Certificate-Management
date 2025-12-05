@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QByteArray
-from PySide6.QtWidgets import QLabel, QVBoxLayout
+from PySide6.QtCore import QByteArray, Qt
 from PySide6.QtSvgWidgets import QSvgWidget
+from PySide6.QtWidgets import QLabel, QVBoxLayout
 
-from .base_page import BasePage
 from ...config import BASE_DIR
 from ..styled_theme import ThemeManager
+from .base_page import BasePage
 
 
 class HomePage(BasePage):

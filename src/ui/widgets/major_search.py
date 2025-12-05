@@ -3,13 +3,9 @@
 提供模糊搜索和一键填充功能
 """
 
-from typing import Callable, List
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-    QFrame,
-    QHBoxLayout,
-    QLabel,
     QListWidget,
     QListWidgetItem,
     QVBoxLayout,
@@ -17,7 +13,6 @@ from PySide6.QtWidgets import (
 )
 from qfluentwidgets import LineEdit
 
-from src.data.models import Major
 from src.services.major_service import MajorService
 from src.ui.styled_theme import ThemeManager
 

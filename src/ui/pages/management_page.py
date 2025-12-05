@@ -397,7 +397,7 @@ class MemberDetailDialog(MaskDialogBase):
             self.original_data = self._get_member_data()
 
         except Exception as e:
-            InfoBar.error("错误", f"保存失败: {str(e)}", parent=self.window())
+            InfoBar.error("错误", f"保存失败: {e!s}", parent=self.window())
 
     def _confirm_delete(self):
         """确认删除"""
@@ -417,7 +417,7 @@ class MemberDetailDialog(MaskDialogBase):
             InfoBar.success("成功", "成员已删除", parent=self.window())
             self.accept()
         except Exception as e:
-            InfoBar.error("错误", f"删除失败: {str(e)}", parent=self.window())
+            InfoBar.error("错误", f"删除失败: {e!s}", parent=self.window())
 
     def _apply_theme(self):
         """应用主题样式 - 包括对话框背景色和标题栏"""

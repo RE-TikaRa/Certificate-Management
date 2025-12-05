@@ -5,8 +5,7 @@ import time
 
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
-from qfluentwidgets import FluentIcon as FIF
-from qfluentwidgets import FluentWindow, NavigationItemPosition, Theme, setTheme
+from qfluentwidgets import FluentIcon as FIF, FluentWindow, NavigationItemPosition, Theme, setTheme
 
 from ..app_context import AppContext
 from .pages.about_page import AboutPage

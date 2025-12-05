@@ -360,7 +360,7 @@ class EntryPage(BasePage):
         member_fields = {}
 
         # 首先创建所有输入框
-        for field_name, label in zip(field_names, field_labels):
+        for field_name, label in zip(field_names, field_labels, strict=False):
             # 专业字段使用特殊的搜索组件
             if field_name == "major":
                 input_widget = MajorSearchWidget(self.ctx.majors, self.theme_manager, parent=member_card)
@@ -371,7 +371,7 @@ class EntryPage(BasePage):
             member_fields[field_name] = input_widget
 
         # 然后按2列布局添加到表单
-        for idx, (field_name, label) in enumerate(zip(field_names, field_labels)):
+        for idx, (field_name, label) in enumerate(zip(field_names, field_labels, strict=False)):
             col = (idx % 2) * 2
             row = idx // 2
 
@@ -604,7 +604,7 @@ class EntryPage(BasePage):
             logger.error(f"文件不存在: {file_path}")
         except Exception as e:
             progress.close()
-            InfoBar.error("导入失败", f"提取文档信息时出错: {str(e)}", parent=self.window())
+            InfoBar.error("导入失败", f"提取文档信息时出错: {e!s}", parent=self.window())
             logger.error(f"导入文档失败: {e}", exc_info=True)
 
     def _get_members_data(self) -> list[dict]:
@@ -638,9 +638,7 @@ class EntryPage(BasePage):
                     for field_name in field_names[1:]:
                         widget = member_fields.get(field_name)
                         # 支持MajorSearchWidget和QLineEdit
-                        if isinstance(widget, MajorSearchWidget):
-                            value = widget.text().strip()
-                        elif isinstance(widget, QLineEdit):
+                        if isinstance(widget, MajorSearchWidget) or isinstance(widget, QLineEdit):
                             value = widget.text().strip()
                         else:
                             value = ""

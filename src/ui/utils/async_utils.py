@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import logging
-from typing import Callable, Any
+from collections.abc import Callable
+from typing import Any
 
-from PySide6.QtCore import QRunnable, QThreadPool, QObject, Signal
+from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,7 @@ class _Worker(QRunnable):
     def run(self) -> None:  # Runs in thread pool worker thread
         try:
             result = self.func()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.exception("Async task failed: %s", exc)
             return
         # Emit from worker thread; Qt delivers to connected slot in GUI thread

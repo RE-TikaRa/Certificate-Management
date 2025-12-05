@@ -3,10 +3,9 @@
 从.doc文档中提取关键学生信息用于成员录入
 """
 
+import os
 import re
 import subprocess
-import os
-from pathlib import Path
 
 
 class DocInfoExtractor:
@@ -48,7 +47,7 @@ class DocInfoExtractor:
             # 使用 errors='replace' 处理编码问题
             result = subprocess.run(
                 ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_script],
-                capture_output=True,
+                check=False, capture_output=True,
                 text=True,
                 encoding="gbk",  # Windows 中文环境使用 GBK
                 errors="replace",  # 替换无法解码的字符

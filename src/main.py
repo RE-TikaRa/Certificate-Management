@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+import logging
 import sys
 import time
-import logging
 
-from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import QLibraryInfo, QLocale, QTranslator
 from PySide6.QtGui import QFont
-from PySide6.QtCore import QTranslator, QLocale, QLibraryInfo
+from PySide6.QtWidgets import QApplication
 
 from .app_context import bootstrap
 from .ui.main_window import MainWindow

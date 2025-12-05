@@ -6,8 +6,8 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Any
 from enum import Enum
+from typing import Any
 
 
 class OperationType(str, Enum):

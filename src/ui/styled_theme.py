@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from enum import Enum
 
-from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QGuiApplication, QPalette
+from PySide6.QtWidgets import QApplication
 from qfluentwidgets import Theme, setTheme
 from qfluentwidgets.common.config import qconfig
 

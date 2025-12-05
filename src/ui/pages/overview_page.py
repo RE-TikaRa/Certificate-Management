@@ -523,7 +523,7 @@ class OverviewPage(BasePage):
                 self.awards_layout.addStretch()
         except Exception as e:
             logger.exception(f"加载更多失败: {e}")
-            InfoBar.error("错误", f"加载失败: {str(e)}", parent=self.window())
+            InfoBar.error("错误", f"加载失败: {e!s}", parent=self.window())
 
     def _create_award_card(self, award) -> QWidget:
         """创建单个荣誉卡片"""
@@ -610,7 +610,7 @@ class OverviewPage(BasePage):
                 self.refresh()  # 刷新列表
         except Exception as e:
             logger.exception(f"编辑失败: {e}")
-            InfoBar.error("错误", f"编辑失败: {str(e)}", parent=self.window())
+            InfoBar.error("错误", f"编辑失败: {e!s}", parent=self.window())
 
     def _delete_award(self, award) -> None:
         """删除荣誉(移入回收站)"""
@@ -627,7 +627,7 @@ class OverviewPage(BasePage):
                 InfoBar.success("成功", "已移入回收站", parent=self.window())
             except Exception as e:
                 logger.exception(f"删除失败: {e}")
-                InfoBar.error("错误", f"删除失败: {str(e)}", parent=self.window())
+                InfoBar.error("错误", f"删除失败: {e!s}", parent=self.window())
 
     def closeEvent(self, event):
         """页面关闭时停止定时器"""
@@ -1017,7 +1017,7 @@ class AwardDetailDialog(MaskDialogBase):
         ]
 
         member_fields = {}
-        for field_name, label in zip(field_names, field_labels):
+        for field_name, label in zip(field_names, field_labels, strict=False):
             # 专业字段使用特殊的搜索组件
             if field_name == "major":
                 input_widget = MajorSearchWidget(self.ctx.majors, self.theme_manager, parent=member_card)
@@ -1040,7 +1040,7 @@ class AwardDetailDialog(MaskDialogBase):
             member_fields[field_name] = input_widget
 
         # 按2列布局
-        for idx, (field_name, label) in enumerate(zip(field_names, field_labels)):
+        for idx, (field_name, label) in enumerate(zip(field_names, field_labels, strict=False)):
             col = (idx % 2) * 2
             row = idx // 2
 
@@ -1237,7 +1237,7 @@ class AwardDetailDialog(MaskDialogBase):
             logger.error(f"文件不存在: {file_path}")
         except Exception as e:
             progress.close()
-            InfoBar.error("导入失败", f"提取文档信息时出错: {str(e)}", parent=self)
+            InfoBar.error("导入失败", f"提取文档信息时出错: {e!s}", parent=self)
             logger.error(f"导入文档失败: {e}", exc_info=True)
 
     def _select_from_history(self, member_fields: dict) -> None:
@@ -1385,7 +1385,7 @@ class AwardDetailDialog(MaskDialogBase):
             self.accept()
         except Exception as e:
             logger.exception(f"保存奖项失败: {e}")
-            InfoBar.error("错误", f"保存失败: {str(e)}", parent=self.window())
+            InfoBar.error("错误", f"保存失败: {e!s}", parent=self.window())
 
     def _get_members_data(self):
         """获取成员数据"""
@@ -1412,9 +1412,7 @@ class AwardDetailDialog(MaskDialogBase):
                     for field_name in field_names[1:]:
                         widget = member_fields.get(field_name)
                         # 支持MajorSearchWidget和QLineEdit
-                        if isinstance(widget, MajorSearchWidget):
-                            value = widget.text().strip()
-                        elif isinstance(widget, QLineEdit):
+                        if isinstance(widget, MajorSearchWidget) or isinstance(widget, QLineEdit):
                             value = widget.text().strip()
                         else:
                             value = ""

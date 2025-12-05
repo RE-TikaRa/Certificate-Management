@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import csv
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Sequence
 
 import pandas as pd
 from sqlalchemy import select
@@ -118,7 +118,7 @@ class ImportExportService:
                     if files:
                         self.attachments.save_attachments(award.id, award.competition_name, files, session=session)
                     success += 1
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:
                     errors.append(f"第 {idx + 2} 行: {exc}")
             session.add(
                 ImportJob(

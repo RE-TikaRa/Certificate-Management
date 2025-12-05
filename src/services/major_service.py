@@ -3,9 +3,10 @@
 提供专业名称的搜索、匹配和管理功能
 """
 
-from typing import List
+
 from pypinyin import lazy_pinyin
 from sqlalchemy import or_
+
 from src.data.database import Database
 from src.data.models import Major
 
@@ -16,13 +17,13 @@ class MajorService:
     def __init__(self, db: Database):
         self.db = db
 
-    def get_all_majors(self) -> List[Major]:
+    def get_all_majors(self) -> list[Major]:
         """获取所有专业"""
         with self.db.session_scope() as session:
             majors = session.query(Major).order_by(Major.name).all()
             return [Major(id=m.id, name=m.name, pinyin=m.pinyin, category=m.category) for m in majors]
 
-    def search_majors(self, query: str, limit: int = 10) -> List[Major]:
+    def search_majors(self, query: str, limit: int = 10) -> list[Major]:
         """
         模糊搜索专业名称
 
@@ -74,7 +75,7 @@ class MajorService:
         with self.db.session_scope() as session:
             return session.query(Major).filter(Major.name == name).count() > 0
 
-    def batch_add_majors(self, major_names: List[str]) -> int:
+    def batch_add_majors(self, major_names: list[str]) -> int:
         """
         批量添加专业
 
@@ -109,7 +110,7 @@ class MajorService:
             session.query(Major).delete()
             return count
 
-    def replace_all_majors(self, major_names: List[str]) -> int:
+    def replace_all_majors(self, major_names: list[str]) -> int:
         """
         清空并重新导入所有专业
 

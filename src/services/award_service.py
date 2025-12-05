@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import date, datetime
 from pathlib import Path
-from typing import Iterable, Sequence
 
-from sqlalchemy import select, and_, or_
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import selectinload
 
 from ..data.database import Database
