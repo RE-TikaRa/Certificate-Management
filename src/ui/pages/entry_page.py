@@ -811,18 +811,14 @@ class EntryPage(BasePage):
         self.attach_label.setText("未选择附件")
 
     def refresh(self) -> None:
-        """刷新页面（可选）"""
         pass
 
     def _submit(self) -> None:
-        # 优化：快速失败机制 - 第一个错误立即返回
         issues = self._validate_form()
         if issues:
-            # 只显示第一个错误（快速反馈）
             InfoBar.warning("表单不合法", issues[0], parent=self.window())
             return
 
-        # 数据已验证，可以直接获取
         members_data = self._get_members_data()
 
         if self.editing_award:
@@ -902,22 +898,18 @@ class EntryPage(BasePage):
             self.clear_btn.setText("清空表单")
 
     def _validate_form(self) -> list[str]:
-        """
-        Validate the entire award form using FormValidator.
-        Returns list of error messages (empty if valid).
-        优化：提前退出机制 + 快速失败检测
-        """
+        """验证荣誉表单，返回错误信息列表，空列表表示验证通过"""
         issues: list[str] = []
 
-        # 1. 验证比赛名称（必填）
+        # 验证比赛名称
         name = self.name_input.text().strip()
         valid, msg = FormValidator.validate_competition_name(name)
         if not valid:
             issues.append(msg)
             self._highlight_field_error(self.name_input)
-            return issues  # 快速失败：基本信息错误立即返回
+            return issues
 
-        # 2. 验证获奖日期（必填）
+        # 验证获奖日期
         try:
             award_date = QDate(
                 self.year_input.value(),
@@ -934,7 +926,7 @@ class EntryPage(BasePage):
             issues.append("获奖日期不合法。")
             return issues
 
-        # 3. 验证证书号和备注（可选）
+        # 验证证书号和备注
         code = self.certificate_input.text().strip()
         valid, msg = FormValidator.validate_certificate_code(code)
         if not valid:
@@ -949,18 +941,16 @@ class EntryPage(BasePage):
             self._highlight_field_error(self.remarks_input)
             return issues
 
-        # 4. 验证成员
+        # 验证成员
         members_data = self._get_members_data()
         if not members_data:
             issues.append("请至少添加一名成员。")
-            return issues  # 快速失败
+            return issues
 
-        # 批量验证成员，但在第一个错误时停止
         for i, member in enumerate(members_data, 1):
             member_errors = FormValidator.validate_member_info(member)
-            if member_errors:  # 找到错误立即返回
+            if member_errors:
                 issues.append(f"成员 {i} - {member_errors[0]}")
-                # 高亮错误的成员卡片
                 if i - 1 < len(self.members_data):
                     self._highlight_member_error(i - 1)
                 return issues
@@ -968,7 +958,7 @@ class EntryPage(BasePage):
         return issues
 
     def _highlight_field_error(self, field_widget: QLineEdit) -> None:
-        """高亮出错的字段 - 快速反馈"""
+        """高亮出错的字段"""
         field_widget.setStyleSheet("""
             QLineEdit {
                 border: 2px solid #ff6b6b;

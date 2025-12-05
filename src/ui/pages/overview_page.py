@@ -81,8 +81,7 @@ class OverviewPage(BasePage):
         super().__init__(ctx, theme_manager)
         self.awards_list = []
 
-        # 性能优化：分批加载
-        self.PAGE_SIZE = 20  # 每页显示20条
+        self.PAGE_SIZE = 20
         self.current_page = 0
         self.total_awards = 0
         self.load_more_btn = None  # 保存加载更多按钮引用
@@ -152,8 +151,7 @@ class OverviewPage(BasePage):
         layout.addWidget(card)
         layout.addStretch()
 
-        # 优化：缓存机制用于快速比较
-        self._cached_award_ids = set()  # 缓存的荣誉 ID 集合
+        self._cached_award_ids = set()
 
         # 自动刷新定时器（每5秒检查一次数据）
         self.refresh_timer = QTimer()
@@ -388,44 +386,26 @@ class OverviewPage(BasePage):
         return awards
 
     def _auto_refresh(self) -> None:
-        """优化：快速数据变化检测 - 只用 ID 比较，不用创建完整对象
-
-        优化前：
-        - 全量查询所有荣誉
-        - 创建所有 ORM 对象
-        - 转换到 Python 对象
-        - 比较大对象列表
-        耗时：~50-100ms
-
-        优化后：
-        - 仅获取 ID 列表
-        - 集合快速比较
-        - 有变化时才全量加载
-        耗时：~3-5ms（20 倍加速！）
-        """
+        """检测数据变化并刷新"""
         try:
             from sqlalchemy import select
 
             from ..data.models import Award
 
-            # 仅查询 ID（极轻量）
             with self.ctx.db.session_scope() as session:
                 award_ids = set(session.scalars(select(Award.id)).all())
 
-            # 快速集合比较
             if award_ids != self._cached_award_ids:
                 self._cached_award_ids = award_ids
-                self.refresh()  # 数据变化才刷新
+                self.refresh()
         except Exception as e:
             logger.debug(f"自动刷新失败: {e}")
 
     def refresh(self) -> None:
-        """刷新荣誉列表（优化版：分批加载 + 筛选 + 排序）"""
+        """刷新荣誉列表"""
         try:
-            # 优化1：快速清空UI
             self._clear_awards_layout()
 
-            # 优化2：获取所有数据
             all_awards = self.ctx.awards.list_awards()
 
             # 应用筛选条件
@@ -439,11 +419,10 @@ class OverviewPage(BasePage):
                 self._show_empty_state()
                 return
 
-            # 优化3：首次只加载20条
+            # 首次只加载 20 条
             self.current_page = 0
             self._load_more_awards()
 
-            # 优化4：如果有更多数据，显示"加载更多"按钮
             if self.total_awards > self.PAGE_SIZE:
                 self._add_load_more_button()
             else:
@@ -456,7 +435,7 @@ class OverviewPage(BasePage):
             logger.error(f"刷新失败: {e}", exc_info=True)
 
     def _clear_awards_layout(self) -> None:
-        """快速清空布局"""
+        """清空布局"""
         widgets_to_delete = []
         while self.awards_layout.count():
             item = self.awards_layout.takeAt(0)

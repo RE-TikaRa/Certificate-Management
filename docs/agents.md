@@ -653,16 +653,16 @@ python -m src.main --debug
 
 ## Key File References for Modifications
 
-| Feature | Primary File | Secondary Files |
-|---------|-------------|-----------------|
-| Award data | `src/services/award_service.py` | `src/data/models.py` |
-| Statistics | `src/services/statistics_service.py` | `src/ui/pages/dashboard_page.py` |
-| Member mgmt | `src/ui/pages/management_page.py` | `src/data/models.py` |
-| Award entry | `src/ui/pages/entry_page.py` | `src/services/award_service.py` |
-| Award edit | `src/ui/pages/overview_page.py` | `src/services/award_service.py` |
-| Settings | `src/ui/pages/settings_page.py` | `src/services/settings_service.py` |
-| Themes | `src/ui/styled_theme.py` | `src/resources/styles/*.qss` |
-| Navigation | `src/ui/main_window.py` | All page files |
+| Feature     | Primary File                         | Secondary Files                    |
+| ----------- | ------------------------------------ | ---------------------------------- |
+| Award data  | `src/services/award_service.py`      | `src/data/models.py`               |
+| Statistics  | `src/services/statistics_service.py` | `src/ui/pages/dashboard_page.py`   |
+| Member mgmt | `src/ui/pages/management_page.py`    | `src/data/models.py`               |
+| Award entry | `src/ui/pages/entry_page.py`         | `src/services/award_service.py`    |
+| Award edit  | `src/ui/pages/overview_page.py`      | `src/services/award_service.py`    |
+| Settings    | `src/ui/pages/settings_page.py`      | `src/services/settings_service.py` |
+| Themes      | `src/ui/styled_theme.py`             | `src/resources/styles/*.qss`       |
+| Navigation  | `src/ui/main_window.py`              | All page files                     |
 
 ---
 

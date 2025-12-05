@@ -64,23 +64,36 @@ exclude = [
 
 [tool.ruff.lint]
 select = [
-  "E4", "E7", "E9",  # pycodestyle errors
-  "W",               # pycodestyle warnings
-  "F",               # pyflakes
-  "I",               # import sorting
-  "B",               # bugbear
-  "C4",              # comprehensions
-  "SIM",             # simplify
-  "UP",              # pyupgrade
-  "N",               # pep8-naming
-  "PTH",             # pathlib
-  "PL",              # pylint-inspired
-  "RUF",             # ruff-specific
+  "E4",
+  "E7",
+  "E9",  # pycodestyle errors
+  "W",   # pycodestyle warnings
+  "F",   # pyflakes
+  "I",   # import sorting
+  "B",   # bugbear
+  "C4",  # comprehensions
+  "SIM", # simplify
+  "UP",  # pyupgrade
+  "N",   # pep8-naming
+  "PTH", # pathlib
+  "PL",  # pylint-inspired
+  "RUF", # ruff-specific
 ]
 ignore = [
-  "W191", "E111", "E114", "E117",
-  "D206", "D300", "Q000", "Q001", "Q002", "Q003",
-  "COM812", "COM819", "ISC001", "ISC002",
+  "W191",
+  "E111",
+  "E114",
+  "E117",
+  "D206",
+  "D300",
+  "Q000",
+  "Q001",
+  "Q002",
+  "Q003",
+  "COM812",
+  "COM819",
+  "ISC001",
+  "ISC002",
 ]
 fix = true
 

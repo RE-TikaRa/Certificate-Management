@@ -253,44 +253,44 @@ Certificate-Management/
 ## 数据模型
 
 ### 荣誉记录
-| 字段 | 类型 | 说明 |
-|-----|-----|------|
-| `id` | Integer | 主键，自增 |
-| `competition_name` | String | 比赛名称 |
-| `award_date` | Date | 获奖日期 |
-| `level` | String | 赛事级别（国家级/省级/校级） |
-| `rank` | String | 奖项等级（一等奖/二等奖/三等奖/优秀奖） |
-| `certificate_code` | String | 证书编号 |
-| `remarks` | Text | 备注说明 |
-| `members` | Relationship | 参与成员（多对多关系） |
-| `tags` | Relationship | 标签分类（多对多关系） |
-| `created_at` | DateTime | 创建时间 |
-| `updated_at` | DateTime | 更新时间 |
+| 字段               | 类型         | 说明                                    |
+| ------------------ | ------------ | --------------------------------------- |
+| `id`               | Integer      | 主键，自增                              |
+| `competition_name` | String       | 比赛名称                                |
+| `award_date`       | Date         | 获奖日期                                |
+| `level`            | String       | 赛事级别（国家级/省级/校级）            |
+| `rank`             | String       | 奖项等级（一等奖/二等奖/三等奖/优秀奖） |
+| `certificate_code` | String       | 证书编号                                |
+| `remarks`          | Text         | 备注说明                                |
+| `members`          | Relationship | 参与成员（多对多关系）                  |
+| `tags`             | Relationship | 标签分类（多对多关系）                  |
+| `created_at`       | DateTime     | 创建时间                                |
+| `updated_at`       | DateTime     | 更新时间                                |
 
 ### 参与成员
-| 字段 | 类型 | 说明 |
-|-----|-----|------|
-| `id` | Integer | 主键，自增 |
-| `name` | String | 姓名 |
-| `gender` | String | 性别 |
-| `id_card` | String | 身份证号 |
-| `phone` | String | 手机号 |
-| `student_id` | String | 学号 |
-| `email` | String | 邮箱地址 |
-| `major` | String | 专业 |
-| `class_name` | String | 班级 |
-| `college` | String | 学院 |
-| `awards` | Relationship | 参与的荣誉（多对多关系） |
+| 字段         | 类型         | 说明                     |
+| ------------ | ------------ | ------------------------ |
+| `id`         | Integer      | 主键，自增               |
+| `name`       | String       | 姓名                     |
+| `gender`     | String       | 性别                     |
+| `id_card`    | String       | 身份证号                 |
+| `phone`      | String       | 手机号                   |
+| `student_id` | String       | 学号                     |
+| `email`      | String       | 邮箱地址                 |
+| `major`      | String       | 专业                     |
+| `class_name` | String       | 班级                     |
+| `college`    | String       | 学院                     |
+| `awards`     | Relationship | 参与的荣誉（多对多关系） |
 
 ### 专业信息
-| 字段 | 类型 | 说明 |
-|-----|-----|------|
-| `id` | Integer | 主键，自增 |
-| `name` | String | 专业名称（唯一） |
-| `pinyin` | String | 拼音（用于搜索） |
-| `category` | String | 专业分类 |
-| `created_at` | DateTime | 创建时间 |
-| `updated_at` | DateTime | 更新时间 |
+| 字段         | 类型     | 说明             |
+| ------------ | -------- | ---------------- |
+| `id`         | Integer  | 主键，自增       |
+| `name`       | String   | 专业名称（唯一） |
+| `pinyin`     | String   | 拼音（用于搜索） |
+| `category`   | String   | 专业分类         |
+| `created_at` | DateTime | 创建时间         |
+| `updated_at` | DateTime | 更新时间         |
 
 ---
 
@@ -300,16 +300,16 @@ Certificate-Management/
 
 ### 指标卡片色彩方案
 
-| 指标 | 颜色方案 | 使用场景 |
-|-----|--------|--------|
-| 总荣誉数 | 紫色 (#a071ff → #7b6cff) | 总体统计 |
-| 国家级 | 蓝色 (#5a80f3 → #4ac6ff) | 国家级荣誉 |
-| 省级 | 金色 (#ffb347 → #ffcc33) | 省级荣誉 |
-| 校级 | 绿色 (#3ec8a0 → #45dd8e) | 校级荣誉 |
-| 一等奖 | 青色 (#00b4d8 → #48cae4) | 一等奖 |
-| 二等奖 | 紫粉色 (#b54cb8 → #d896ff) | 二等奖 |
-| 三等奖 | 红色 (#ff6b6b → #ff8787) | 三等奖 |
-| 优秀奖 | 蓝色 (#5a80f3 → #4ac6ff) | 优秀奖 |
+| 指标     | 颜色方案                   | 使用场景   |
+| -------- | -------------------------- | ---------- |
+| 总荣誉数 | 紫色 (#a071ff → #7b6cff)   | 总体统计   |
+| 国家级   | 蓝色 (#5a80f3 → #4ac6ff)   | 国家级荣誉 |
+| 省级     | 金色 (#ffb347 → #ffcc33)   | 省级荣誉   |
+| 校级     | 绿色 (#3ec8a0 → #45dd8e)   | 校级荣誉   |
+| 一等奖   | 青色 (#00b4d8 → #48cae4)   | 一等奖     |
+| 二等奖   | 紫粉色 (#b54cb8 → #d896ff) | 二等奖     |
+| 三等奖   | 红色 (#ff6b6b → #ff8787)   | 三等奖     |
+| 优秀奖   | 蓝色 (#5a80f3 → #4ac6ff)   | 优秀奖     |
 
 主题切换通过设置页面完成，用户偏好自动保存。
 
@@ -356,18 +356,18 @@ uv run ruff format .
 
 主要依赖通过 `pyproject.toml` 管理：
 
-| 包名 | 说明 |
-|------|------|
-| PySide6 | Qt 6 Python 绑定，GUI 框架 |
-| PySide6-Fluent-Widgets | Fluent Design 风格组件库 |
-| SQLAlchemy | ORM 框架，数据库抽象 |
-| pandas | 数据处理和分析 |
-| openpyxl | Excel 文件读写 |
-| APScheduler | 定时任务调度 |
-| loguru | 日志记录库 |
-| alembic | 数据库迁移工具 |
-| python-dateutil | 日期时间处理 |
-| pypinyin | 拼音转换工具，用于专业搜索 |
+| 包名                   | 说明                       |
+| ---------------------- | -------------------------- |
+| PySide6                | Qt 6 Python 绑定，GUI 框架 |
+| PySide6-Fluent-Widgets | Fluent Design 风格组件库   |
+| SQLAlchemy             | ORM 框架，数据库抽象       |
+| pandas                 | 数据处理和分析             |
+| openpyxl               | Excel 文件读写             |
+| APScheduler            | 定时任务调度               |
+| loguru                 | 日志记录库                 |
+| alembic                | 数据库迁移工具             |
+| python-dateutil        | 日期时间处理               |
+| pypinyin               | 拼音转换工具，用于专业搜索 |
 
 完整依赖与版本策略请见 `pyproject.toml`，精确解析版本记录在 `uv.lock`（如需保持一致可运行 `uv sync --locked`）。
 
