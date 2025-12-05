@@ -5,6 +5,7 @@ import time
 import logging
 
 from PySide6.QtWidgets import QApplication
+from PySide6.QtGui import QFont
 from PySide6.QtCore import QTranslator, QLocale, QLibraryInfo
 
 from .app_context import bootstrap
@@ -19,6 +20,10 @@ def main(debug: bool = False) -> None:
     start_time = time.time()
     
     app = QApplication(sys.argv)
+
+    # 设置全局字体为含 pointSize 的字体，避免 Qt 在复制像素字体时落入 -1 警告
+    default_font = QFont("Segoe UI", 12)
+    app.setFont(default_font)
     
     # 加载Qt中文翻译
     translator = QTranslator()
