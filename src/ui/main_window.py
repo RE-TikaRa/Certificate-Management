@@ -124,7 +124,7 @@ class MainWindow(FluentWindow):
             home_page, FIF.HOME, "首页", position=NavigationItemPosition.TOP
         )
         self.route_keys["home"] = key
-        self.navigate("home")
+        self.navigate_to("home")
 
     def _load_remaining_pages(self) -> None:
         """延迟加载其他页面"""

@@ -428,8 +428,8 @@ class DashboardPage(BasePage):
 
     def _navigate(self, route: str) -> None:
         window = self.window()
-        if hasattr(window, "navigate"):
-            window.navigate(route)
+        if hasattr(window, "navigate_to"):
+            window.navigate_to(route)
 
     def _do_backup(self) -> None:
         path = self.ctx.backup.perform_backup()
