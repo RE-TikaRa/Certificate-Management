@@ -645,7 +645,7 @@ class OverviewPage(BasePage):
     def _apply_theme(self) -> None:
         """应用主题到滚动区域"""
         is_dark = self.theme_manager.is_dark
-        scroll_bg = "#1c1f2e" if is_dark else "#f4f6fb"
+        scroll_bg = "#232635" if is_dark else "#f4f6fb"
 
         scroll_stylesheet = f"""
             QScrollArea {{
@@ -668,7 +668,7 @@ class OverviewPage(BasePage):
             palette = scroll_widget.palette()
             palette.setColor(
                 palette.ColorRole.Window,
-                {"#1c1f2e": QColor(28, 31, 46), "#f4f6fb": QColor(244, 246, 251)}[scroll_bg],
+                {"#232635": QColor(35, 38, 53), "#f4f6fb": QColor(244, 246, 251)}[scroll_bg],
             )
             scroll_widget.setPalette(palette)
 
@@ -1425,7 +1425,7 @@ class AwardDetailDialog(MaskDialogBase):
         """应用主题 - 标题栏、背景和控件都跟随系统主题"""
         is_dark = self.theme_manager.is_dark
         if is_dark:
-            bg_color = "#1c1f2e"  # 对话框背景跟随主题背景
+            bg_color = "#232635"  # 对话框背景跟随主题背景
             text_color = "#f2f4ff"
             input_bg = "#2a2a3a"
             border_color = "#4a4a5e"
@@ -1481,7 +1481,7 @@ class AwardDetailDialog(MaskDialogBase):
         # 设置 Palette 使标题栏也跟随主题
         palette = QPalette()
         if is_dark:
-            palette.setColor(QPalette.ColorRole.Window, QColor("#1c1f2e"))
+            palette.setColor(QPalette.ColorRole.Window, QColor("#232635"))
             palette.setColor(QPalette.ColorRole.WindowText, QColor("#f2f4ff"))
             palette.setColor(QPalette.ColorRole.Base, QColor("#2a2a3a"))
             palette.setColor(QPalette.ColorRole.Text, QColor("#f2f4ff"))

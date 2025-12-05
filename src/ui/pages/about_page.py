@@ -182,7 +182,7 @@ class AboutPage(BasePage):
         is_dark = self.theme_manager.is_dark
 
         if is_dark:
-            scroll_bg = "#1c1f2e"
+            scroll_bg = "#232635"
             card_bg = "#2b2b3c"
             card_border = "#3a3a4a"
             text_color = "#e0e0e0"

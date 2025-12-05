@@ -426,7 +426,7 @@ class MemberDetailDialog(MaskDialogBase):
 
         # 根据主题选择颜色
         if is_dark:
-            dialog_bg = "#1c1f2e"  # 对话框背景跟随主窗口深色
+            dialog_bg = "#232635"  # 对话框背景跟随主窗口深色
             scroll_bg = "#2a2a3a"
             card_bg = "#353751"
             card_border = "rgba(138, 159, 255, 0.1)"
@@ -576,7 +576,7 @@ class MemberDetailDialog(MaskDialogBase):
         # 设置 Palette 使标题栏也跟随主题
         palette = QPalette()
         if is_dark:
-            palette.setColor(QPalette.ColorRole.Window, QColor("#1c1f2e"))
+            palette.setColor(QPalette.ColorRole.Window, QColor("#232635"))
             palette.setColor(QPalette.ColorRole.WindowText, QColor("#e0e0e0"))
             palette.setColor(QPalette.ColorRole.Base, QColor("#2a2d3f"))
             palette.setColor(QPalette.ColorRole.Text, QColor("#e0e0e0"))

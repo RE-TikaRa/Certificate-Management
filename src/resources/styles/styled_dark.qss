@@ -3,7 +3,7 @@ QWidget {
     color: #f2f4ff;
 }
 QWidget#pageRoot {
-    background-color: #1c1f2e;
+    background-color: #232635;
 }
 
 /* Form Labels */
@@ -249,7 +249,7 @@ QCalendarWidget QSpinBox {
 QCalendarWidget QAbstractItemView {
     selection-background-color: rgba(138, 159, 255, 0.18);
     selection-color: #e2e8ff;
-    alternate-background-color: #1c1f2e;
+    alternate-background-color: #232635;
 }
 
 /* ComboBox dropdown list */
@@ -503,4 +503,3 @@ QDialog QPushButton:!default:hover {
 QDialog QPushButton:!default:pressed {
     background-color: rgba(90, 108, 243, 0.35);
 }
-

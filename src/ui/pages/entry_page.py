@@ -948,7 +948,7 @@ class EntryPage(BasePage):
     def _apply_theme(self) -> None:
         """应用主题到滚动区域"""
         is_dark = self.theme_manager.is_dark
-        scroll_bg = "#1c1f2e" if is_dark else "#f4f6fb"
+        scroll_bg = "#232635" if is_dark else "#f4f6fb"
 
         scroll_stylesheet = f"""
             QScrollArea {{
@@ -971,7 +971,7 @@ class EntryPage(BasePage):
             palette = scroll_widget.palette()
             palette.setColor(
                 palette.ColorRole.Window,
-                {"#1c1f2e": QColor(28, 31, 46), "#f4f6fb": QColor(244, 246, 251)}[scroll_bg],
+                {"#232635": QColor(35, 38, 53), "#f4f6fb": QColor(244, 246, 251)}[scroll_bg],
             )
             scroll_widget.setPalette(palette)
 
@@ -1244,7 +1244,7 @@ class HistoryMemberDialog(MaskDialogBase):
         is_dark = self.theme_manager.is_dark
 
         if is_dark:
-            bg_color = "#1c1f2e"
+            bg_color = "#232635"
             card_bg = "#2a2d3f"
             card_hover = "#353751"
             border_color = "rgba(138, 159, 255, 0.08)"
