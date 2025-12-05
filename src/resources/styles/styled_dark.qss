@@ -356,7 +356,7 @@ QLabel[dataChip="true"] {
     color: #c0c9ff;
     font-size: 12px;
 }
-QTableWidget {
+QTableWidget, QTableView {
     background: transparent;
     border: none;
     gridline-color: transparent;
@@ -365,7 +365,7 @@ QTableWidget {
     selection-color: #e2e8ff;
     color: #e2e8ff;
 }
-QTableWidget::item {
+QTableWidget::item, QTableView::item {
     padding: 6px 8px;
     color: #e2e8ff;
 }

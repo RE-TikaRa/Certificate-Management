@@ -356,7 +356,7 @@ QLabel[dataChip="true"] {
     color: #4a5096;
     font-size: 12px;
 }
-QTableWidget {
+QTableWidget, QTableView {
     background: transparent;
     border: none;
     gridline-color: transparent;
@@ -365,7 +365,7 @@ QTableWidget {
     selection-color: #0f1a42;
     color: #1e2746;
 }
-QTableWidget::item {
+QTableWidget::item, QTableView::item {
     padding: 6px 8px;
     color: #1e2746;
 }
@@ -516,4 +516,3 @@ QDialog QPushButton:!default:hover {
 QDialog QPushButton:!default:pressed {
     background-color: rgba(90, 108, 243, 0.25);
 }
-
