@@ -34,7 +34,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["ruff"]
+dev = ["ruff", "pyright"]
 
 [project.scripts]
 certificate-management = "src.main:main"
@@ -103,3 +103,28 @@ skip-magic-trailing-comma = false
 line-ending = "auto"
 docstring-code-format = true
 docstring-code-line-length = "dynamic"
+
+[tool.pyright]
+pythonVersion = "3.14"
+pythonPlatform = "All"
+include = ["src", "tools"]
+exclude = [
+  ".git",
+  ".venv",
+  "attachments",
+  "backups",
+  "data",
+  "logs",
+  "img",
+  "docs",
+  "**/__pycache__",
+]
+typeCheckingMode = "standard"
+# 与 ruff 配合：ruff 负责代码风格，pyright 负责类型检查
+reportMissingImports = true
+reportMissingTypeStubs = false
+reportUnusedImport = false     # ruff F401 处理
+reportUnusedVariable = false   # ruff F841 处理
+reportUnusedClass = false      # ruff 处理
+reportUnusedFunction = false   # ruff 处理
+reportDuplicateImport = false  # ruff 处理

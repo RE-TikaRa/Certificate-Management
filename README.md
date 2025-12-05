@@ -352,10 +352,15 @@ Certificate-Management/
 
 ### 运行测试与验证
 
-使用 Ruff 进行检查与格式化：
+使用 Ruff 进行代码风格检查与格式化：
 ```bash
 uv run ruff check .
 uv run ruff format .
+```
+
+使用 Pyright 进行类型检查：
+```bash
+uv run pyright
 ```
 
 ---
