@@ -1075,6 +1075,7 @@ class HistoryMemberDialog(MaskDialogBase):
         self.setWindowTitle("选择历史成员")
         self.setMinimumWidth(650)
         self.setMinimumHeight(500)
+        self.widget.setGraphicsEffect(None)
 
         self._init_ui()
         self._apply_theme()

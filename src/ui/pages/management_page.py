@@ -178,6 +178,7 @@ class MemberDetailDialog(MaskDialogBase):
         self.setModal(True)
         self.setMinimumWidth(900)
         self.setMinimumHeight(600)
+        self.widget.setGraphicsEffect(None)
         
         # ✅ 设置中心 widget 的圆角
         self.widget.setObjectName("centerWidget")

@@ -728,6 +728,7 @@ class AwardDetailDialog(MaskDialogBase):
         self.setWindowTitle(f"📝 荣誉详情 - {award.competition_name}")
         self.setMinimumWidth(700)
         self.setMinimumHeight(600)
+        self.widget.setGraphicsEffect(None)
 
         # ✅ 设置中心 widget 的圆角
         self.widget.setObjectName("centerWidget")
