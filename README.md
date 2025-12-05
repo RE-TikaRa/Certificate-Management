@@ -253,19 +253,22 @@ Certificate-Management/
 ## 数据模型
 
 ### 荣誉记录
-| 字段               | 类型         | 说明                                    |
-| ------------------ | ------------ | --------------------------------------- |
-| `id`               | Integer      | 主键，自增                              |
-| `competition_name` | String       | 比赛名称                                |
-| `award_date`       | Date         | 获奖日期                                |
-| `level`            | String       | 赛事级别（国家级/省级/校级）            |
-| `rank`             | String       | 奖项等级（一等奖/二等奖/三等奖/优秀奖） |
-| `certificate_code` | String       | 证书编号                                |
-| `remarks`          | Text         | 备注说明                                |
-| `members`          | Relationship | 参与成员（多对多关系）                  |
-| `tags`             | Relationship | 标签分类（多对多关系）                  |
-| `created_at`       | DateTime     | 创建时间                                |
-| `updated_at`       | DateTime     | 更新时间                                |
+| 字段                | 类型         | 说明                                    |
+| ------------------- | ------------ | --------------------------------------- |
+| `id`                | Integer      | 主键，自增                              |
+| `competition_name`  | String       | 比赛名称                                |
+| `award_date`        | Date         | 获奖日期                                |
+| `level`             | String       | 赛事级别（国家级/省级/校级）            |
+| `rank`              | String       | 奖项等级（一等奖/二等奖/三等奖/优秀奖） |
+| `certificate_code`  | String       | 证书编号                                |
+| `remarks`           | Text         | 备注说明                                |
+| `attachment_folder` | String       | 附件目录相对路径                        |
+| `deleted`           | Boolean      | 软删除标记                              |
+| `deleted_at`        | DateTime     | 软删除时间                              |
+| `members`           | Relationship | 参与成员（多对多关系）                  |
+| `attachments`       | Relationship | 附件记录（级联删除）                    |
+| `created_at`        | DateTime     | 创建时间                                |
+| `updated_at`        | DateTime     | 更新时间                                |
 
 ### 参与成员
 | 字段         | 类型         | 说明                     |
@@ -280,7 +283,12 @@ Certificate-Management/
 | `major`      | String       | 专业                     |
 | `class_name` | String       | 班级                     |
 | `college`    | String       | 学院                     |
+| `pinyin`     | String       | 姓名拼音（搜索加速）     |
+| `active`     | Boolean      | 启用状态                 |
+| `sort_index` | Integer      | 自定义排序权重           |
 | `awards`     | Relationship | 参与的荣誉（多对多关系） |
+| `created_at` | DateTime     | 创建时间                 |
+| `updated_at` | DateTime     | 更新时间                 |
 
 ### 专业信息
 | 字段         | 类型     | 说明             |
@@ -356,18 +364,18 @@ uv run ruff format .
 
 主要依赖通过 `pyproject.toml` 管理：
 
-| 包名                   | 说明                       |
-| ---------------------- | -------------------------- |
-| PySide6                | Qt 6 Python 绑定，GUI 框架 |
-| PySide6-Fluent-Widgets | Fluent Design 风格组件库   |
-| SQLAlchemy             | ORM 框架，数据库抽象       |
-| pandas                 | 数据处理和分析             |
-| openpyxl               | Excel 文件读写             |
-| APScheduler            | 定时任务调度               |
-| loguru                 | 日志记录库                 |
-| alembic                | 数据库迁移工具             |
-| python-dateutil        | 日期时间处理               |
-| pypinyin               | 拼音转换工具，用于专业搜索 |
+| 包名                   | 说明                                       |
+| ---------------------- | ------------------------------------------ |
+| PySide6                | Qt 6 Python 绑定，GUI 框架                 |
+| PySide6-Fluent-Widgets | Fluent Design 风格组件库                   |
+| SQLAlchemy             | ORM 框架，数据库抽象                       |
+| pandas                 | 数据处理和分析                             |
+| openpyxl               | Excel 文件读写                             |
+| APScheduler            | 定时任务调度                               |
+| loguru                 | 日志记录库                                 |
+| alembic                | 数据库迁移工具（预留，当前未使用迁移脚本） |
+| python-dateutil        | 日期时间处理                               |
+| pypinyin               | 拼音转换工具，用于专业搜索                 |
 
 完整依赖与版本策略请见 `pyproject.toml`，精确解析版本记录在 `uv.lock`（如需保持一致可运行 `uv sync --locked`）。
 
@@ -465,16 +473,6 @@ secrets.json
 3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
 4. 推送到分支 (`git push origin feature/AmazingFeature`)
 5. 打开 Pull Request
-
----
-
-## 版本控制
-
-该项目使用 Git 进行版本管理。
-
-当前版本：1.0.0（2025年12月）
-
-查看 [Releases](https://github.com/RE-TikaRa/Certificate-Management/releases) 了解更新历史。
 
 ---
 

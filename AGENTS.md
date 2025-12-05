@@ -1,11 +1,10 @@
-# Certificate Management System – AI Agent Guide (2025-12-05)
+# Certificate Management System – AI Agent Guide
 
 欢迎来到荣誉证书管理系统的开发助手指南。本文件面向自动化/AI 代理，提供项目快速事实、代码规范、命令和常见改动提示，保持简洁可操作。
 
 ## 快速概要
 - 应用：荣誉证书管理桌面端（PySide6 + QFluentWidgets）
 - 语言/平台：Python 3.14+，SQLite + SQLAlchemy 2.x
-- 当前版本：pyproject 标记 1.0.0（功能集更新至 2025-12-05，文档口径 1.0.1）
 - 入口：`uv run python -m src.main`（Windows 可用 `main.bat`）；调试加 `--debug`
 - 数据目录：`data/`（awards.db），`attachments/`，`backups/`，`logs/`，`temp/` 均已 gitignore
 
@@ -62,7 +61,3 @@
 - 成员字段在 UI 约定为 9 项；管理页刷新依赖该集合。
 - 导入/导出：CSV 模板 `resources/templates/awards_template.csv`；专业导入 `tools/import_majors.py`（使用 index.xlsx）。
 - 运行/调试前确认运行目录为仓库根目录；避免提交 `data/`、`attachments/`、`backups/`、`logs/`、`temp/` 生成物。
-
-## 版本与状态
-- 源码 version 字段：1.0.0（pyproject.toml）
-- 文档/功能更新：2025-12-05（含关于页、筛选排序增强、主题修复、专业智能搜索）
