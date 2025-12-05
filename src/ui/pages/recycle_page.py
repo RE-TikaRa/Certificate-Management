@@ -37,21 +37,29 @@ class RecyclePage(BasePage):
 
         outer_layout = QVBoxLayout(self)
         outer_layout.setContentsMargins(0, 0, 0, 0)
+        outer_layout.setSpacing(0)
+
+        title_widget = QWidget()
+        title_widget.setObjectName("pageRoot")
+        title_layout = QVBoxLayout(title_widget)
+        title_layout.setContentsMargins(32, 24, 32, 0)
+        title_layout.setSpacing(0)
+        title_layout.addWidget(create_page_header("荣誉回收站", "管理已删除的荣誉记录"))
+        outer_layout.addWidget(title_widget)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         outer_layout.addWidget(scroll)
+        self.content_widget = scroll
 
         container = QWidget()
         container.setObjectName("pageRoot")
         scroll.setWidget(container)
 
         layout = QVBoxLayout(container)
-        layout.setContentsMargins(32, 24, 32, 32)
+        layout.setContentsMargins(32, 28, 32, 32)
         layout.setSpacing(28)
-
-        layout.addWidget(create_page_header("荣誉回收站", "管理已删除的荣誉记录"))
 
         card, card_layout = create_card()
 

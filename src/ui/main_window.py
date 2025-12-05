@@ -2,8 +2,14 @@ import logging
 import time
 from typing import Any, cast
 
-from PySide6.QtCore import QEasingCurve, QTimer
-from PySide6.QtWidgets import QApplication, QWidget
+from PySide6.QtCore import (
+    QEasingCurve,
+    QParallelAnimationGroup,
+    QPoint,
+    QPropertyAnimation,
+    QTimer,
+)
+from PySide6.QtWidgets import QApplication, QGraphicsOpacityEffect, QWidget
 from qfluentwidgets import (
     FluentIcon as FIF,
     FluentWindow,
@@ -84,15 +90,54 @@ class MainWindow(FluentWindow):
         self.apply_theme_stylesheet()
 
     def switchTo(self, interface: QWidget) -> None:
-        """重写页面切换方法，使用更流畅的 Fluent Design 动画。"""
+        """页面切换动画"""
         view = self.stackedWidget.view
-        view.setCurrentWidget(
-            interface,
-            needPopOut=False,
-            showNextWidgetDirectly=True,
-            duration=400,
-            easingCurve=QEasingCurve.Type.OutQuint,
-        )
+        current_index = view.currentIndex()
+        next_index = view.indexOf(interface)
+
+        if current_index == next_index:
+            return
+
+        content_widget = getattr(interface, "content_widget", None)
+
+        if content_widget:
+            view.setAnimationEnabled(False)
+            view.setCurrentIndex(next_index)
+            view.setAnimationEnabled(True)
+
+            opacity_effect = content_widget.graphicsEffect()
+            if not isinstance(opacity_effect, QGraphicsOpacityEffect):
+                opacity_effect = QGraphicsOpacityEffect(content_widget)
+                content_widget.setGraphicsEffect(opacity_effect)
+
+            end_pos = content_widget.pos()
+            start_pos = end_pos + QPoint(0, 60)
+
+            opacity_ani = QPropertyAnimation(opacity_effect, b"opacity", self)
+            opacity_ani.setStartValue(0.0)
+            opacity_ani.setEndValue(1.0)
+            opacity_ani.setDuration(400)
+            opacity_ani.setEasingCurve(QEasingCurve.Type.OutQuint)
+
+            pos_ani = QPropertyAnimation(content_widget, b"pos", self)
+            pos_ani.setStartValue(start_pos)
+            pos_ani.setEndValue(end_pos)
+            pos_ani.setDuration(400)
+            pos_ani.setEasingCurve(QEasingCurve.Type.OutQuint)
+
+            ani_group = QParallelAnimationGroup(self)
+            ani_group.addAnimation(opacity_ani)
+            ani_group.addAnimation(pos_ani)
+            ani_group.finished.connect(self._on_page_animation_finished)
+            ani_group.start()
+        else:
+            view.setCurrentWidget(
+                interface,
+                needPopOut=False,
+                showNextWidgetDirectly=True,
+                duration=400,
+                easingCurve=QEasingCurve.Type.OutQuint,
+            )
 
     def _on_page_changed(self, index: int) -> None:
         """记录即将显示的页索引，等待动画结束后再刷新"""

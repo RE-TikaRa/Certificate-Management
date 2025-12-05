@@ -13,8 +13,17 @@ class HomePage(BasePage):
     def __init__(self, ctx, theme_manager: ThemeManager):
         super().__init__(ctx, theme_manager)
         self.setObjectName("pageRoot")
+
+        content_container = QLabel()
+        content_container.setObjectName("pageRoot")
+        self.content_widget = content_container
+
         layout = QVBoxLayout(self)
-        layout.addStretch()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(content_container)
+
+        container_layout = QVBoxLayout(content_container)
+        container_layout.addStretch()
 
         widget: QLabel | QSvgWidget
         logo_path = (BASE_DIR / "img" / "LOGO.svg").resolve()
@@ -33,9 +42,9 @@ class HomePage(BasePage):
             label = QLabel("Certificate Manager")
             label.setProperty("h1", True)
             widget = label
-        layout.addWidget(widget, alignment=Qt.AlignmentFlag.AlignCenter)
+        container_layout.addWidget(widget, alignment=Qt.AlignmentFlag.AlignCenter)
         self.logo = widget
-        layout.addStretch()
+        container_layout.addStretch()
 
     def refresh(self) -> None:
         pass

@@ -75,21 +75,29 @@ class SettingsPage(BasePage):
     def _build_ui(self) -> None:
         outer_layout = QVBoxLayout(self)
         outer_layout.setContentsMargins(0, 0, 0, 0)
+        outer_layout.setSpacing(0)
+
+        title_widget = QWidget()
+        title_widget.setObjectName("pageRoot")
+        title_layout = QVBoxLayout(title_widget)
+        title_layout.setContentsMargins(32, 24, 32, 0)
+        title_layout.setSpacing(0)
+        title_layout.addWidget(create_page_header("系统设置", "配置目录、主题与备份策略"))
+        outer_layout.addWidget(title_widget)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         outer_layout.addWidget(scroll)
+        self.content_widget = scroll
 
         container = QWidget()
         container.setObjectName("pageRoot")
         scroll.setWidget(container)
 
         layout = QVBoxLayout(container)
-        layout.setContentsMargins(32, 24, 32, 32)
+        layout.setContentsMargins(32, 28, 32, 32)
         layout.setSpacing(28)
-
-        layout.addWidget(create_page_header("系统设置", "配置目录、主题与备份策略"))
 
         settings_card, settings_layout = create_card()
         settings_layout.addWidget(make_section_title("目录与备份"))

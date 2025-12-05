@@ -65,24 +65,29 @@ class ManagementPage(BasePage):
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
-        # 滚动区域
+        title_widget = QWidget()
+        title_widget.setObjectName("pageRoot")
+        title_layout = QVBoxLayout(title_widget)
+        title_layout.setContentsMargins(32, 24, 32, 0)
+        title_layout.setSpacing(0)
+        title_layout.addWidget(create_page_header("成员管理", "查看历史成员信息"))
+        layout.addWidget(title_widget)
+
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         layout.addWidget(scroll)
+        self.content_widget = scroll
 
-        # 容器
         container = QWidget()
         container.setObjectName("pageRoot")
         scroll.setWidget(container)
 
         container_layout = QVBoxLayout(container)
-        container_layout.setContentsMargins(32, 24, 32, 32)
+        container_layout.setContentsMargins(32, 28, 32, 32)
         container_layout.setSpacing(28)
-
-        # 页面头
-        container_layout.addWidget(create_page_header("成员管理", "查看历史成员信息"))
 
         # 成员表格卡片
         card, card_layout = create_card()

@@ -21,18 +21,16 @@ class AboutPage(BasePage):
 
     def _build_ui(self):
         """构建UI"""
-        # 主布局
         outer_layout = QVBoxLayout(self)
         outer_layout.setContentsMargins(0, 0, 0, 0)
 
-        # 滚动区域
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll_area.setObjectName("aboutScrollArea")
         outer_layout.addWidget(scroll_area)
+        self.content_widget = scroll_area
 
-        # 容器
         container = QWidget()
         container.setObjectName("pageRoot")
         scroll_area.setWidget(container)

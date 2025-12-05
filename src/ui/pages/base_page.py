@@ -9,6 +9,10 @@ if TYPE_CHECKING:
 
 
 class BasePage(QWidget):
+    """页面基类"""
+
+    content_widget: QWidget | None = None
+
     def __init__(self, ctx: AppContext, theme_manager: ThemeManager):
         super().__init__()
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)

@@ -53,28 +53,33 @@ class DashboardPage(BasePage):
 
         outer_layout = QVBoxLayout(self)
         outer_layout.setContentsMargins(0, 0, 0, 0)
+        outer_layout.setSpacing(0)
+
+        title_widget = QWidget()
+        title_widget.setObjectName("pageRoot")
+        title_layout = QHBoxLayout(title_widget)
+        title_layout.setContentsMargins(32, 24, 32, 0)
+        title_layout.setSpacing(0)
+        title_layout.addWidget(create_page_header("仪表盘与统计", "关键指标、趋势与分布一站式总览"))
+        title_layout.addStretch()
+        refresh_btn = TransparentToolButton(FluentIcon.SYNC)
+        refresh_btn.setToolTip("刷新所有数据")
+        refresh_btn.clicked.connect(self._refresh_all)
+        title_layout.addWidget(refresh_btn)
+        outer_layout.addWidget(title_widget)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         outer_layout.addWidget(scroll)
+        self.content_widget = scroll
 
         container = QWidget()
         container.setObjectName("pageRoot")  # Apply background color from QSS
         scroll.setWidget(container)
         layout = QVBoxLayout(container)
-        layout.setContentsMargins(32, 24, 32, 32)
+        layout.setContentsMargins(32, 28, 32, 32)
         layout.setSpacing(28)
-
-        # 页面标题和刷新按钮
-        header_layout = QHBoxLayout()
-        header_layout.addWidget(create_page_header("仪表盘与统计", "关键指标、趋势与分布一站式总览"))
-        header_layout.addStretch()
-        refresh_btn = TransparentToolButton(FluentIcon.SYNC)
-        refresh_btn.setToolTip("刷新所有数据")
-        refresh_btn.clicked.connect(self._refresh_all)
-        header_layout.addWidget(refresh_btn)
-        layout.addLayout(header_layout)
 
         layout.addWidget(self._build_metric_section())
         layout.addWidget(self._build_distribution_section())

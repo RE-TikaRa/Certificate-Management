@@ -101,22 +101,29 @@ class OverviewPage(BasePage):
 
         outer_layout = QVBoxLayout(self)
         outer_layout.setContentsMargins(0, 0, 0, 0)
+        outer_layout.setSpacing(0)
+
+        title_widget = QWidget()
+        title_widget.setObjectName("pageRoot")
+        title_layout = QVBoxLayout(title_widget)
+        title_layout.setContentsMargins(32, 24, 32, 0)
+        title_layout.setSpacing(0)
+        title_layout.addWidget(create_page_header("所有荣誉项目", "查看和管理已输入的所有荣誉信息"))
+        outer_layout.addWidget(title_widget)
 
         self.scrollArea = QScrollArea()
         self.scrollArea.setWidgetResizable(True)
         self.scrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         outer_layout.addWidget(self.scrollArea)
+        self.content_widget = self.scrollArea
 
         container = QWidget()
         container.setObjectName("pageRoot")
         self.scrollArea.setWidget(container)
 
         layout = QVBoxLayout(container)
-        layout.setContentsMargins(32, 24, 32, 32)
+        layout.setContentsMargins(32, 28, 32, 32)
         layout.setSpacing(28)
-
-        # 页面标题
-        layout.addWidget(create_page_header("所有荣誉项目", "查看和管理已输入的所有荣誉信息"))
 
         # 筛选区域
         filter_card, filter_layout = create_card()
@@ -251,18 +258,16 @@ class OverviewPage(BasePage):
         row2.addWidget(sort_label)
 
         self.sort_combo = ComboBox()
-        self.sort_combo.addItems(
-            [
-                "日期降序",
-                "日期升序",
-                "等级降序",
-                "等级升序",
-                "奖项降序",
-                "奖项升序",
-                "名称A-Z",
-                "名称Z-A",
-            ]
-        )
+        self.sort_combo.addItems([
+            "日期降序",
+            "日期升序",
+            "等级降序",
+            "等级升序",
+            "奖项降序",
+            "奖项升序",
+            "名称A-Z",
+            "名称Z-A",
+        ])
         self.sort_combo.setCurrentText(self.sort_by)
         self.sort_combo.currentTextChanged.connect(self._on_sort_changed)
         self.sort_combo.setFixedWidth(150)
@@ -1299,15 +1304,13 @@ class AwardDetailDialog(MaskDialogBase):
             for idx, file_path in enumerate(self.selected_files, start=1):
                 md5_hash = self._calculate_md5(file_path)
                 size_str = self._format_file_size(file_path.stat().st_size)
-                rows.append(
-                    {
-                        "index": idx,
-                        "name": file_path.name,
-                        "md5": md5_hash[:16] + "...",
-                        "size": size_str,
-                        "path": file_path,
-                    }
-                )
+                rows.append({
+                    "index": idx,
+                    "name": file_path.name,
+                    "md5": md5_hash[:16] + "...",
+                    "size": size_str,
+                    "path": file_path,
+                })
             return rows
 
         run_in_thread(build_rows, self._on_attachments_ready)

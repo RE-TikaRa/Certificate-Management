@@ -77,29 +77,35 @@ class EntryPage(BasePage):
     def _build_ui(self) -> None:
         outer_layout = QVBoxLayout(self)
         outer_layout.setContentsMargins(0, 0, 0, 0)
-        self.scrollArea = QScrollArea()
-        self.scrollArea.setWidgetResizable(True)
-        self.scrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        outer_layout.addWidget(self.scrollArea)
+        outer_layout.setSpacing(0)
 
-        container = QWidget()
-        container.setObjectName("pageRoot")
-        self.scrollArea.setWidget(container)
-        layout = QVBoxLayout(container)
-        layout.setContentsMargins(32, 24, 32, 32)
-        layout.setSpacing(28)
-
-        # 页面标题和清空按钮
-        header_layout = QHBoxLayout()
-        header_layout.addWidget(create_page_header("荣誉录入", "集中采集证书信息并同步团队"))
-        header_layout.addStretch()
+        title_widget = QWidget()
+        title_widget.setObjectName("pageRoot")
+        title_layout = QHBoxLayout(title_widget)
+        title_layout.setContentsMargins(32, 24, 32, 0)
+        title_layout.setSpacing(0)
+        title_layout.addWidget(create_page_header("荣誉录入", "集中采集证书信息并同步团队"))
+        title_layout.addStretch()
         from qfluentwidgets import FluentIcon, TransparentToolButton
 
         refresh_btn = TransparentToolButton(FluentIcon.ERASE_TOOL)
         refresh_btn.setToolTip("清空表单")
         refresh_btn.clicked.connect(self._clear_form)
-        header_layout.addWidget(refresh_btn)
-        layout.addLayout(header_layout)
+        title_layout.addWidget(refresh_btn)
+        outer_layout.addWidget(title_widget)
+
+        self.scrollArea = QScrollArea()
+        self.scrollArea.setWidgetResizable(True)
+        self.scrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        outer_layout.addWidget(self.scrollArea)
+        self.content_widget = self.scrollArea
+
+        container = QWidget()
+        container.setObjectName("pageRoot")
+        self.scrollArea.setWidget(container)
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(32, 28, 32, 32)
+        layout.setSpacing(28)
 
         # === Basic Info Card ===
         info_card, info_layout = create_card()
@@ -669,15 +675,13 @@ class EntryPage(BasePage):
             for idx, file_path in enumerate(self.selected_files, start=1):
                 md5_hash = self._calculate_md5(file_path)
                 size_str = self._format_file_size(file_path.stat().st_size)
-                rows.append(
-                    {
-                        "index": idx,
-                        "name": file_path.name,
-                        "md5": md5_hash[:16] + "...",
-                        "size": size_str,
-                        "path": file_path,
-                    }
-                )
+                rows.append({
+                    "index": idx,
+                    "name": file_path.name,
+                    "md5": md5_hash[:16] + "...",
+                    "size": size_str,
+                    "path": file_path,
+                })
             return rows
 
         run_in_thread(build_rows, self._on_attachments_ready)
