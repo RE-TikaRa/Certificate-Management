@@ -2,8 +2,8 @@ import logging
 import time
 from typing import Any, cast
 
-from PySide6.QtCore import QTimer
-from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import QEasingCurve, QTimer
+from PySide6.QtWidgets import QApplication, QWidget
 from qfluentwidgets import (
     FluentIcon as FIF,
     FluentWindow,
@@ -52,6 +52,7 @@ class MainWindow(FluentWindow):
         # 连接堆栈切换信号：记录即将显示的页，动画结束再刷新
         self._pending_refresh_index: int | None = None
         self.stackedWidget.currentChanged.connect(self._on_page_changed)
+
         # qfluentwidgets 使用 PopUpAniStackedWidget，动画结束信号为 aniFinished
         if hasattr(self.stackedWidget, "view") and hasattr(self.stackedWidget.view, "aniFinished"):
             self.stackedWidget.view.aniFinished.connect(self._on_page_animation_finished)
@@ -81,6 +82,17 @@ class MainWindow(FluentWindow):
         q_theme = Theme.DARK if self.theme_manager.is_dark else Theme.LIGHT
         setTheme(q_theme, lazy=False)
         self.apply_theme_stylesheet()
+
+    def switchTo(self, interface: QWidget) -> None:
+        """重写页面切换方法，使用更流畅的 Fluent Design 动画。"""
+        view = self.stackedWidget.view
+        view.setCurrentWidget(
+            interface,
+            needPopOut=False,
+            showNextWidgetDirectly=True,
+            duration=400,
+            easingCurve=QEasingCurve.Type.OutQuint,
+        )
 
     def _on_page_changed(self, index: int) -> None:
         """记录即将显示的页索引，等待动画结束后再刷新"""
@@ -165,6 +177,11 @@ class MainWindow(FluentWindow):
             widget.setObjectName(route)
             key = self.addSubInterface(widget, icon, text, position=NavigationItemPosition.BOTTOM)
             self.route_keys[route] = key
+
+        # 优化页面切换动画
+        view = self.stackedWidget.view
+        for ani_info in view.aniInfos:
+            ani_info.deltaY = 100
 
         self.navigate_to("home")
 
