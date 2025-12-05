@@ -48,7 +48,8 @@ class DocInfoExtractor:
             # 使用 errors='replace' 处理编码问题
             result = subprocess.run(
                 ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_script],
-                check=False, capture_output=True,
+                check=False,
+                capture_output=True,
                 text=True,
                 encoding="gbk",  # Windows 中文环境使用 GBK
                 errors="replace",  # 替换无法解码的字符

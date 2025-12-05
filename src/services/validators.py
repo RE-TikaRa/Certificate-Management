@@ -338,10 +338,7 @@ class FormValidator:
                 current_year = datetime.today().year
                 current_yy = current_year % 100
 
-                if yy > current_yy:
-                    birth_year = 1900 + yy
-                else:
-                    birth_year = 2000 + yy
+                birth_year = 1900 + yy if yy > current_yy else 2000 + yy
 
                 birth_month = int(id_card[2:4])
                 birth_day = int(id_card[4:6])

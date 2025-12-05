@@ -289,10 +289,7 @@ class EntryPage(BasePage):
 
         # 获取当前样式用于标签
         is_dark = self.theme_manager.is_dark
-        if is_dark:
-            label_style = "color: #a6aabb; font-size: 12px;"
-        else:
-            label_style = "color: #666; font-size: 12px;"
+        label_style = "color: #a6aabb; font-size: 12px;" if is_dark else "color: #666; font-size: 12px;"
         member_layout = QVBoxLayout(member_card)
         member_layout.setContentsMargins(16, 16, 16, 16)
         member_layout.setSpacing(12)
@@ -638,10 +635,7 @@ class EntryPage(BasePage):
                     for field_name in field_names[1:]:
                         widget = member_fields.get(field_name)
                         # 支持MajorSearchWidget和QLineEdit
-                        if isinstance(widget, MajorSearchWidget) or isinstance(widget, QLineEdit):
-                            value = widget.text().strip()
-                        else:
-                            value = ""
+                        value = widget.text().strip() if isinstance(widget, (MajorSearchWidget, QLineEdit)) else ""
 
                         if value:
                             member_info[field_name] = value
@@ -688,7 +682,7 @@ class EntryPage(BasePage):
     def _on_attachments_ready(self, rows: list[dict]) -> None:
         self.attach_model.set_objects(rows)
         # 设置操作按钮
-        for row_idx, row in enumerate(rows):
+        for row_idx, _row in enumerate(rows):
             delete_btn = TransparentToolButton(FluentIcon.DELETE)
             delete_btn.setToolTip("删除")
             delete_btn.clicked.connect(lambda checked, r=row_idx: self._remove_attachment(r))
@@ -1236,7 +1230,7 @@ class HistoryMemberDialog(MaskDialogBase):
 
         if not text:
             # 空文本显示所有
-            for member, card in self.member_widgets:
+            for _member, card in self.member_widgets:
                 card.show()
             self.result_label.setText(f"共 {len(self.members)} 位成员")
             return

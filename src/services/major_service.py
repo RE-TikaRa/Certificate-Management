@@ -3,7 +3,6 @@
 提供专业名称的搜索、匹配和管理功能
 """
 
-
 from pypinyin import lazy_pinyin
 from sqlalchemy import or_
 

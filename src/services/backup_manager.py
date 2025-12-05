@@ -175,9 +175,10 @@ class BackupManager:
                     return False, "备份中不包含数据库文件"
 
                 # Verify SQLite database integrity
-                with zip_ref.open("data/awards.db") as db_file, tempfile.NamedTemporaryFile(
-                    suffix=".db", delete=False
-                ) as tmp:
+                with (
+                    zip_ref.open("data/awards.db") as db_file,
+                    tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp,
+                ):
                     tmp.write(db_file.read())
                     tmp_path = Path(tmp.name)
 

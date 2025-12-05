@@ -8,7 +8,7 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import selectinload
 
 from ..data.database import Database
-from ..data.models import Award, Tag, TeamMember
+from ..data.models import Award, TeamMember
 from .attachment_manager import AttachmentManager
 
 
@@ -63,10 +63,6 @@ class AwardService:
             # Convert to dict to preserve data after session closes
             return members
 
-    def list_tags(self) -> list[Tag]:
-        with self.db.session_scope() as session:
-            return session.scalars(select(Tag).order_by(Tag.sort_index, Tag.name)).all()
-
     def add_member(self, name: str) -> TeamMember:
         with self.db.session_scope() as session:
             member = TeamMember(name=name, pinyin=name)
@@ -74,24 +70,11 @@ class AwardService:
             session.flush()
             return member
 
-    def add_tag(self, name: str) -> Tag:
-        with self.db.session_scope() as session:
-            tag = Tag(name=name, pinyin=name)
-            session.add(tag)
-            session.flush()
-            return tag
-
     def remove_member(self, name: str) -> None:
         with self.db.session_scope() as session:
             member = session.scalar(select(TeamMember).where(TeamMember.name == name))
             if member:
                 session.delete(member)
-
-    def remove_tag(self, name: str) -> None:
-        with self.db.session_scope() as session:
-            tag = session.scalar(select(Tag).where(Tag.name == name))
-            if tag:
-                session.delete(tag)
 
     def _get_or_create_member(self, session, name: str) -> TeamMember:
         member = session.scalar(select(TeamMember).where(TeamMember.name == name))

@@ -945,10 +945,7 @@ class AwardDetailDialog(MaskDialogBase):
 
         # 获取当前样式用于标签
         is_dark = self.theme_manager.is_dark
-        if is_dark:
-            label_style = "color: #a6aabb; font-size: 12px;"
-        else:
-            label_style = "color: #666; font-size: 12px;"
+        label_style = "color: #a6aabb; font-size: 12px;" if is_dark else "color: #666; font-size: 12px;"
 
         member_layout = QVBoxLayout(member_card)
         member_layout.setContentsMargins(16, 16, 16, 16)
@@ -1408,10 +1405,7 @@ class AwardDetailDialog(MaskDialogBase):
                     for field_name in field_names[1:]:
                         widget = member_fields.get(field_name)
                         # 支持MajorSearchWidget和QLineEdit
-                        if isinstance(widget, MajorSearchWidget) or isinstance(widget, QLineEdit):
-                            value = widget.text().strip()
-                        else:
-                            value = ""
+                        value = widget.text().strip() if isinstance(widget, (MajorSearchWidget, QLineEdit)) else ""
 
                         if value:
                             member_info[field_name] = value

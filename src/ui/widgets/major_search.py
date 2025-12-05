@@ -3,7 +3,6 @@
 提供模糊搜索和一键填充功能
 """
 
-
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QListWidget,

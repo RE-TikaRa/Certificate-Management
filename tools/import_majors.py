@@ -6,12 +6,8 @@
 import sys
 from pathlib import Path
 
-# 添加项目根目录到路径
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
-
-from src.data.database import Database  # noqa: E402
-from src.services.major_service import MajorService  # noqa: E402
+from src.data.database import Database
+from src.services.major_service import MajorService
 
 
 def read_majors_from_excel(excel_path: Path) -> list[str]:

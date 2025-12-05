@@ -80,10 +80,7 @@ class ImportExportService:
 
     def import_from_file(self, file_path: Path) -> ImportResult:
         try:
-            if file_path.suffix.lower() == ".xlsx":
-                df = pd.read_excel(file_path)
-            else:
-                df = pd.read_csv(file_path)
+            df = pd.read_excel(file_path) if file_path.suffix.lower() == ".xlsx" else pd.read_csv(file_path)
         except Exception as exc:
             return ImportResult(total=0, success=0, failed=0, errors=[str(exc)])
 

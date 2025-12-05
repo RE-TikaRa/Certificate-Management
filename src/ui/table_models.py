@@ -15,20 +15,20 @@ class ObjectTableModel(QAbstractTableModel):
         self._accessors = list(accessors)
         self._objects: list[Any] = []
 
-    def rowCount(self, parent=QModelIndex()) -> int:  # type: ignore[override]
+    def rowCount(self, parent=QModelIndex()) -> int:
         return 0 if parent.isValid() else len(self._objects)
 
-    def columnCount(self, parent=QModelIndex()) -> int:  # type: ignore[override]
+    def columnCount(self, parent=QModelIndex()) -> int:
         return 0 if parent.isValid() else len(self._headers)
 
-    def data(self, index: QModelIndex, role=Qt.ItemDataRole.DisplayRole):  # type: ignore[override]
+    def data(self, index: QModelIndex, role=Qt.ItemDataRole.DisplayRole):
         if not index.isValid() or role not in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole):
             return None
         obj = self._objects[index.row()]
         value = self._accessors[index.column()](obj)
         return "" if value is None else str(value)
 
-    def headerData(self, section: int, orientation: Qt.Orientation, role=Qt.ItemDataRole.DisplayRole):  # type: ignore[override]
+    def headerData(self, section: int, orientation: Qt.Orientation, role=Qt.ItemDataRole.DisplayRole):
         if role != Qt.ItemDataRole.DisplayRole:
             return None
         if orientation == Qt.Orientation.Horizontal and 0 <= section < len(self._headers):
