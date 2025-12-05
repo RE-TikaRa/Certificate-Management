@@ -1,8 +1,9 @@
 import logging
+import signal
 import sys
 import time
 
-from PySide6.QtCore import QLibraryInfo, QLocale, QTranslator
+from PySide6.QtCore import QLibraryInfo, QLocale, QTimer, QTranslator
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QApplication
 
@@ -18,6 +19,12 @@ def main(debug: bool = False) -> None:
     start_time = time.time()
 
     app = QApplication(sys.argv)
+    signal.signal(signal.SIGINT, lambda *_: app.quit())
+    if hasattr(signal, "SIGBREAK"):
+        signal.signal(signal.SIGBREAK, lambda *_: app.quit())
+    keep_alive_timer = QTimer(parent=app)
+    keep_alive_timer.timeout.connect(lambda: None)
+    keep_alive_timer.start(200)
 
     # 设置全局字体为含 pointSize 的字体，避免 Qt 在复制像素字体时落入 -1 警告
     default_font = QFont("Segoe UI", 12)
@@ -49,7 +56,11 @@ def main(debug: bool = False) -> None:
 
     window.show()
     logger.info(f"Total startup time: {time.time() - start_time:.2f}s")
-    sys.exit(app.exec())
+    try:
+        sys.exit(app.exec())
+    except KeyboardInterrupt:
+        logger.info("收到中断信号，应用已退出")
+        sys.exit(0)
 
 
 if __name__ == "__main__":
