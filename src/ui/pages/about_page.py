@@ -28,7 +28,7 @@ class AboutPage(BasePage):
         # 滚动区域
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
-        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll_area.setObjectName("aboutScrollArea")
         outer_layout.addWidget(scroll_area)
 

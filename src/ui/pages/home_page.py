@@ -35,7 +35,7 @@ class HomePage(BasePage):
             label = QLabel("Certificate Manager")
             label.setProperty("h1", True)
             widget = label
-        layout.addWidget(widget, alignment=Qt.AlignCenter)
+        layout.addWidget(widget, alignment=Qt.AlignmentFlag.AlignCenter)
         self.logo = widget
         layout.addStretch()
 

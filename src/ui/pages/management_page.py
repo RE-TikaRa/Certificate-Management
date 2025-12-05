@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import logging
+from typing import cast
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import (
     QFrame,
+    QGraphicsEffect,
     QGridLayout,
     QHBoxLayout,
     QLabel,
@@ -69,7 +71,7 @@ class ManagementPage(BasePage):
         # 滚动区域
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         layout.addWidget(scroll)
 
         # 容器
@@ -126,7 +128,7 @@ class ManagementPage(BasePage):
         try:
             from sqlalchemy import select
 
-            from ..data.models import TeamMember
+            from ...data.models import TeamMember
 
             with self.ctx.db.session_scope() as session:
                 member_ids = set(session.scalars(select(TeamMember.id)).all())
@@ -174,7 +176,7 @@ class MemberDetailDialog(MaskDialogBase):
         self.setModal(True)
         self.setMinimumWidth(900)
         self.setMinimumHeight(600)
-        self.widget.setGraphicsEffect(None)
+        self.widget.setGraphicsEffect(cast(QGraphicsEffect, None))
 
         # 设置中心 widget 的圆角
         self.widget.setObjectName("centerWidget")
@@ -202,8 +204,8 @@ class MemberDetailDialog(MaskDialogBase):
         layout.setSpacing(16)
 
         # 滚动区域
-        self.scroll = QScrollArea()
-        self.scroll.setWidgetResizable(True)
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
 
         # 内容容器
         content = QWidget()
@@ -239,8 +241,8 @@ class MemberDetailDialog(MaskDialogBase):
         )
 
         content_layout.addStretch()
-        self.scroll.setWidget(content)
-        layout.addWidget(self.scroll)
+        self.scroll_area.setWidget(content)
+        layout.addWidget(self.scroll_area)
 
         # 按钮区域
         btn_layout = QHBoxLayout()
@@ -481,9 +483,9 @@ class MemberDetailDialog(MaskDialogBase):
                 background-color: {scroll_bg};
             }}
         """
-        self.scroll.setStyleSheet(scroll_stylesheet)
+        self.scroll_area.setStyleSheet(scroll_stylesheet)
         # 确保内部容器也有正确的背景色
-        scroll_widget = self.scroll.widget()
+        scroll_widget = self.scroll_area.widget()
         if scroll_widget:
             scroll_widget.setObjectName("scrollContent")
             scroll_widget.setAutoFillBackground(True)

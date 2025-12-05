@@ -24,8 +24,8 @@ class AwardService:
         award_date: date,
         level: str,
         rank: str,
-        certificate_code: str,
-        remarks: str,
+        certificate_code: str | None,
+        remarks: str | None,
         member_names: Sequence[str] | Sequence[dict],
         attachment_files: Sequence[Path],
     ) -> Award:
@@ -60,8 +60,7 @@ class AwardService:
                 .options(selectinload(TeamMember.awards))
                 .order_by(TeamMember.sort_index, TeamMember.name)
             ).all()
-            # Convert to dict to preserve data after session closes
-            return members
+            return list(members)
 
     def add_member(self, name: str) -> TeamMember:
         with self.db.session_scope() as session:
@@ -121,7 +120,7 @@ class AwardService:
                 .options(selectinload(Award.members))
                 .order_by(Award.award_date.desc())
             ).all()
-            return awards
+            return list(awards)
 
     def delete_award(self, award_id: int) -> None:
         """软删除指定 ID 的荣誉（移到回收站）"""
@@ -266,7 +265,7 @@ class AwardService:
             # Order by date (newest first) and apply limit
             q = q.order_by(Award.award_date.desc()).limit(limit)
 
-            return session.scalars(q).all()
+            return list(session.scalars(q).all())
 
     def batch_delete_awards(self, award_ids: list[int]) -> int:
         """

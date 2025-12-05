@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from PySide6.QtCharts import (
     QBarCategoryAxis,
     QBarSeries,
@@ -9,7 +11,7 @@ from PySide6.QtCharts import (
     QPieSeries,
     QValueAxis,
 )
-from PySide6.QtCore import Qt, QUrl, Slot
+from PySide6.QtCore import Qt, QTimer, QUrl, Slot
 from PySide6.QtGui import QBrush, QColor, QDesktopServices, QPainter
 from PySide6.QtWidgets import (
     QFrame,
@@ -45,6 +47,8 @@ class DashboardPage(BasePage):
 
         self._cached_level_data = None
         self._cached_rank_data = None
+        self.refresh_timer = QTimer(self)
+        self.refresh_timer.timeout.connect(self.refresh)
 
         # 连接主题变化信号
         self.theme_manager.themeChanged.connect(self._on_theme_changed)
@@ -54,7 +58,7 @@ class DashboardPage(BasePage):
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         outer_layout.addWidget(scroll)
 
         container = QWidget()
@@ -111,7 +115,7 @@ class DashboardPage(BasePage):
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(6)
         icon_label = QLabel(icon)
-        icon_label.setAlignment(Qt.AlignLeft)
+        icon_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
         icon_label.setStyleSheet("font-size: 24px;")
         layout.addWidget(icon_label)
         value = QLabel("0")
@@ -131,15 +135,15 @@ class DashboardPage(BasePage):
         charts_row.setSpacing(16)
 
         self.level_chart = QChartView()
-        self.level_chart.setRenderHint(QPainter.Antialiasing)
-        self.level_chart.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.level_chart.setRenderHint(QPainter.RenderHint.Antialiasing)
+        self.level_chart.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.level_chart.setMinimumHeight(260)
         self.level_chart.setStyleSheet("background: transparent;")
         charts_row.addWidget(self.level_chart)
 
         self.rank_chart = QChartView()
-        self.rank_chart.setRenderHint(QPainter.Antialiasing)
-        self.rank_chart.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.rank_chart.setRenderHint(QPainter.RenderHint.Antialiasing)
+        self.rank_chart.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.rank_chart.setMinimumHeight(260)
         self.rank_chart.setStyleSheet("background: transparent;")
         charts_row.addWidget(self.rank_chart)
@@ -253,7 +257,7 @@ class DashboardPage(BasePage):
         self.refresh()
 
         # 查找主窗口并刷新其他页面
-        parent = self.parent()
+        parent: Any = self.parent()
         while parent:
             if hasattr(parent, "overview_page") and parent.overview_page:
                 parent.overview_page.refresh()
@@ -317,7 +321,7 @@ class DashboardPage(BasePage):
         level_chart.setTitle("按级别分布")
         level_chart.setTitleBrush(QBrush(text_color))
         level_chart.legend().setLabelColor(text_color)
-        level_chart.setAnimationOptions(QChart.SeriesAnimations)
+        level_chart.setAnimationOptions(QChart.AnimationOption.SeriesAnimations)
         level_chart.setBackgroundBrush(QBrush(chart_bg_color))
         self.level_chart.setChart(level_chart)
 
@@ -343,15 +347,15 @@ class DashboardPage(BasePage):
         axis_y.setLabelsColor(text_color)
         axis_y.setGridLineColor(grid_color)
 
-        bar_chart.addAxis(axis_x, Qt.AlignBottom)
-        bar_chart.addAxis(axis_y, Qt.AlignLeft)
+        bar_chart.addAxis(axis_x, Qt.AlignmentFlag.AlignBottom)
+        bar_chart.addAxis(axis_y, Qt.AlignmentFlag.AlignLeft)
         bar_series.attachAxis(axis_x)
         bar_series.attachAxis(axis_y)
 
         bar_chart.setTitle("按等级分布")
         bar_chart.setTitleBrush(QBrush(text_color))
         bar_chart.legend().setLabelColor(text_color)
-        bar_chart.setAnimationOptions(QChart.SeriesAnimations)
+        bar_chart.setAnimationOptions(QChart.AnimationOption.SeriesAnimations)
         bar_chart.setBackgroundBrush(QBrush(chart_bg_color))
         self.rank_chart.setChart(bar_chart)
 
@@ -383,13 +387,13 @@ class DashboardPage(BasePage):
             rank_chart.legend().setLabelColor(text_color)
 
             # 修改轴颜色
-            for axis in rank_chart.axes(Qt.Horizontal):
+            for axis in rank_chart.axes(Qt.Orientation.Horizontal):
                 if hasattr(axis, "setLabelsColor"):
                     axis.setLabelsColor(text_color)
                 if hasattr(axis, "setGridLineColor"):
                     axis.setGridLineColor(grid_color)
 
-            for axis in rank_chart.axes(Qt.Vertical):
+            for axis in rank_chart.axes(Qt.Orientation.Vertical):
                 if hasattr(axis, "setLabelsColor"):
                     axis.setLabelsColor(text_color)
                 if hasattr(axis, "setGridLineColor"):
@@ -405,7 +409,7 @@ class DashboardPage(BasePage):
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder.resolve())))
 
     def _navigate(self, route: str) -> None:
-        window = self.window()
+        window: Any = self.window()
         if hasattr(window, "navigate_to"):
             window.navigate_to(route)
 
@@ -417,11 +421,9 @@ class DashboardPage(BasePage):
         """页面显示时启动定时器并刷新数据"""
         super().showEvent(event)
         self.refresh()
-        if hasattr(self, "refresh_timer"):
-            self.refresh_timer.start(5000)
+        self.refresh_timer.start(5000)
 
     def closeEvent(self, event) -> None:
         """页面关闭时停止定时器"""
-        if hasattr(self, "refresh_timer"):
-            self.refresh_timer.stop()
+        self.refresh_timer.stop()
         super().closeEvent(event)

@@ -2,13 +2,21 @@ from __future__ import annotations
 
 import logging
 import time
+from typing import Any, cast
 
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
-from qfluentwidgets import FluentIcon as FIF, FluentWindow, NavigationItemPosition, Theme, setTheme
+from qfluentwidgets import (
+    FluentIcon as FIF,
+    FluentWindow,
+    NavigationItemPosition,
+    Theme,
+    setTheme,
+)
 
 from ..app_context import AppContext
 from .pages.about_page import AboutPage
+from .pages.base_page import BasePage
 from .pages.dashboard_page import DashboardPage
 from .pages.entry_page import EntryPage
 from .pages.home_page import HomePage
@@ -88,7 +96,7 @@ class MainWindow(FluentWindow):
         if index is None:
             index = self.stackedWidget.currentIndex()
         try:
-            current_widget = self.stackedWidget.widget(index)
+            current_widget: Any = self.stackedWidget.widget(index)
             if current_widget and hasattr(current_widget, "refresh"):
                 # 动画结束立即刷新，可按需再加微小延迟
                 QTimer.singleShot(0, current_widget.refresh)
@@ -106,15 +114,16 @@ class MainWindow(FluentWindow):
         logger.debug(f"HomePage initialized in {time.time() - page_start:.2f}s")
 
         # 保存页面引用（其他页面为None）
-        self.entry_page = None
-        self.dashboard_page = None
-        self.management_page = None
-        self.overview_page = None
-        self.recycle_page = None
-        self.settings_page = None
+        self.home_page = home_page
+        self.entry_page: EntryPage | None = None
+        self.dashboard_page: DashboardPage | None = None
+        self.management_page: ManagementPage | None = None
+        self.overview_page: OverviewPage | None = None
+        self.recycle_page: RecyclePage | None = None
+        self.settings_page: SettingsPage | None = None
 
         # 只注册首页到导航栏
-        self.route_keys: dict[str, str] = {}
+        self.route_keys: dict[str, Any] = {}
         key = self.addSubInterface(home_page, FIF.HOME, "首页", position=NavigationItemPosition.TOP)
         self.route_keys["home"] = key
         self.navigate_to("home")
@@ -245,11 +254,11 @@ class MainWindow(FluentWindow):
     def navigate_to(self, route: str) -> None:
         """导航到指定页面"""
         if route in self.route_keys:
-            self.navigationInterface.setCurrentItem(self.route_keys[route])
+            self.navigationInterface.setCurrentItem(cast(Any, self.route_keys[route]))
 
             # 自动刷新该页面 - 获取对应的页面对象并调用 refresh()
-            page_map = {
-                "home": self.home_page if hasattr(self, "home_page") else None,
+            page_map: dict[str, BasePage | None] = {
+                "home": self.home_page,
                 "overview": self.overview_page,
                 "entry": self.entry_page,
                 "dashboard": self.dashboard_page,

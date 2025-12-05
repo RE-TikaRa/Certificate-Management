@@ -11,9 +11,9 @@ if TYPE_CHECKING:
 
 
 class BasePage(QWidget):
-    def __init__(self, ctx: AppContext, theme_manager: ThemeManager = None):
+    def __init__(self, ctx: AppContext, theme_manager: ThemeManager):
         super().__init__()
-        self.setAttribute(Qt.WA_StyledBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.ctx = ctx
         self.theme_manager = theme_manager
 

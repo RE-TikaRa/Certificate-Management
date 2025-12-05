@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import hashlib
+from datetime import date
 from pathlib import Path
+from typing import cast
 
 from PySide6.QtCore import QDate, Qt, Slot
 from PySide6.QtGui import QColor, QCursor
@@ -9,10 +11,12 @@ from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
     QFrame,
+    QGraphicsEffect,
     QGridLayout,
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QLayout,
     QLineEdit,
     QProgressDialog,
     QScrollArea,
@@ -77,7 +81,7 @@ class EntryPage(BasePage):
         outer_layout.setContentsMargins(0, 0, 0, 0)
         self.scrollArea = QScrollArea()
         self.scrollArea.setWidgetResizable(True)
-        self.scrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.scrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         outer_layout.addWidget(self.scrollArea)
 
         container = QWidget()
@@ -216,7 +220,7 @@ class EntryPage(BasePage):
         self.members_list_layout = QVBoxLayout(self.members_container)
         self.members_list_layout.setContentsMargins(0, 0, 0, 0)
         self.members_list_layout.setSpacing(12)
-        self.members_list_layout.setSizeConstraint(QVBoxLayout.SetMinAndMaxSize)  # 自动调整大小
+        self.members_list_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinAndMaxSize)  # 自动调整大小
 
         # 成员卡片会自动扩展父容器的高度
         members_layout.addWidget(self.members_container)
@@ -247,11 +251,12 @@ class EntryPage(BasePage):
         self.attach_model = AttachmentTableModel(self)
         self.attach_table = QTableView()
         self.attach_table.setModel(self.attach_model)
-        self.attach_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)  # 序号
-        self.attach_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)  # 附件名
-        self.attach_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)  # MD5
-        self.attach_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)  # 大小
-        self.attach_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)  # 操作
+        header = self.attach_table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)  # 序号
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)  # 附件名
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)  # MD5
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)  # 大小
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)  # 操作
         self.attach_table.setMaximumHeight(200)
         self.attach_table.setMinimumHeight(100)
         self.attach_table.verticalHeader().setVisible(False)
@@ -690,7 +695,7 @@ class EntryPage(BasePage):
             btn_layout = QHBoxLayout(btn_widget)
             btn_layout.setContentsMargins(4, 0, 4, 0)
             btn_layout.addWidget(delete_btn)
-            btn_layout.setAlignment(Qt.AlignCenter)
+            btn_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
             index = self.attach_model.index(row_idx, 4)
             self.attach_table.setIndexWidget(index, btn_widget)
 
@@ -705,13 +710,14 @@ class EntryPage(BasePage):
         except Exception:
             return "无法计算"
 
-    def _format_file_size(self, size: int) -> str:
+    def _format_file_size(self, size: int | float) -> str:
         """格式化文件大小"""
+        size_float = float(size)
         for unit in ["B", "KB", "MB", "GB"]:
-            if size < 1024.0:
-                return f"{size:.1f} {unit}"
-            size /= 1024.0
-        return f"{size:.1f} TB"
+            if size_float < 1024.0:
+                return f"{size_float:.1f} {unit}"
+            size_float /= 1024.0
+        return f"{size_float:.1f} TB"
 
     def _remove_attachment(self, row: int) -> None:
         """删除指定行的附件"""
@@ -766,7 +772,6 @@ class EntryPage(BasePage):
                     member_fields[field_name].setText(value)
 
         self.selected_files = []
-        self.attach_label.setText("未选择附件")
 
     def refresh(self) -> None:
         pass
@@ -779,15 +784,20 @@ class EntryPage(BasePage):
 
         members_data = self._get_members_data()
 
+        award_date = cast(
+            date,
+            QDate(
+                self.year_input.value(),
+                self.month_input.value(),
+                self.day_input.value(),
+            ).toPython(),
+        )
+
         if self.editing_award:
             # 编辑模式：更新现有荣誉
             award = self.editing_award
             award.competition_name = self.name_input.text().strip()
-            award.award_date = QDate(
-                self.year_input.value(),
-                self.month_input.value(),
-                self.day_input.value(),
-            ).toPython()
+            award.award_date = award_date
             award.level = self.level_input.currentText()
             award.rank = self.rank_input.currentText()
             award.certificate_code = self.certificate_input.text().strip() or None
@@ -810,11 +820,7 @@ class EntryPage(BasePage):
             # 创建模式：创建新荣誉
             award = self.ctx.awards.create_award(
                 competition_name=self.name_input.text().strip(),
-                award_date=QDate(
-                    self.year_input.value(),
-                    self.month_input.value(),
-                    self.day_input.value(),
-                ).toPython(),
+                award_date=award_date,
                 level=self.level_input.currentText(),
                 rank=self.rank_input.currentText(),
                 certificate_code=self.certificate_input.text().strip() or None,
@@ -825,29 +831,6 @@ class EntryPage(BasePage):
             InfoBar.success("成功", f"已保存：{award.competition_name}", parent=self.window())
 
         self._clear_form()
-
-    def _clear_form(self) -> None:
-        self.name_input.clear()
-        today = QDate.currentDate()
-        self.year_input.setValue(today.year())
-        self.month_input.setValue(today.month())
-        self.day_input.setValue(today.day())
-        self.level_input.setCurrentIndex(0)
-        self.rank_input.setCurrentIndex(0)
-        self.certificate_input.clear()
-        self.remarks_input.clear()
-        self.selected_files = []
-        self.attach_label.setText("未选择附件")
-        # 清空成员卡片
-        for member_data in self.members_data:
-            member_data["card"].deleteLater()
-        self.members_data.clear()
-
-        # 退出编辑模式
-        if self.editing_award:
-            self.editing_award = None
-            self.submit_btn.setText("保存荣誉")
-            self.clear_btn.setText("清空表单")
 
     def _validate_form(self) -> list[str]:
         """验证荣誉表单，返回错误信息列表，空列表表示验证通过"""
@@ -1015,7 +998,7 @@ class HistoryMemberDialog(MaskDialogBase):
         self.setWindowTitle("选择历史成员")
         self.setMinimumWidth(650)
         self.setMinimumHeight(500)
-        self.widget.setGraphicsEffect(None)
+        self.widget.setGraphicsEffect(cast(QGraphicsEffect, None))
 
         self._init_ui()
         self._apply_theme()
@@ -1152,7 +1135,7 @@ class HistoryMemberDialog(MaskDialogBase):
 
         # === 分隔线 ===
         separator = QFrame()
-        separator.setFrameShape(QFrame.HLine)
+        separator.setFrameShape(QFrame.Shape.HLine)
         is_dark = self.theme_manager.is_dark
         separator.setStyleSheet(f"background-color: {'#4a4a5e' if is_dark else '#e8e8e8'}; max-height: 1px;")
         layout.addWidget(separator)

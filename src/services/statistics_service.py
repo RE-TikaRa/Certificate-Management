@@ -43,27 +43,30 @@ class StatisticsService:
                 if award:
                     latest_awards.append(award)
 
-        return {
-            "total": result.total or 0,
-            "national": result.national or 0,
-            "provincial": result.provincial or 0,
-            "school": result.school or 0,
-            "first_prize": result.first_prize or 0,
-            "second_prize": result.second_prize or 0,
-            "third_prize": result.third_prize or 0,
-            "excellent_prize": result.excellent_prize or 0,
-            "latest_awards": latest_awards,
+        totals = {
+            "total": int(result.total) if result else 0,
+            "national": int(result.national) if result else 0,
+            "provincial": int(result.provincial) if result else 0,
+            "school": int(result.school) if result else 0,
+            "first_prize": int(result.first_prize) if result else 0,
+            "second_prize": int(result.second_prize) if result else 0,
+            "third_prize": int(result.third_prize) if result else 0,
+            "excellent_prize": int(result.excellent_prize) if result else 0,
         }
+
+        return {**totals, "latest_awards": latest_awards}
 
     def get_group_by_level(self) -> dict[str, int]:
         with self.db.session_scope() as session:
             rows = session.execute(select(Award.level, func.count(Award.id)).group_by(Award.level)).all()
-        return dict(rows)
+        pairs = [(level, count) for level, count in rows]
+        return dict(pairs)
 
     def get_group_by_rank(self) -> dict[str, int]:
         with self.db.session_scope() as session:
             rows = session.execute(select(Award.rank, func.count(Award.id)).group_by(Award.rank)).all()
-        return dict(rows)
+        pairs = [(rank, count) for rank, count in rows]
+        return dict(pairs)
 
     def get_recent_by_month(self, months: int = 6) -> dict[str, int]:
         threshold = date.today().replace(day=1)
@@ -74,7 +77,8 @@ class StatisticsService:
                 .group_by(func.strftime("%Y-%m", Award.award_date))
                 .order_by(func.strftime("%Y-%m", Award.award_date))
             ).all()
-        return dict(rows)
+        pairs = [(month, count) for month, count in rows]
+        return dict(pairs)
 
     def get_award_level_statistics(self) -> dict[str, int]:
         """按等级详细分类统计荣誉"""

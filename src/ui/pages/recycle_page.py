@@ -42,7 +42,7 @@ class RecyclePage(BasePage):
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         outer_layout.addWidget(scroll)
 
         container = QWidget()

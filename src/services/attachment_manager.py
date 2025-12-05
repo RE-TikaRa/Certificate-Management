@@ -150,8 +150,9 @@ class AttachmentManager:
 
     def list_deleted(self) -> list[Attachment]:
         with self.db.session_scope() as session:
-            return (
+            deleted = (
                 session.scalars(select(Attachment).where(Attachment.deleted.is_(True)).order_by(Attachment.deleted_at))
                 .unique()
                 .all()
             )
+            return list(deleted)

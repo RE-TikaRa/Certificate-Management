@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -80,7 +80,7 @@ class SettingsPage(BasePage):
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         outer_layout.addWidget(scroll)
 
         container = QWidget()
@@ -193,7 +193,7 @@ class SettingsPage(BasePage):
             self.theme_manager.set_theme(theme_mode)
 
             # Refresh entire window stylesheet
-            main_window = self.window()
+            main_window: Any = self.window()
             if hasattr(main_window, "apply_theme_stylesheet"):
                 main_window.apply_theme_stylesheet()
 

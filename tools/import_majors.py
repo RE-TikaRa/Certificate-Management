@@ -34,6 +34,9 @@ def read_majors_from_excel(excel_path: Path) -> list[str]:
     # 打开Excel文件
     wb = openpyxl.load_workbook(excel_path)
     ws = wb.active
+    if ws is None:
+        wb.close()
+        return majors
 
     # 读取所有行(第3列是专业名称,索引为2)
     for row in ws.iter_rows(min_row=2, values_only=True):  # 跳过表头

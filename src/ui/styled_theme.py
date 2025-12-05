@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from enum import Enum
+from typing import cast
 
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QCoreApplication, QObject, Signal
 from PySide6.QtGui import QGuiApplication, QPalette
 from PySide6.QtWidgets import QApplication
 from qfluentwidgets import Theme, setTheme
@@ -45,9 +46,11 @@ class ThemeManager(QObject):
     themeChanged = Signal()  # 主题变化信号
     _instance = None
 
-    def __init__(self, app: QApplication):
+    def __init__(self, app: QApplication | QCoreApplication | None):
         super().__init__()
-        self.app = app
+        if app is None:
+            raise RuntimeError("QApplication instance is required to manage theme.")
+        self.app = cast(QApplication, app)
         self._mode = ThemeMode.LIGHT
         self._is_dark = False
 

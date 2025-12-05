@@ -18,7 +18,7 @@ class MemberService:
             db = ctx.db
         self.db = db
 
-    def get_member(self, member_id: int) -> TeamMember:
+    def get_member(self, member_id: int) -> TeamMember | None:
         """获取单个成员"""
         with self.db.session_scope() as session:
             stmt = select(TeamMember).where(TeamMember.id == member_id)
@@ -45,4 +45,4 @@ class MemberService:
         """列出所有成员"""
         with self.db.session_scope() as session:
             stmt = select(TeamMember).order_by(TeamMember.id.desc())
-            return session.execute(stmt).scalars().all()
+            return list(session.execute(stmt).scalars().all())

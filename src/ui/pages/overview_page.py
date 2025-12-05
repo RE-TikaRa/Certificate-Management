@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import logging
 from pathlib import Path
+from typing import cast
 
 from PySide6.QtCore import QDate, Qt, QTimer, Slot
 from PySide6.QtGui import QColor, QFont, QPalette
@@ -11,6 +12,7 @@ from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
     QFrame,
+    QGraphicsEffect,
     QGridLayout,
     QHBoxLayout,
     QHeaderView,
@@ -104,7 +106,7 @@ class OverviewPage(BasePage):
 
         self.scrollArea = QScrollArea()
         self.scrollArea.setWidgetResizable(True)
-        self.scrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.scrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         outer_layout.addWidget(self.scrollArea)
 
         container = QWidget()
@@ -382,7 +384,7 @@ class OverviewPage(BasePage):
         try:
             from sqlalchemy import select
 
-            from ..data.models import Award
+            from ...data.models import Award
 
             with self.ctx.db.session_scope() as session:
                 award_ids = set(session.scalars(select(Award.id)).all())
@@ -452,13 +454,13 @@ class OverviewPage(BasePage):
         icon_font = QFont()
         icon_font.setPointSize(48)  # 减小字体大小避免负值警告
         empty_icon.setFont(icon_font)
-        empty_layout.addWidget(empty_icon, alignment=Qt.AlignCenter)
+        empty_layout.addWidget(empty_icon, alignment=Qt.AlignmentFlag.AlignCenter)
 
         empty_text = BodyLabel("暂无项目数据")
-        empty_layout.addWidget(empty_text, alignment=Qt.AlignCenter)
+        empty_layout.addWidget(empty_text, alignment=Qt.AlignmentFlag.AlignCenter)
 
         empty_hint = CaptionLabel("点击「录入」页添加新项目")
-        empty_layout.addWidget(empty_hint, alignment=Qt.AlignCenter)
+        empty_layout.addWidget(empty_hint, alignment=Qt.AlignmentFlag.AlignCenter)
 
         empty_layout.addStretch()
         self.awards_layout.addWidget(empty_container)
@@ -505,8 +507,9 @@ class OverviewPage(BasePage):
             for _ in range(2):
                 if self.awards_layout.count() > 0:
                     item = self.awards_layout.takeAt(self.awards_layout.count() - 1)
-                    if item.widget():
-                        item.widget().deleteLater()
+                    widget = item.widget()
+                    if widget:
+                        widget.deleteLater()
 
             # 加载下一批
             self._load_more_awards()
@@ -518,7 +521,7 @@ class OverviewPage(BasePage):
                 # 全部加载完成
                 self.awards_layout.addStretch()
                 done_label = CaptionLabel(f"✓ 已加载全部 {self.total_awards} 条记录")
-                done_label.setAlignment(Qt.AlignCenter)
+                done_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.awards_layout.addWidget(done_label)
                 self.awards_layout.addStretch()
         except Exception as e:
@@ -692,7 +695,7 @@ class AwardDetailDialog(MaskDialogBase):
         self.setWindowTitle(f"荣誉详情 - {award.competition_name}")
         self.setMinimumWidth(700)
         self.setMinimumHeight(600)
-        self.widget.setGraphicsEffect(None)
+        self.widget.setGraphicsEffect(cast(QGraphicsEffect, None))
 
         # 设置中心 widget 的圆角
         self.widget.setObjectName("centerWidget")
@@ -862,11 +865,12 @@ class AwardDetailDialog(MaskDialogBase):
         self.attach_model = AttachmentTableModel(self)
         self.attach_table = QTableView()
         self.attach_table.setModel(self.attach_model)
-        self.attach_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        self.attach_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
-        self.attach_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
-        self.attach_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
-        self.attach_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
+        header = self.attach_table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
         self.attach_table.setMaximumHeight(200)
         self.attach_table.setMinimumHeight(100)
         self.attach_table.verticalHeader().setVisible(False)
@@ -1061,6 +1065,12 @@ class AwardDetailDialog(MaskDialogBase):
     def _add_member_row(self):
         """添加空白成员卡片"""
         self._add_member_card()
+
+    def _apply_member_card_style(self, card: QFrame) -> None:
+        """刷新成员卡片的样式以匹配当前主题"""
+        card.setProperty("memberCard", True)
+        card.style().unpolish(card)
+        card.style().polish(card)
 
     @Slot()
     def _on_dialog_theme_changed(self) -> None:
@@ -1314,7 +1324,7 @@ class AwardDetailDialog(MaskDialogBase):
             btn_layout = QHBoxLayout(btn_widget)
             btn_layout.setContentsMargins(4, 0, 4, 0)
             btn_layout.addWidget(delete_btn)
-            btn_layout.setAlignment(Qt.AlignCenter)
+            btn_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
             index = self.attach_model.index(row_idx, 4)
             self.attach_table.setIndexWidget(index, btn_widget)
 
@@ -1329,13 +1339,14 @@ class AwardDetailDialog(MaskDialogBase):
         except Exception:
             return "无法计算"
 
-    def _format_file_size(self, size: int) -> str:
+    def _format_file_size(self, size: int | float) -> str:
         """格式化文件大小"""
+        size_float = float(size)
         for unit in ["B", "KB", "MB", "GB"]:
-            if size < 1024.0:
-                return f"{size:.1f} {unit}"
-            size /= 1024.0
-        return f"{size:.1f} TB"
+            if size_float < 1024.0:
+                return f"{size_float:.1f} {unit}"
+            size_float /= 1024.0
+        return f"{size_float:.1f} TB"
 
     def _remove_attachment(self, row: int) -> None:
         """删除指定行的附件"""
