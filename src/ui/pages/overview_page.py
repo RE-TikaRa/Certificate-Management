@@ -116,9 +116,7 @@ class OverviewPage(BasePage):
         layout.setSpacing(28)
 
         # 页面标题
-        layout.addWidget(
-            create_page_header("所有荣誉项目", "查看和管理已输入的所有荣誉信息")
-        )
+        layout.addWidget(create_page_header("所有荣誉项目", "查看和管理已输入的所有荣誉信息"))
 
         # 筛选区域
         filter_card, filter_layout = create_card()
@@ -253,16 +251,18 @@ class OverviewPage(BasePage):
         row2.addWidget(sort_label)
 
         self.sort_combo = ComboBox()
-        self.sort_combo.addItems([
-            "日期降序",
-            "日期升序",
-            "等级降序",
-            "等级升序",
-            "奖项降序",
-            "奖项升序",
-            "名称A-Z",
-            "名称Z-A",
-        ])
+        self.sort_combo.addItems(
+            [
+                "日期降序",
+                "日期升序",
+                "等级降序",
+                "等级升序",
+                "奖项降序",
+                "奖项升序",
+                "名称A-Z",
+                "名称Z-A",
+            ]
+        )
         self.sort_combo.setCurrentText(self.sort_by)
         self.sort_combo.currentTextChanged.connect(self._on_sort_changed)
         self.sort_combo.setFixedWidth(150)
@@ -335,11 +335,7 @@ class OverviewPage(BasePage):
 
         # 日期范围筛选
         if self.filter_start_date and self.filter_end_date:
-            filtered = [
-                a
-                for a in filtered
-                if self.filter_start_date <= a.award_date <= self.filter_end_date
-            ]
+            filtered = [a for a in filtered if self.filter_start_date <= a.award_date <= self.filter_end_date]
 
         # 关键词搜索（竞赛名称或证书编号）
         if self.filter_keyword:
@@ -367,15 +363,11 @@ class OverviewPage(BasePage):
         elif self.sort_by == "日期升序":
             return sorted(awards, key=lambda a: a.award_date)
         elif self.sort_by == "等级降序":
-            return sorted(
-                awards, key=lambda a: level_priority.get(a.level, 0), reverse=True
-            )
+            return sorted(awards, key=lambda a: level_priority.get(a.level, 0), reverse=True)
         elif self.sort_by == "等级升序":
             return sorted(awards, key=lambda a: level_priority.get(a.level, 0))
         elif self.sort_by == "奖项降序":
-            return sorted(
-                awards, key=lambda a: rank_priority.get(a.rank, 0), reverse=True
-            )
+            return sorted(awards, key=lambda a: rank_priority.get(a.rank, 0), reverse=True)
         elif self.sort_by == "奖项升序":
             return sorted(awards, key=lambda a: rank_priority.get(a.rank, 0))
         elif self.sort_by == "名称A-Z":
@@ -428,9 +420,7 @@ class OverviewPage(BasePage):
             else:
                 self.awards_layout.addStretch()
 
-            logger.debug(
-                f"已加载 {min(self.PAGE_SIZE, self.total_awards)}/{self.total_awards} 个荣誉项目"
-            )
+            logger.debug(f"已加载 {min(self.PAGE_SIZE, self.total_awards)}/{self.total_awards} 个荣誉项目")
         except Exception as e:
             logger.error(f"刷新失败: {e}", exc_info=True)
 
@@ -483,10 +473,7 @@ class OverviewPage(BasePage):
         for award in self.awards_list[start_idx:end_idx]:
             card = self._create_award_card(award)
             insert_pos = self.awards_layout.count()
-            if (
-                insert_pos > 0
-                and self.awards_layout.itemAt(insert_pos - 1).spacerItem()
-            ):
+            if insert_pos > 0 and self.awards_layout.itemAt(insert_pos - 1).spacerItem():
                 insert_pos -= 1
             self.awards_layout.insertWidget(insert_pos, card)
 
@@ -680,9 +667,7 @@ class OverviewPage(BasePage):
             palette = scroll_widget.palette()
             palette.setColor(
                 palette.ColorRole.Window,
-                {"#1c1f2e": QColor(28, 31, 46), "#f4f6fb": QColor(244, 246, 251)}[
-                    scroll_bg
-                ],
+                {"#1c1f2e": QColor(28, 31, 46), "#f4f6fb": QColor(244, 246, 251)}[scroll_bg],
             )
             scroll_widget.setPalette(palette)
 
@@ -840,15 +825,11 @@ class AwardDetailDialog(MaskDialogBase):
         members_layout.addWidget(make_section_title("参赛成员"))
 
         self.members_container = QWidget()
-        self.members_container.setStyleSheet(
-            "QWidget { background-color: transparent; }"
-        )
+        self.members_container.setStyleSheet("QWidget { background-color: transparent; }")
         self.members_list_layout = QVBoxLayout(self.members_container)
         self.members_list_layout.setContentsMargins(0, 0, 0, 0)
         self.members_list_layout.setSpacing(12)
-        self.members_list_layout.setSizeConstraint(
-            QVBoxLayout.SizeConstraint.SetMinAndMaxSize
-        )
+        self.members_list_layout.setSizeConstraint(QVBoxLayout.SizeConstraint.SetMinAndMaxSize)
 
         members_layout.addWidget(self.members_container)
 
@@ -881,21 +862,11 @@ class AwardDetailDialog(MaskDialogBase):
         self.attach_model = AttachmentTableModel(self)
         self.attach_table = QTableView()
         self.attach_table.setModel(self.attach_model)
-        self.attach_table.horizontalHeader().setSectionResizeMode(
-            0, QHeaderView.ResizeToContents
-        )
-        self.attach_table.horizontalHeader().setSectionResizeMode(
-            1, QHeaderView.Stretch
-        )
-        self.attach_table.horizontalHeader().setSectionResizeMode(
-            2, QHeaderView.ResizeToContents
-        )
-        self.attach_table.horizontalHeader().setSectionResizeMode(
-            3, QHeaderView.ResizeToContents
-        )
-        self.attach_table.horizontalHeader().setSectionResizeMode(
-            4, QHeaderView.ResizeToContents
-        )
+        self.attach_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.attach_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.attach_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        self.attach_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        self.attach_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
         self.attach_table.setMaximumHeight(200)
         self.attach_table.setMinimumHeight(100)
         self.attach_table.verticalHeader().setVisible(False)
@@ -1049,9 +1020,7 @@ class AwardDetailDialog(MaskDialogBase):
         for field_name, label in zip(field_names, field_labels):
             # 专业字段使用特殊的搜索组件
             if field_name == "major":
-                input_widget = MajorSearchWidget(
-                    self.ctx.majors, self.theme_manager, parent=member_card
-                )
+                input_widget = MajorSearchWidget(self.ctx.majors, self.theme_manager, parent=member_card)
                 # 如果是编辑现有成员，填充数据
                 if member:
                     value = getattr(member, field_name, "")
@@ -1080,9 +1049,7 @@ class AwardDetailDialog(MaskDialogBase):
             label_widget.setMinimumWidth(50)
             label_widget.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-            form_grid.addWidget(
-                label_widget, row, col, alignment=Qt.AlignmentFlag.AlignCenter
-            )
+            form_grid.addWidget(label_widget, row, col, alignment=Qt.AlignmentFlag.AlignCenter)
             form_grid.addWidget(member_fields[field_name], row, col + 1)
 
         # 组装
@@ -1092,9 +1059,7 @@ class AwardDetailDialog(MaskDialogBase):
         # 连接按钮信号
         import_btn.clicked.connect(lambda: self._import_from_doc(member_fields))
         history_btn.clicked.connect(lambda: self._select_from_history(member_fields))
-        delete_btn.clicked.connect(
-            lambda: self._remove_member_card(member_card, member_fields)
-        )
+        delete_btn.clicked.connect(lambda: self._remove_member_card(member_card, member_fields))
 
         member_data = {"card": member_card, "fields": member_fields}
         self.members_data.append(member_data)
@@ -1126,9 +1091,7 @@ class AwardDetailDialog(MaskDialogBase):
     def _import_from_doc(self, member_fields: dict) -> None:
         """从 .doc 文档导入成员信息"""
         # 打开文件选择对话框
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, "选择成员信息文档", "", "Word 文档 (*.doc);;所有文件 (*.*)"
-        )
+        file_path, _ = QFileDialog.getOpenFileName(self, "选择成员信息文档", "", "Word 文档 (*.doc);;所有文件 (*.*)")
 
         if not file_path:
             return
@@ -1260,9 +1223,7 @@ class AwardDetailDialog(MaskDialogBase):
                     f"已自动填充 {len(filled_fields)} 个字段，请手动输入姓名",
                     parent=self,
                 )
-                logger.info(
-                    f"成功导入 {len(filled_fields)} 个字段: {', '.join(filled_fields)}"
-                )
+                logger.info(f"成功导入 {len(filled_fields)} 个字段: {', '.join(filled_fields)}")
 
                 # 聚焦到姓名输入框
                 if "name" in member_fields:
@@ -1312,9 +1273,7 @@ class AwardDetailDialog(MaskDialogBase):
                     major_widget.setText(selected_member.major or "")
                 member_fields["class_name"].setText(selected_member.class_name or "")
                 member_fields["college"].setText(selected_member.college or "")
-                InfoBar.success(
-                    "成功", f"已选择成员: {selected_member.name}", parent=self
-                )
+                InfoBar.success("成功", f"已选择成员: {selected_member.name}", parent=self)
 
     def _pick_files(self) -> None:
         """选择附件文件并添加到表格"""
@@ -1339,13 +1298,15 @@ class AwardDetailDialog(MaskDialogBase):
             for idx, file_path in enumerate(self.selected_files, start=1):
                 md5_hash = self._calculate_md5(file_path)
                 size_str = self._format_file_size(file_path.stat().st_size)
-                rows.append({
-                    "index": idx,
-                    "name": file_path.name,
-                    "md5": md5_hash[:16] + "...",
-                    "size": size_str,
-                    "path": file_path,
-                })
+                rows.append(
+                    {
+                        "index": idx,
+                        "name": file_path.name,
+                        "md5": md5_hash[:16] + "...",
+                        "size": size_str,
+                        "path": file_path,
+                    }
+                )
             return rows
 
         run_in_thread(build_rows, self._on_attachments_ready)
@@ -1355,9 +1316,7 @@ class AwardDetailDialog(MaskDialogBase):
         for row_idx, _ in enumerate(rows):
             delete_btn = TransparentToolButton(FluentIcon.DELETE)
             delete_btn.setToolTip("删除此附件")
-            delete_btn.clicked.connect(
-                lambda checked, r=row_idx: self._remove_attachment(r)
-            )
+            delete_btn.clicked.connect(lambda checked, r=row_idx: self._remove_attachment(r))
             btn_widget = QWidget()
             btn_layout = QHBoxLayout(btn_widget)
             btn_layout.setContentsMargins(4, 0, 4, 0)

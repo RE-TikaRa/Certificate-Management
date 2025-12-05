@@ -107,23 +107,23 @@ class AwardService:
         if isinstance(member_info, str):
             # 如果是字符串，使用原来的逻辑
             return self._get_or_create_member(session, member_info)
-        
+
         # 如果是字典，提取姓名并查询现有成员
-        name = member_info.get('name', '')
+        name = member_info.get("name", "")
         if not name:
             raise ValueError("成员信息必须包含 'name' 字段")
-        
+
         member = session.scalar(select(TeamMember).where(TeamMember.name == name))
         if member:
             # 成员已存在，更新其信息
             for key, value in member_info.items():
-                if key != 'name' and value:
+                if key != "name" and value:
                     setattr(member, key, value)
             session.flush()
             return member
-        
+
         # 创建新成员
-        member = TeamMember(name=name, pinyin=name, **{k: v for k, v in member_info.items() if k != 'name'})
+        member = TeamMember(name=name, pinyin=name, **{k: v for k, v in member_info.items() if k != "name"})
         session.add(member)
         session.flush()
         return member
@@ -135,9 +135,7 @@ class AwardService:
             awards = session.scalars(
                 select(Award)
                 .where(Award.deleted == False)
-                .options(
-                    selectinload(Award.members)
-                )
+                .options(selectinload(Award.members))
                 .order_by(Award.award_date.desc())
             ).all()
             return awards
@@ -167,7 +165,7 @@ class AwardService:
         """
         Update an existing award with transaction support.
         Only updates fields that are provided (not None).
-        
+
         Args:
             award_id: ID of award to update
             competition_name: New competition name
@@ -178,10 +176,10 @@ class AwardService:
             remarks: New remarks
             member_names: New member list (replaces existing)
             attachment_files: New attachment files (replaces existing)
-            
+
         Returns:
             Updated Award object
-            
+
         Raises:
             ValueError: If award not found
         """
@@ -189,7 +187,7 @@ class AwardService:
             award = session.get(Award, award_id)
             if not award:
                 raise ValueError(f"Award {award_id} not found")
-            
+
             # Update scalar fields
             if competition_name is not None:
                 award.competition_name = competition_name
@@ -203,18 +201,15 @@ class AwardService:
                 award.certificate_code = certificate_code
             if remarks is not None:
                 award.remarks = remarks
-            
+
             # Update member associations
             if member_names is not None:
                 award.members.clear()
-                award.members = [
-                    self._get_or_create_member_with_info(session, item)
-                    for item in member_names
-                ]
-            
+                award.members = [self._get_or_create_member_with_info(session, item) for item in member_names]
+
             session.add(award)
             session.flush()  # Validate before commit
-            
+
             # Update attachments if provided
             if attachment_files is not None:
                 self.attachments.save_attachments(
@@ -223,9 +218,8 @@ class AwardService:
                     attachment_files,
                     session=session,
                 )
-            
-            return award
 
+            return award
 
     def get_award_by_id(self, award_id: int) -> Award | None:
         """根据 ID 获取荣誉"""
@@ -243,7 +237,7 @@ class AwardService:
     ) -> list[Award]:
         """
         Search and filter awards by multiple criteria.
-        
+
         Args:
             query: Search text (matches competition_name or certificate_code)
             level: Filter by level (国家级/省级/校级)
@@ -251,14 +245,14 @@ class AwardService:
             date_from: Start date for award_date range
             date_to: End date for award_date range
             limit: Maximum number of results to return
-            
+
         Returns:
             List of matching Award objects
         """
         with self.db.session_scope() as session:
             q = select(Award)
             conditions = []
-            
+
             # Text search
             if query:
                 conditions.append(
@@ -267,37 +261,37 @@ class AwardService:
                         Award.certificate_code.ilike(f"%{query}%"),
                     )
                 )
-            
+
             # Level filter
             if level:
                 conditions.append(Award.level == level)
-            
+
             # Rank filter
             if rank:
                 conditions.append(Award.rank == rank)
-            
+
             # Date range filter
             if date_from:
                 conditions.append(Award.award_date >= date_from)
             if date_to:
                 conditions.append(Award.award_date <= date_to)
-            
+
             # Apply all conditions
             if conditions:
                 q = q.where(and_(*conditions))
-            
+
             # Order by date (newest first) and apply limit
             q = q.order_by(Award.award_date.desc()).limit(limit)
-            
+
             return session.scalars(q).all()
 
     def batch_delete_awards(self, award_ids: list[int]) -> int:
         """
         Delete multiple awards in a single transaction.
-        
+
         Args:
             award_ids: List of award IDs to delete
-            
+
         Returns:
             Number of awards deleted
         """
@@ -308,35 +302,31 @@ class AwardService:
     def batch_update_level(self, award_ids: list[int], new_level: str) -> int:
         """
         Batch update award level for multiple records.
-        
+
         Args:
             award_ids: List of award IDs to update
             new_level: New level value (国家级/省级/校级)
-            
+
         Returns:
             Number of awards updated
         """
         with self.db.session_scope() as session:
-            count = session.query(Award).filter(Award.id.in_(award_ids)).update(
-                {Award.level: new_level}
-            )
+            count = session.query(Award).filter(Award.id.in_(award_ids)).update({Award.level: new_level})
             return count
 
     def batch_update_rank(self, award_ids: list[int], new_rank: str) -> int:
         """
         Batch update award rank for multiple records.
-        
+
         Args:
             award_ids: List of award IDs to update
             new_rank: New rank value (一等奖/二等奖/三等奖/优秀奖)
-            
+
         Returns:
             Number of awards updated
         """
         with self.db.session_scope() as session:
-            count = session.query(Award).filter(Award.id.in_(award_ids)).update(
-                {Award.rank: new_rank}
-            )
+            count = session.query(Award).filter(Award.id.in_(award_ids)).update({Award.rank: new_rank})
             return count
 
     def list_deleted_awards(self) -> list[Award]:
@@ -345,9 +335,7 @@ class AwardService:
             awards = session.scalars(
                 select(Award)
                 .where(Award.deleted == True)
-                .options(
-                    selectinload(Award.members)
-                )
+                .options(selectinload(Award.members))
                 .order_by(Award.deleted_at.desc())
             ).all()
             return list(awards)

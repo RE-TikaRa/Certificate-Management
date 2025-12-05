@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+
 def create_page_header(title: str, subtitle: str | None = None) -> QWidget:
     wrapper = QWidget()
     layout = QVBoxLayout(wrapper)

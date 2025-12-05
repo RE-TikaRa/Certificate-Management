@@ -139,12 +139,8 @@ class SettingsPage(BasePage):
         display_frequency = self.FREQUENCY_OPTIONS.get(stored_frequency, "手动")
         self.frequency.setCurrentText(display_frequency)
 
-        self.include_attachments.setChecked(
-            self.ctx.settings.get("include_attachments", "true") == "true"
-        )
-        self.include_logs.setChecked(
-            self.ctx.settings.get("include_logs", "true") == "true"
-        )
+        self.include_attachments.setChecked(self.ctx.settings.get("include_attachments", "true") == "true")
+        self.include_logs.setChecked(self.ctx.settings.get("include_logs", "true") == "true")
         # Convert stored theme value to display text
         stored_theme = self.ctx.settings.get("theme_mode", "light")
         display_text = self.THEME_OPTIONS.get(stored_theme, "浅色")
@@ -154,16 +150,12 @@ class SettingsPage(BasePage):
         self.email_suffix.setText(email_suffix)
 
     def _choose_attach_dir(self) -> None:
-        path = QFileDialog.getExistingDirectory(
-            self, "选择附件目录", self.attach_dir.text()
-        )
+        path = QFileDialog.getExistingDirectory(self, "选择附件目录", self.attach_dir.text())
         if path:
             self.attach_dir.setText(path)
 
     def _choose_backup_dir(self) -> None:
-        path = QFileDialog.getExistingDirectory(
-            self, "选择备份目录", self.backup_dir.text()
-        )
+        path = QFileDialog.getExistingDirectory(self, "选择备份目录", self.backup_dir.text())
         if path:
             self.backup_dir.setText(path)
 
@@ -175,21 +167,13 @@ class SettingsPage(BasePage):
             # Convert display text back to frequency value
             display_frequency = self.frequency.currentText()
             frequency_value = next(
-                (
-                    k
-                    for k, v in self.FREQUENCY_OPTIONS.items()
-                    if v == display_frequency
-                ),
+                (k for k, v in self.FREQUENCY_OPTIONS.items() if v == display_frequency),
                 "manual",
             )
             self.ctx.settings.set("backup_frequency", frequency_value)
 
-            self.ctx.settings.set(
-                "include_attachments", str(self.include_attachments.isChecked()).lower()
-            )
-            self.ctx.settings.set(
-                "include_logs", str(self.include_logs.isChecked()).lower()
-            )
+            self.ctx.settings.set("include_attachments", str(self.include_attachments.isChecked()).lower())
+            self.ctx.settings.set("include_logs", str(self.include_logs.isChecked()).lower())
 
             # Save email suffix
             email_suffix = self.email_suffix.text().strip()
@@ -199,9 +183,7 @@ class SettingsPage(BasePage):
 
             # Convert display text back to theme value
             display_text = self.theme_mode.currentText()
-            theme_value = next(
-                (k for k, v in self.THEME_OPTIONS.items() if v == display_text), "light"
-            )
+            theme_value = next((k for k, v in self.THEME_OPTIONS.items() if v == display_text), "light")
             self.ctx.settings.set("theme_mode", theme_value)
 
             # Apply theme changes

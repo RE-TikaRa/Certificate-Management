@@ -401,9 +401,7 @@ class MemberDetailDialog(MaskDialogBase):
 
     def _confirm_delete(self):
         """确认删除"""
-        box = MessageBox(
-            "确认删除", f"确定要删除成员 {self.member.name} 吗？", self.window()
-        )
+        box = MessageBox("确认删除", f"确定要删除成员 {self.member.name} 吗？", self.window())
 
         if box.exec():
             self._delete_member()
@@ -494,9 +492,7 @@ class MemberDetailDialog(MaskDialogBase):
             palette = scroll_widget.palette()
             palette.setColor(
                 palette.ColorRole.Window,
-                {"#2a2a3a": QColor(42, 42, 58), "#f5f5f5": QColor(245, 245, 245)}[
-                    scroll_bg
-                ],
+                {"#2a2a3a": QColor(42, 42, 58), "#f5f5f5": QColor(245, 245, 245)}[scroll_bg],
             )
             scroll_widget.setPalette(palette)
 

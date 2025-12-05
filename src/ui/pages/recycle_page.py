@@ -72,9 +72,7 @@ class RecyclePage(BasePage):
             lambda a: a.level,
             lambda a: a.rank,
             lambda a: a.award_date,
-            lambda a: a.deleted_at.strftime("%Y-%m-%d %H:%M:%S")
-            if a.deleted_at
-            else "",
+            lambda a: a.deleted_at.strftime("%Y-%m-%d %H:%M:%S") if a.deleted_at else "",
         ]
         self.model = ObjectTableModel(headers, accessors, self)
         self.table = QTableView()
@@ -115,17 +113,13 @@ class RecyclePage(BasePage):
             InfoBar.warning("提示", "请选择要恢复的荣誉记录", parent=self.window())
             return
 
-        box = MessageBox(
-            "确认恢复", f"确定要恢复选中的 {len(ids)} 条荣誉记录吗？", self.window()
-        )
+        box = MessageBox("确认恢复", f"确定要恢复选中的 {len(ids)} 条荣誉记录吗？", self.window())
 
         if box.exec():
             for award_id in ids:
                 self.ctx.awards.restore_award(award_id)
             self.refresh()
-            InfoBar.success(
-                "成功", f"已恢复 {len(ids)} 条荣誉记录", parent=self.window()
-            )
+            InfoBar.success("成功", f"已恢复 {len(ids)} 条荣誉记录", parent=self.window())
 
     def _purge(self) -> None:
         """彻底删除选中的荣誉记录"""
@@ -144,6 +138,4 @@ class RecyclePage(BasePage):
             for award_id in ids:
                 self.ctx.awards.permanently_delete_award(award_id)
             self.refresh()
-            InfoBar.success(
-                "成功", f"已彻底删除 {len(ids)} 条荣誉记录", parent=self.window()
-            )
+            InfoBar.success("成功", f"已彻底删除 {len(ids)} 条荣誉记录", parent=self.window())

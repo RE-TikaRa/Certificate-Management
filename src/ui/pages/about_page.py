@@ -126,9 +126,7 @@ class AboutPage(BasePage):
         links_layout.setSpacing(20)
         links_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        github_btn = HyperlinkButton(
-            "https://github.com/RE-TikaRa/Certificate-Management", "GitHub 仓库", self
-        )
+        github_btn = HyperlinkButton("https://github.com/RE-TikaRa/Certificate-Management", "GitHub 仓库", self)
         github_btn.setIcon(FluentIcon.GITHUB)
         links_layout.addWidget(github_btn)
 

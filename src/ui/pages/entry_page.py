@@ -89,9 +89,7 @@ class EntryPage(BasePage):
 
         # 页面标题和清空按钮
         header_layout = QHBoxLayout()
-        header_layout.addWidget(
-            create_page_header("荣誉录入", "集中采集证书信息并同步团队")
-        )
+        header_layout.addWidget(create_page_header("荣誉录入", "集中采集证书信息并同步团队"))
         header_layout.addStretch()
         from qfluentwidgets import FluentIcon, TransparentToolButton
 
@@ -214,15 +212,11 @@ class EntryPage(BasePage):
 
         # 成员列表容器 - 直接使用 QWidget，会自动扩展
         self.members_container = QWidget()
-        self.members_container.setStyleSheet(
-            "QWidget { background-color: transparent; }"
-        )
+        self.members_container.setStyleSheet("QWidget { background-color: transparent; }")
         self.members_list_layout = QVBoxLayout(self.members_container)
         self.members_list_layout.setContentsMargins(0, 0, 0, 0)
         self.members_list_layout.setSpacing(12)
-        self.members_list_layout.setSizeConstraint(
-            QVBoxLayout.SetMinAndMaxSize
-        )  # 自动调整大小
+        self.members_list_layout.setSizeConstraint(QVBoxLayout.SetMinAndMaxSize)  # 自动调整大小
 
         # 成员卡片会自动扩展父容器的高度
         members_layout.addWidget(self.members_container)
@@ -253,21 +247,11 @@ class EntryPage(BasePage):
         self.attach_model = AttachmentTableModel(self)
         self.attach_table = QTableView()
         self.attach_table.setModel(self.attach_model)
-        self.attach_table.horizontalHeader().setSectionResizeMode(
-            0, QHeaderView.ResizeToContents
-        )  # 序号
-        self.attach_table.horizontalHeader().setSectionResizeMode(
-            1, QHeaderView.Stretch
-        )  # 附件名
-        self.attach_table.horizontalHeader().setSectionResizeMode(
-            2, QHeaderView.ResizeToContents
-        )  # MD5
-        self.attach_table.horizontalHeader().setSectionResizeMode(
-            3, QHeaderView.ResizeToContents
-        )  # 大小
-        self.attach_table.horizontalHeader().setSectionResizeMode(
-            4, QHeaderView.ResizeToContents
-        )  # 操作
+        self.attach_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)  # 序号
+        self.attach_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)  # 附件名
+        self.attach_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)  # MD5
+        self.attach_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)  # 大小
+        self.attach_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)  # 操作
         self.attach_table.setMaximumHeight(200)
         self.attach_table.setMinimumHeight(100)
         self.attach_table.verticalHeader().setVisible(False)
@@ -379,9 +363,7 @@ class EntryPage(BasePage):
         for field_name, label in zip(field_names, field_labels):
             # 专业字段使用特殊的搜索组件
             if field_name == "major":
-                input_widget = MajorSearchWidget(
-                    self.ctx.majors, self.theme_manager, parent=member_card
-                )
+                input_widget = MajorSearchWidget(self.ctx.majors, self.theme_manager, parent=member_card)
             else:
                 input_widget = LineEdit()
                 clean_input_text(input_widget)
@@ -398,9 +380,7 @@ class EntryPage(BasePage):
             label_widget.setMinimumWidth(50)
             label_widget.setAlignment(Qt.AlignmentFlag.AlignCenter)  # 标签居中
 
-            form_grid.addWidget(
-                label_widget, row, col, alignment=Qt.AlignmentFlag.AlignCenter
-            )
+            form_grid.addWidget(label_widget, row, col, alignment=Qt.AlignmentFlag.AlignCenter)
             form_grid.addWidget(member_fields[field_name], row, col + 1)
 
         member_layout.addLayout(form_grid)
@@ -412,9 +392,7 @@ class EntryPage(BasePage):
         history_btn.clicked.connect(lambda: self._select_from_history(member_fields))
 
         # 删除按钮连接
-        delete_btn.clicked.connect(
-            lambda: self._remove_member_card(member_card, member_fields)
-        )
+        delete_btn.clicked.connect(lambda: self._remove_member_card(member_card, member_fields))
 
         # 保存成员数据
         member_data = {"card": member_card, "fields": member_fields}
@@ -469,9 +447,7 @@ class EntryPage(BasePage):
                     major_widget.setText(selected_member.major)
                 member_fields["class_name"].setText(selected_member.class_name)
                 member_fields["college"].setText(selected_member.college)
-                InfoBar.success(
-                    "成功", f"已选择成员: {selected_member.name}", parent=self.window()
-                )
+                InfoBar.success("成功", f"已选择成员: {selected_member.name}", parent=self.window())
 
     def _import_from_doc(self, member_fields: dict) -> None:
         """从 .doc 文档导入成员信息"""
@@ -480,9 +456,7 @@ class EntryPage(BasePage):
         logger = logging.getLogger(__name__)
 
         # 打开文件选择对话框
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, "选择成员信息文档", "", "Word 文档 (*.doc);;所有文件 (*.*)"
-        )
+        file_path, _ = QFileDialog.getOpenFileName(self, "选择成员信息文档", "", "Word 文档 (*.doc);;所有文件 (*.*)")
 
         if not file_path:
             return
@@ -579,9 +553,7 @@ class EntryPage(BasePage):
             extracted_count = sum(1 for v in member_info.values() if v is not None)
 
             if extracted_count == 0:
-                InfoBar.warning(
-                    "提取失败", "未能从文档中提取到任何信息", parent=self.window()
-                )
+                InfoBar.warning("提取失败", "未能从文档中提取到任何信息", parent=self.window())
                 logger.warning(f"未从文档中提取到信息: {file_path}")
                 return
 
@@ -618,17 +590,13 @@ class EntryPage(BasePage):
                     f"已自动填充 {len(filled_fields)} 个字段，请手动输入姓名",
                     parent=self.window(),
                 )
-                logger.info(
-                    f"成功导入 {len(filled_fields)} 个字段: {', '.join(filled_fields)}"
-                )
+                logger.info(f"成功导入 {len(filled_fields)} 个字段: {', '.join(filled_fields)}")
 
                 # 聚焦到姓名输入框
                 if "name" in member_fields:
                     member_fields["name"].setFocus()
             else:
-                InfoBar.warning(
-                    "提取失败", "未能从文档中提取到有效信息", parent=self.window()
-                )
+                InfoBar.warning("提取失败", "未能从文档中提取到有效信息", parent=self.window())
 
         except FileNotFoundError as e:
             progress.close()
@@ -636,9 +604,7 @@ class EntryPage(BasePage):
             logger.error(f"文件不存在: {file_path}")
         except Exception as e:
             progress.close()
-            InfoBar.error(
-                "导入失败", f"提取文档信息时出错: {str(e)}", parent=self.window()
-            )
+            InfoBar.error("导入失败", f"提取文档信息时出错: {str(e)}", parent=self.window())
             logger.error(f"导入文档失败: {e}", exc_info=True)
 
     def _get_members_data(self) -> list[dict]:
@@ -708,13 +674,15 @@ class EntryPage(BasePage):
             for idx, file_path in enumerate(self.selected_files, start=1):
                 md5_hash = self._calculate_md5(file_path)
                 size_str = self._format_file_size(file_path.stat().st_size)
-                rows.append({
-                    "index": idx,
-                    "name": file_path.name,
-                    "md5": md5_hash[:16] + "...",
-                    "size": size_str,
-                    "path": file_path,
-                })
+                rows.append(
+                    {
+                        "index": idx,
+                        "name": file_path.name,
+                        "md5": md5_hash[:16] + "...",
+                        "size": size_str,
+                        "path": file_path,
+                    }
+                )
             return rows
 
         run_in_thread(build_rows, self._on_attachments_ready)
@@ -725,9 +693,7 @@ class EntryPage(BasePage):
         for row_idx, row in enumerate(rows):
             delete_btn = TransparentToolButton(FluentIcon.DELETE)
             delete_btn.setToolTip("删除")
-            delete_btn.clicked.connect(
-                lambda checked, r=row_idx: self._remove_attachment(r)
-            )
+            delete_btn.clicked.connect(lambda checked, r=row_idx: self._remove_attachment(r))
             btn_widget = QWidget()
             btn_layout = QHBoxLayout(btn_widget)
             btn_layout.setContentsMargins(4, 0, 4, 0)
@@ -843,15 +809,11 @@ class EntryPage(BasePage):
                     db_award.members.clear()
                     # 添加新成员
                     for member_info in members_data:
-                        member = self.ctx.awards._get_or_create_member_with_info(
-                            session, member_info
-                        )
+                        member = self.ctx.awards._get_or_create_member_with_info(session, member_info)
                         db_award.members.append(member)
                     session.commit()
 
-            InfoBar.success(
-                "成功", f"已更新：{award.competition_name}", parent=self.window()
-            )
+            InfoBar.success("成功", f"已更新：{award.competition_name}", parent=self.window())
         else:
             # 创建模式：创建新荣誉
             award = self.ctx.awards.create_award(
@@ -868,9 +830,7 @@ class EntryPage(BasePage):
                 member_names=members_data,
                 attachment_files=self.selected_files,
             )
-            InfoBar.success(
-                "成功", f"已保存：{award.competition_name}", parent=self.window()
-            )
+            InfoBar.success("成功", f"已保存：{award.competition_name}", parent=self.window())
 
         self._clear_form()
 
@@ -1038,9 +998,7 @@ class EntryPage(BasePage):
             palette = scroll_widget.palette()
             palette.setColor(
                 palette.ColorRole.Window,
-                {"#1c1f2e": QColor(28, 31, 46), "#f4f6fb": QColor(244, 246, 251)}[
-                    scroll_bg
-                ],
+                {"#1c1f2e": QColor(28, 31, 46), "#f4f6fb": QColor(244, 246, 251)}[scroll_bg],
             )
             scroll_widget.setPalette(palette)
 
@@ -1094,9 +1052,7 @@ class HistoryMemberDialog(MaskDialogBase):
 
         # 搜索输入框（带内置搜索图标）
         self.search_input = SearchLineEdit()
-        self.search_input.setPlaceholderText(
-            "输入姓名、学号、手机号、邮箱或学院搜索..."
-        )
+        self.search_input.setPlaceholderText("输入姓名、学号、手机号、邮箱或学院搜索...")
         self.search_input.textChanged.connect(self._on_search_text_changed)
         self.search_input.setMinimumHeight(36)
         search_layout.addWidget(self.search_input)
@@ -1106,9 +1062,7 @@ class HistoryMemberDialog(MaskDialogBase):
         # === 结果计数提示 ===
         self.result_label = QLabel(f"共 {len(self.members)} 位成员")
         is_dark = self.theme_manager.is_dark
-        self.result_label.setStyleSheet(
-            f"color: {'#a0a0a0' if is_dark else '#666'}; font-size: 12px;"
-        )
+        self.result_label.setStyleSheet(f"color: {'#a0a0a0' if is_dark else '#666'}; font-size: 12px;")
         layout.addWidget(self.result_label)
 
         # === 成员列表（滚动区域）===
@@ -1135,9 +1089,7 @@ class HistoryMemberDialog(MaskDialogBase):
 
         # === 底部提示 ===
         hint_label = QLabel("点击任意成员卡片即可选择")
-        hint_label.setStyleSheet(
-            f"color: {'#808080' if is_dark else '#999'}; font-size: 11px;"
-        )
+        hint_label.setStyleSheet(f"color: {'#808080' if is_dark else '#999'}; font-size: 11px;")
         hint_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(hint_label)
 
@@ -1162,11 +1114,7 @@ class HistoryMemberDialog(MaskDialogBase):
             self.accept()
 
         # 使用点击事件
-        card.mousePressEvent = (
-            lambda e: select_member()
-            if e.button() == Qt.MouseButton.LeftButton
-            else None
-        )
+        card.mousePressEvent = lambda e: select_member() if e.button() == Qt.MouseButton.LeftButton else None
 
         layout = QVBoxLayout(card)
         layout.setContentsMargins(16, 14, 16, 14)
@@ -1214,9 +1162,7 @@ class HistoryMemberDialog(MaskDialogBase):
         separator = QFrame()
         separator.setFrameShape(QFrame.HLine)
         is_dark = self.theme_manager.is_dark
-        separator.setStyleSheet(
-            f"background-color: {'#4a4a5e' if is_dark else '#e8e8e8'}; max-height: 1px;"
-        )
+        separator.setStyleSheet(f"background-color: {'#4a4a5e' if is_dark else '#e8e8e8'}; max-height: 1px;")
         layout.addWidget(separator)
 
         # === 详细信息网格（2列布局）===
@@ -1241,13 +1187,9 @@ class HistoryMemberDialog(MaskDialogBase):
             # 标签（灰色小字）
             label_widget = QLabel(f"{label}")
             if is_dark:
-                label_widget.setStyleSheet(
-                    "color: #a0a0a0; font-size: 11px; min-width: 36px;"
-                )
+                label_widget.setStyleSheet("color: #a0a0a0; font-size: 11px; min-width: 36px;")
             else:
-                label_widget.setStyleSheet(
-                    "color: #888; font-size: 11px; min-width: 36px;"
-                )
+                label_widget.setStyleSheet("color: #888; font-size: 11px; min-width: 36px;")
 
             # 值（正常字体）
             value_widget = QLabel(str(value))

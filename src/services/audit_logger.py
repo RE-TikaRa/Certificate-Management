@@ -1,6 +1,7 @@
 """
 Audit logging system for tracking user operations and changes.
 """
+
 from __future__ import annotations
 
 import logging
@@ -11,6 +12,7 @@ from enum import Enum
 
 class OperationType(str, Enum):
     """Types of operations that are audited."""
+
     CREATE = "create"
     UPDATE = "update"
     DELETE = "delete"
@@ -23,6 +25,7 @@ class OperationType(str, Enum):
 
 class EntityType(str, Enum):
     """Types of entities that are audited."""
+
     AWARD = "award"
     MEMBER = "member"
     TAG = "tag"
@@ -233,8 +236,7 @@ class AuditLogger:
         """
         if duration_ms > threshold_ms:
             self.logger.warning(
-                f"AUDIT_SLOW: {operation} | duration={duration_ms:.2f}ms | "
-                f"threshold={threshold_ms}ms",
+                f"AUDIT_SLOW: {operation} | duration={duration_ms:.2f}ms | threshold={threshold_ms}ms",
             )
 
     def log_error_recovery(

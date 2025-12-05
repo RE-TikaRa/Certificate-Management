@@ -48,12 +48,8 @@ class MainWindow(FluentWindow):
         self._pending_refresh_index: int | None = None
         self.stackedWidget.currentChanged.connect(self._on_page_changed)
         # qfluentwidgets 使用 PopUpAniStackedWidget，动画结束信号为 aniFinished
-        if hasattr(self.stackedWidget, "view") and hasattr(
-            self.stackedWidget.view, "aniFinished"
-        ):
-            self.stackedWidget.view.aniFinished.connect(
-                self._on_page_animation_finished
-            )
+        if hasattr(self.stackedWidget, "view") and hasattr(self.stackedWidget.view, "aniFinished"):
+            self.stackedWidget.view.aniFinished.connect(self._on_page_animation_finished)
 
         self._init_navigation_fast()
 
@@ -120,9 +116,7 @@ class MainWindow(FluentWindow):
 
         # 只注册首页到导航栏
         self.route_keys: dict[str, str] = {}
-        key = self.addSubInterface(
-            home_page, FIF.HOME, "首页", position=NavigationItemPosition.TOP
-        )
+        key = self.addSubInterface(home_page, FIF.HOME, "首页", position=NavigationItemPosition.TOP)
         self.route_keys["home"] = key
         self.navigate_to("home")
 

@@ -38,7 +38,7 @@ class AttachmentManager:
         keep = [c for c in name if c.isalnum() or c in (" ", "_", "-", ".")]
         safe = "".join(keep).strip().replace(" ", "_")
         return safe or "attachment"
-    
+
     def _calculate_md5(self, file_path: Path) -> str:
         """计算文件的MD5哈希值"""
         md5_hash = hashlib.md5()
@@ -75,11 +75,11 @@ class AttachmentManager:
                 if not src.exists():
                     logger.warning("Attachment %s not found, skipped", src)
                     continue
-                
+
                 # 计算MD5和文件大小
                 file_md5 = self._calculate_md5(src)
                 file_size = src.stat().st_size
-                
+
                 suffix = src.suffix
                 safe_name = self._sanitize_name(f"{competition_name}-附件{index:02d}{suffix}")
                 dest = self._ensure_unique_path(folder, safe_name)
@@ -101,9 +101,7 @@ class AttachmentManager:
     def mark_deleted(self, attachment_ids: Iterable[int]) -> None:
         root = self.ensure_root()
         with self.db.session_scope() as session:
-            attachments = session.scalars(
-                select(Attachment).where(Attachment.id.in_(list(attachment_ids)))
-            ).all()
+            attachments = session.scalars(select(Attachment).where(Attachment.id.in_(list(attachment_ids)))).all()
             for attachment in attachments:
                 if attachment.deleted:
                     continue
@@ -120,9 +118,7 @@ class AttachmentManager:
     def restore(self, attachment_ids: Iterable[int]) -> None:
         root = self.ensure_root()
         with self.db.session_scope() as session:
-            attachments = session.scalars(
-                select(Attachment).where(Attachment.id.in_(list(attachment_ids)))
-            ).all()
+            attachments = session.scalars(select(Attachment).where(Attachment.id.in_(list(attachment_ids)))).all()
             for attachment in attachments:
                 if not attachment.deleted:
                     continue

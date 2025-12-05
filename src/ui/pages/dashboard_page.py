@@ -66,9 +66,7 @@ class DashboardPage(BasePage):
 
         # 页面标题和刷新按钮
         header_layout = QHBoxLayout()
-        header_layout.addWidget(
-            create_page_header("仪表盘与统计", "关键指标、趋势与分布一站式总览")
-        )
+        header_layout.addWidget(create_page_header("仪表盘与统计", "关键指标、趋势与分布一站式总览"))
         header_layout.addStretch()
         refresh_btn = TransparentToolButton(FluentIcon.SYNC)
         refresh_btn.setToolTip("刷新所有数据")
@@ -167,9 +165,7 @@ class DashboardPage(BasePage):
 
         left = QVBoxLayout()
         left.addWidget(make_section_title("级别汇总"))
-        self.level_model = ObjectTableModel(
-            ["级别", "数量"], [lambda r: r[0], lambda r: r[1]], self
-        )
+        self.level_model = ObjectTableModel(["级别", "数量"], [lambda r: r[0], lambda r: r[1]], self)
         self.level_table = QTableView()
         self.level_table.setModel(self.level_model)
         apply_table_style(self.level_table)
@@ -179,9 +175,7 @@ class DashboardPage(BasePage):
 
         right = QVBoxLayout()
         right.addWidget(make_section_title("等级汇总"))
-        self.rank_model = ObjectTableModel(
-            ["等级", "数量"], [lambda r: r[0], lambda r: r[1]], self
-        )
+        self.rank_model = ObjectTableModel(["等级", "数量"], [lambda r: r[0], lambda r: r[1]], self)
         self.rank_table = QTableView()
         self.rank_table.setModel(self.rank_model)
         apply_table_style(self.rank_table)
@@ -273,9 +267,7 @@ class DashboardPage(BasePage):
             if hasattr(parent, "overview_page") and parent.overview_page:
                 parent.overview_page.refresh()
             if hasattr(parent, "entry_page") and parent.entry_page:
-                parent.entry_page.refresh() if hasattr(
-                    parent.entry_page, "refresh"
-                ) else None
+                parent.entry_page.refresh() if hasattr(parent.entry_page, "refresh") else None
             if hasattr(parent, "management_page") and parent.management_page:
                 parent.management_page.refresh()
             break
@@ -302,16 +294,11 @@ class DashboardPage(BasePage):
             rank_stats = self.ctx.statistics.get_group_by_rank()
             self._update_charts(level_stats, rank_stats)
 
-    def _update_charts(
-        self, level_data: dict[str, int], rank_data: dict[str, int]
-    ) -> None:
+    def _update_charts(self, level_data: dict[str, int], rank_data: dict[str, int]) -> None:
         """更新图表数据"""
 
         # 检查数据是否改变
-        if (
-            level_data == self._cached_level_data
-            and rank_data == self._cached_rank_data
-        ):
+        if level_data == self._cached_level_data and rank_data == self._cached_rank_data:
             # 数据未变，只改颜色（主题切换场景）
             self._recolor_charts()
             return

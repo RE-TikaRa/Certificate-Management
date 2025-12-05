@@ -21,34 +21,29 @@ class StatisticsService:
         """
         with self.db.session_scope() as session:
             from sqlalchemy import case
-            
+
             # Single query for all statistics
             result = session.query(
-                func.count(Award.id).label('total'),
-                func.sum(case((Award.level == "国家级", 1), else_=0)).label('national'),
-                func.sum(case((Award.level == "省级", 1), else_=0)).label('provincial'),
-                func.sum(case((Award.level == "校级", 1), else_=0)).label('school'),
-                func.sum(case((Award.rank == "一等奖", 1), else_=0)).label('first_prize'),
-                func.sum(case((Award.rank == "二等奖", 1), else_=0)).label('second_prize'),
-                func.sum(case((Award.rank == "三等奖", 1), else_=0)).label('third_prize'),
-                func.sum(case((Award.rank == "优秀奖", 1), else_=0)).label('excellent_prize'),
+                func.count(Award.id).label("total"),
+                func.sum(case((Award.level == "国家级", 1), else_=0)).label("national"),
+                func.sum(case((Award.level == "省级", 1), else_=0)).label("provincial"),
+                func.sum(case((Award.level == "校级", 1), else_=0)).label("school"),
+                func.sum(case((Award.rank == "一等奖", 1), else_=0)).label("first_prize"),
+                func.sum(case((Award.rank == "二等奖", 1), else_=0)).label("second_prize"),
+                func.sum(case((Award.rank == "三等奖", 1), else_=0)).label("third_prize"),
+                func.sum(case((Award.rank == "优秀奖", 1), else_=0)).label("excellent_prize"),
             ).first()
-            
+
             # Separate query for latest awards (needed for UI display)
             # Get only award IDs first to avoid loading relationships
-            award_ids = (
-                session.query(Award.id)
-                .order_by(Award.award_date.desc())
-                .limit(10)
-                .all()
-            )
+            award_ids = session.query(Award.id).order_by(Award.award_date.desc()).limit(10).all()
             # Now load full Award objects by ID
             latest_awards = []
             for (aid,) in award_ids:
                 award = session.get(Award, aid)
                 if award:
                     latest_awards.append(award)
-        
+
         return {
             "total": result.total or 0,
             "national": result.national or 0,
@@ -97,12 +92,10 @@ class StatisticsService:
             }
             stats = {}
             for display_name, level_value in level_categories.items():
-                count = session.scalar(
-                    select(func.count(Award.id)).where(Award.level == level_value)
-                ) or 0
+                count = session.scalar(select(func.count(Award.id)).where(Award.level == level_value)) or 0
                 if count > 0:  # 仅添加有数据的等级
                     stats[display_name] = count
-            
+
             # 也统计按rank分类的等级奖
             rank_categories = {
                 "一等优秀奖": "一等优秀奖",
@@ -110,10 +103,8 @@ class StatisticsService:
                 "三等优秀奖": "三等优秀奖",
             }
             for display_name, rank_value in rank_categories.items():
-                count = session.scalar(
-                    select(func.count(Award.id)).where(Award.rank == rank_value)
-                ) or 0
+                count = session.scalar(select(func.count(Award.id)).where(Award.rank == rank_value)) or 0
                 if count > 0:
                     stats[display_name] = count
-            
+
         return stats

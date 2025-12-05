@@ -8,21 +8,22 @@ from ..data.models import TeamMember
 
 class MemberService:
     """成员管理服务"""
-    
+
     def __init__(self, db: Database | None = None):
         if db is None:
             # 延迟导入以避免循环依赖
             from ..app_context import bootstrap
+
             ctx = bootstrap()
             db = ctx.db
         self.db = db
-    
+
     def get_member(self, member_id: int) -> TeamMember:
         """获取单个成员"""
         with self.db.session_scope() as session:
             stmt = select(TeamMember).where(TeamMember.id == member_id)
             return session.execute(stmt).scalar_one_or_none()
-    
+
     def update_member(self, member: TeamMember) -> TeamMember:
         """更新成员信息"""
         with self.db.session_scope() as session:
@@ -31,7 +32,7 @@ class MemberService:
             session.add(merged)
             session.flush()
             return merged
-    
+
     def delete_member(self, member_id: int) -> None:
         """删除成员"""
         with self.db.session_scope() as session:
@@ -39,7 +40,7 @@ class MemberService:
             if member:
                 session.delete(member)
                 session.flush()
-    
+
     def list_members(self) -> list[TeamMember]:
         """列出所有成员"""
         with self.db.session_scope() as session:
