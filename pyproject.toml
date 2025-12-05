@@ -61,6 +61,7 @@ exclude = [
   "img",
   "docs",
 ]
+fix = true
 
 [tool.ruff.lint]
 select = [
@@ -95,7 +96,6 @@ ignore = [
   "ISC001",
   "ISC002",
 ]
-fix = true
 
 [tool.ruff.lint.isort]
 combine-as-imports = true
