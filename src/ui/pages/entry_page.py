@@ -1,7 +1,8 @@
 import hashlib
+from collections.abc import Iterable
 from datetime import date
 from pathlib import Path
-from typing import Iterable, cast
+from typing import cast
 
 from PySide6.QtCore import QDate, Qt, Slot
 from PySide6.QtGui import QColor, QCursor
