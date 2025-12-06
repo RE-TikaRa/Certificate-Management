@@ -24,7 +24,7 @@
 - 服务层 `src/services/`: award_service、statistics_service、import_export、backup_manager、attachment_manager、settings_service、major_service 等。
 - 表现层 `src/ui/`: `main_window.py`（窗口与导航，懒加载页面，窗口居中），`styled_theme.py`（ThemeManager），`theme.py`（通用 UI 工具），`widgets/major_search.py`，`pages/`（home、dashboard、overview、entry、management、recycle、settings、about、base_page）。
 - 资源 `src/resources/`: `styles/styled_light.qss`、`styles/styled_dark.qss`，`templates/awards_template.csv`。
-- 工具 `tools/import_majors.py` + `tools/index.xlsx`（66 个专业导入）。
+- 文档 `docs/index.xlsx`（66 个专业导入模板）。
 
 ## 模型与数据
 - Base：统一主键、自增、时间戳。
@@ -32,7 +32,7 @@
 - TeamMember：姓名、性别、身份证、手机号、学号、邮箱、专业、班级、学院 + pinyin、active、sort_index；关系 awards（m2m）。
 - Attachment：award_id、stored_name、original_name、relative_path（唯一）、file_md5、file_size、deleted 标记。
 - Setting/BackupRecord：应用设置与备份记录。
-- Major 数据由 major_service 提供，支持中文/拼音模糊搜索（66 项，来源 tools/index.xlsx）。
+- Major 数据由 major_service 提供，支持中文/拼音模糊搜索（66 项，来源 docs/index.xlsx）。
 
 ## 主要特性（按页面）
 - **MainWindow**：`_center_window()` 居中；快速加载首页，余下页面 100ms 后异步载入；route_keys 管理导航；主题变化事件转发。
@@ -61,5 +61,5 @@
 - 添加页面：继承 `BasePage`，实现 `_init_ui`；在 `main_window.py` 注册（导航项、_load_* 分组、route_keys），按需处理主题信号。
 - 添加数据字段：同步更新模型、对应 service、UI 表单/列表、统计或刷新逻辑（管理页的 10 字段监控需保持一致）。
 - 成员字段在 UI 约定为 9 项；管理页刷新依赖该集合。
-- 导入/导出：CSV 模板 `resources/templates/awards_template.csv`；专业导入 `tools/import_majors.py`（使用 index.xlsx）。
+- 导入/导出：CSV 模板 `resources/templates/awards_template.csv`；专业导入使用 `docs/index.xlsx`。
 - 运行/调试前确认运行目录为仓库根目录；避免提交 `data/`、`attachments/`、`backups/`、`logs/`、`temp/` 生成物。
