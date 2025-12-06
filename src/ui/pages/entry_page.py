@@ -675,13 +675,15 @@ class EntryPage(BasePage):
             for idx, file_path in enumerate(self.selected_files, start=1):
                 md5_hash = self._calculate_md5(file_path)
                 size_str = self._format_file_size(file_path.stat().st_size)
-                rows.append({
-                    "index": idx,
-                    "name": file_path.name,
-                    "md5": md5_hash[:16] + "...",
-                    "size": size_str,
-                    "path": file_path,
-                })
+                rows.append(
+                    {
+                        "index": idx,
+                        "name": file_path.name,
+                        "md5": md5_hash[:16] + "...",
+                        "size": size_str,
+                        "path": file_path,
+                    }
+                )
             return rows
 
         run_in_thread(build_rows, self._on_attachments_ready)

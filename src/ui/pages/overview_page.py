@@ -258,16 +258,18 @@ class OverviewPage(BasePage):
         row2.addWidget(sort_label)
 
         self.sort_combo = ComboBox()
-        self.sort_combo.addItems([
-            "日期降序",
-            "日期升序",
-            "等级降序",
-            "等级升序",
-            "奖项降序",
-            "奖项升序",
-            "名称A-Z",
-            "名称Z-A",
-        ])
+        self.sort_combo.addItems(
+            [
+                "日期降序",
+                "日期升序",
+                "等级降序",
+                "等级升序",
+                "奖项降序",
+                "奖项升序",
+                "名称A-Z",
+                "名称Z-A",
+            ]
+        )
         self.sort_combo.setCurrentText(self.sort_by)
         self.sort_combo.currentTextChanged.connect(self._on_sort_changed)
         self.sort_combo.setFixedWidth(150)
@@ -1304,13 +1306,15 @@ class AwardDetailDialog(MaskDialogBase):
             for idx, file_path in enumerate(self.selected_files, start=1):
                 md5_hash = self._calculate_md5(file_path)
                 size_str = self._format_file_size(file_path.stat().st_size)
-                rows.append({
-                    "index": idx,
-                    "name": file_path.name,
-                    "md5": md5_hash[:16] + "...",
-                    "size": size_str,
-                    "path": file_path,
-                })
+                rows.append(
+                    {
+                        "index": idx,
+                        "name": file_path.name,
+                        "md5": md5_hash[:16] + "...",
+                        "size": size_str,
+                        "path": file_path,
+                    }
+                )
             return rows
 
         run_in_thread(build_rows, self._on_attachments_ready)

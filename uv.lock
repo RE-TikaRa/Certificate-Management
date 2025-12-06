@@ -45,7 +45,7 @@ dependencies = [
     { name = "sqlalchemy" },
 ]
 
-[package.optional-dependencies]
+[package.dev-dependencies]
 dev = [
     { name = "pyright" },
     { name = "ruff" },
@@ -59,14 +59,17 @@ requires-dist = [
     { name = "openpyxl" },
     { name = "pandas" },
     { name = "pypinyin" },
-    { name = "pyright", marker = "extra == 'dev'" },
     { name = "pyside6" },
     { name = "pyside6-fluent-widgets" },
     { name = "python-dateutil" },
-    { name = "ruff", marker = "extra == 'dev'" },
     { name = "sqlalchemy" },
 ]
-provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pyright" },
+    { name = "ruff" },
+]
 
 [[package]]
 name = "colorama"
