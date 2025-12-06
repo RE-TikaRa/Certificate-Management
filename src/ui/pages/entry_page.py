@@ -1,7 +1,7 @@
 import hashlib
 from datetime import date
 from pathlib import Path
-from typing import cast
+from typing import Iterable, cast
 
 from PySide6.QtCore import QDate, Qt, Slot
 from PySide6.QtGui import QColor, QCursor
@@ -40,6 +40,7 @@ from ..styled_theme import ThemeManager
 from ..table_models import AttachmentTableModel
 from ..theme import create_card, create_page_header, make_section_title
 from ..utils.async_utils import run_in_thread
+from ..widgets.attachment_table_view import AttachmentTableView
 from ..widgets.major_search import MajorSearchWidget
 from .base_page import BasePage
 
@@ -67,6 +68,7 @@ class EntryPage(BasePage):
     def __init__(self, ctx, theme_manager: ThemeManager):
         super().__init__(ctx, theme_manager)
         self.selected_files: list[Path] = []
+        self._selected_file_keys: set[str] = set()
         self.editing_award = None  # 当前正在编辑的荣誉
 
         # 连接主题变化信号
@@ -253,7 +255,7 @@ class EntryPage(BasePage):
 
         # 附件表格
         self.attach_model = AttachmentTableModel(self)
-        self.attach_table = QTableView()
+        self.attach_table = AttachmentTableView()
         self.attach_table.setModel(self.attach_model)
         header = self.attach_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)  # 序号
@@ -261,16 +263,16 @@ class EntryPage(BasePage):
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)  # MD5
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)  # 大小
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)  # 操作
-        self.attach_table.setMaximumHeight(200)
-        self.attach_table.setMinimumHeight(100)
         self.attach_table.verticalHeader().setVisible(False)
         self.attach_table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
         self.attach_table.setSelectionMode(QTableView.SelectionMode.SingleSelection)
         from ..theme import apply_table_style
 
         apply_table_style(self.attach_table)
+        self.attach_table.fileDropped.connect(self._on_files_dropped)
         attachment_layout.addWidget(self.attach_table)
         layout.addWidget(attachment_card)
+        self._resize_attachment_table(0)
 
         action_row = QHBoxLayout()
         action_row.addStretch()
@@ -658,38 +660,45 @@ class EntryPage(BasePage):
         if not files:
             return
 
-        # 添加到已选文件列表
-        for file_path in files:
-            path = Path(file_path)
-            if path not in self.selected_files:
-                self.selected_files.append(path)
-
-        # 更新表格显示
-        self._update_attachment_table()
+        added = self._add_attachment_files(Path(file_path) for file_path in files)
+        if added:
+            InfoBar.success("成功", f"已添加 {added} 个附件", parent=self.window())
+        else:
+            InfoBar.info("无新增", "文件已存在或不可用", parent=self.window())
 
     def _update_attachment_table(self) -> None:
         """更新附件表格显示（异步计算 MD5/大小）"""
 
         def build_rows():
             rows = []
-            for idx, file_path in enumerate(self.selected_files, start=1):
+            display_idx = 1
+            for file_path in self.selected_files:
+                if not file_path.exists():
+                    continue
                 md5_hash = self._calculate_md5(file_path)
-                size_str = self._format_file_size(file_path.stat().st_size)
+                try:
+                    size_value = file_path.stat().st_size
+                except OSError:
+                    size_str = "未知"
+                else:
+                    size_str = self._format_file_size(size_value)
                 rows.append(
                     {
-                        "index": idx,
+                        "index": display_idx,
                         "name": file_path.name,
                         "md5": md5_hash[:16] + "...",
                         "size": size_str,
                         "path": file_path,
                     }
                 )
+                display_idx += 1
             return rows
 
         run_in_thread(build_rows, self._on_attachments_ready)
 
     def _on_attachments_ready(self, rows: list[dict]) -> None:
         self.attach_model.set_objects(rows)
+        self._resize_attachment_table(len(rows))
         # 设置操作按钮
         for row_idx, _row in enumerate(rows):
             delete_btn = TransparentToolButton(FluentIcon.DELETE)
@@ -726,7 +735,8 @@ class EntryPage(BasePage):
     def _remove_attachment(self, row: int) -> None:
         """删除指定行的附件"""
         if 0 <= row < len(self.selected_files):
-            self.selected_files.pop(row)
+            removed = self.selected_files.pop(row)
+            self._selected_file_keys.discard(self._to_file_key(removed))
             self._update_attachment_table()
 
     def load_award_for_editing(self, award) -> None:
@@ -939,6 +949,7 @@ class EntryPage(BasePage):
         self.certificate_input.clear()
         self.remarks_input.clear()
         self.selected_files = []
+        self._selected_file_keys.clear()
         self._update_attachment_table()
         # 清空所有成员卡片
         for member_data in self.members_data[:]:  # 使用副本遍历
@@ -950,6 +961,42 @@ class EntryPage(BasePage):
         from qfluentwidgets import InfoBar
 
         InfoBar.success("成功", "表单已清空", duration=2000, parent=self.window())
+
+    def _on_files_dropped(self, files: list[Path]) -> None:
+        added = self._add_attachment_files(files)
+        if added:
+            InfoBar.success("成功", f"拖入 {added} 个附件", parent=self.window())
+        else:
+            InfoBar.info("无新增", "拖入的文件不可用或已存在", parent=self.window())
+
+    def _add_attachment_files(self, files: Iterable[Path]) -> int:
+        added = 0
+        for file_path in files:
+            resolved = Path(file_path).resolve()
+            if not resolved.exists():
+                continue
+            key = self._to_file_key(resolved)
+            if key in self._selected_file_keys:
+                continue
+            self.selected_files.append(resolved)
+            self._selected_file_keys.add(key)
+            added += 1
+
+        if added:
+            self._update_attachment_table()
+        return added
+
+    def _resize_attachment_table(self, row_count: int) -> None:
+        header = self.attach_table.horizontalHeader()
+        header_height = header.height() or 40
+        row_height = self.attach_table.verticalHeader().defaultSectionSize() or 48
+        visible_rows = min(max(row_count, 3), 8)
+        target_height = header_height + row_height * visible_rows + 12
+        self.attach_table.setMinimumHeight(target_height)
+        self.attach_table.setMaximumHeight(target_height)
+
+    def _to_file_key(self, path: Path) -> str:
+        return str(path.resolve()).lower()
 
     def _apply_theme(self) -> None:
         """应用主题到滚动区域"""
