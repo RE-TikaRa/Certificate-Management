@@ -1,22 +1,20 @@
-from __future__ import annotations
+from typing import Any, ClassVar
 
-from pathlib import Path
-
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QFileDialog,
     QFormLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QScrollArea,
     QVBoxLayout,
     QWidget,
-    QLabel,
-    QHBoxLayout,
-    QApplication,
-    QLineEdit,
 )
-from qfluentwidgets import CheckBox, InfoBar, PrimaryPushButton, PushButton, ComboBox
+from qfluentwidgets import CheckBox, ComboBox, InfoBar, LineEdit, PrimaryPushButton, PushButton
 
+from ..styled_theme import ThemeManager
 from ..theme import create_card, create_page_header, make_section_title
-from ..styled_theme import ThemeManager, ThemeMode
-
 from .base_page import BasePage
 
 
@@ -24,15 +22,15 @@ def clean_input_text(line_edit: QLineEdit) -> None:
     """
     为 QLineEdit 添加自动清理空白字符功能
     自动删除用户输入中的所有空格、制表符、换行符等空白字符
-    
+
     Args:
         line_edit: 要应用清理功能的 QLineEdit 组件
     """
     import re
-    
+
     def on_text_changed(text: str):
         # 删除所有空白字符（空格、制表符、换行符等）
-        cleaned = re.sub(r'\s+', '', text)
+        cleaned = re.sub(r"\s+", "", text)
         if cleaned != text:
             # 临时断开信号避免递归
             line_edit.textChanged.disconnect(on_text_changed)
@@ -40,24 +38,24 @@ def clean_input_text(line_edit: QLineEdit) -> None:
             line_edit.setCursorPosition(len(cleaned))  # 保持光标位置
             # 重新连接信号
             line_edit.textChanged.connect(on_text_changed)
-    
+
     line_edit.textChanged.connect(on_text_changed)
 
 
 class SettingsPage(BasePage):
-    THEME_OPTIONS = {
+    THEME_OPTIONS: ClassVar[dict[str, str]] = {
         "light": "浅色",
-        "dark": "深色", 
+        "dark": "深色",
         "auto": "跟随系统",
     }
-    
-    FREQUENCY_OPTIONS = {
+
+    FREQUENCY_OPTIONS: ClassVar[dict[str, str]] = {
         "manual": "手动",
         "startup": "启动时",
         "daily": "每天",
         "weekly": "每周",
     }
-    
+
     def __init__(self, ctx, theme_manager: ThemeManager):
         super().__init__(ctx, theme_manager)
         self.attach_dir = QLabel()
@@ -68,17 +66,38 @@ class SettingsPage(BasePage):
         self.include_logs = CheckBox("包含日志")
         self.theme_mode = ComboBox()
         self.theme_mode.addItems(list(self.THEME_OPTIONS.values()))
-        self.email_suffix = QLineEdit()  # 邮箱后缀输入框
-        clean_input_text(self.email_suffix)  # 自动删除空白字符
+        self.email_suffix = LineEdit()
+        clean_input_text(self.email_suffix)
         self.email_suffix.setPlaceholderText("例如: @st.gsau.edu.cn")
         self._build_ui()
         self.refresh()
 
     def _build_ui(self) -> None:
-        self.setObjectName("pageRoot")
-        layout = QVBoxLayout(self)
-        layout.setSpacing(18)
-        layout.addWidget(create_page_header("系统设置", "配置目录、主题与备份策略"))
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        outer_layout.setSpacing(0)
+
+        title_widget = QWidget()
+        title_widget.setObjectName("pageRoot")
+        title_layout = QVBoxLayout(title_widget)
+        title_layout.setContentsMargins(32, 24, 32, 0)
+        title_layout.setSpacing(0)
+        title_layout.addWidget(create_page_header("系统设置", "配置目录、主题与备份策略"))
+        outer_layout.addWidget(title_widget)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        outer_layout.addWidget(scroll)
+        self.content_widget = scroll
+
+        container = QWidget()
+        container.setObjectName("pageRoot")
+        scroll.setWidget(container)
+
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(32, 28, 32, 32)
+        layout.setSpacing(28)
 
         settings_card, settings_layout = create_card()
         settings_layout.addWidget(make_section_title("目录与备份"))
@@ -122,12 +141,12 @@ class SettingsPage(BasePage):
     def refresh(self) -> None:
         self.attach_dir.setText(self.ctx.attachments.root.as_posix())
         self.backup_dir.setText(self.ctx.backup.backup_root.as_posix())
-        
+
         # Convert stored frequency value to display text
         stored_frequency = self.ctx.settings.get("backup_frequency", "manual")
         display_frequency = self.FREQUENCY_OPTIONS.get(stored_frequency, "手动")
         self.frequency.setCurrentText(display_frequency)
-        
+
         self.include_attachments.setChecked(self.ctx.settings.get("include_attachments", "true") == "true")
         self.include_logs.setChecked(self.ctx.settings.get("include_logs", "true") == "true")
         # Convert stored theme value to display text
@@ -152,41 +171,38 @@ class SettingsPage(BasePage):
         try:
             self.ctx.settings.set("attachment_root", self.attach_dir.text())
             self.ctx.settings.set("backup_root", self.backup_dir.text())
-            
+
             # Convert display text back to frequency value
             display_frequency = self.frequency.currentText()
             frequency_value = next(
                 (k for k, v in self.FREQUENCY_OPTIONS.items() if v == display_frequency),
-                "manual"
+                "manual",
             )
             self.ctx.settings.set("backup_frequency", frequency_value)
-            
+
             self.ctx.settings.set("include_attachments", str(self.include_attachments.isChecked()).lower())
             self.ctx.settings.set("include_logs", str(self.include_logs.isChecked()).lower())
-            
+
             # Save email suffix
             email_suffix = self.email_suffix.text().strip()
             if not email_suffix:
                 email_suffix = "@st.gsau.edu.cn"  # 默认值
             self.ctx.settings.set("email_suffix", email_suffix)
-            
+
             # Convert display text back to theme value
             display_text = self.theme_mode.currentText()
-            theme_value = next(
-                (k for k, v in self.THEME_OPTIONS.items() if v == display_text),
-                "light"
-            )
+            theme_value = next((k for k, v in self.THEME_OPTIONS.items() if v == display_text), "light")
             self.ctx.settings.set("theme_mode", theme_value)
-            
+
             # Apply theme changes
             theme_mode = self.theme_manager.get_theme_from_text(theme_value)
             self.theme_manager.set_theme(theme_mode)
-            
+
             # Refresh entire window stylesheet
-            main_window = self.window()
-            if hasattr(main_window, 'apply_theme_stylesheet'):
+            main_window: Any = self.window()
+            if hasattr(main_window, "apply_theme_stylesheet"):
                 main_window.apply_theme_stylesheet()
-            
+
             InfoBar.success("成功", "设置已保存", parent=self.window())
         except Exception as e:
             InfoBar.error("错误", f"保存设置失败: {e}", parent=self.window())

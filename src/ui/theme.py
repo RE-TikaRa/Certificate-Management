@@ -1,15 +1,15 @@
-from __future__ import annotations
-
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QFrame,
     QGraphicsDropShadowEffect,
     QHeaderView,
     QLabel,
-    QTableWidget,
+    QTableView,
     QVBoxLayout,
     QWidget,
 )
+
 
 def create_page_header(title: str, subtitle: str | None = None) -> QWidget:
     wrapper = QWidget()
@@ -32,13 +32,13 @@ def make_section_title(text: str) -> QLabel:
     return label
 
 
-def create_card(shadow: bool = True) -> tuple[QFrame, QVBoxLayout]:
+def create_card(shadow: bool = False) -> tuple[QFrame, QVBoxLayout]:
     frame = QFrame()
     frame.setProperty("card", True)
     layout = QVBoxLayout(frame)
     layout.setContentsMargins(24, 24, 24, 24)
     layout.setSpacing(16)
-    if shadow:
+    if shadow:  # 模糊效果会导致性能下降很多，请不要使用
         effect = QGraphicsDropShadowEffect(frame)
         effect.setBlurRadius(28)
         effect.setOffset(0, 8)
@@ -47,15 +47,15 @@ def create_card(shadow: bool = True) -> tuple[QFrame, QVBoxLayout]:
     return frame, layout
 
 
-def apply_table_style(table: QTableWidget) -> None:
+def apply_table_style(table: QTableView) -> None:
     table.setAlternatingRowColors(True)
-    table.setSelectionBehavior(QTableWidget.SelectRows)
-    table.setSelectionMode(QTableWidget.SingleSelection)
+    table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+    table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
     table.setShowGrid(False)
     table.verticalHeader().setVisible(False)
     table.verticalHeader().setDefaultSectionSize(55)  # 增加行高到55
     header = table.horizontalHeader()
     # 根据窗口宽度自动调整列宽，最后一列自动拉伸
     header.setStretchLastSection(True)
-    header.setSectionResizeMode(QHeaderView.Stretch)
+    header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
     header.setHighlightSections(False)

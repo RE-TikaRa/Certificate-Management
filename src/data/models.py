@@ -1,6 +1,4 @@
-from __future__ import annotations
-
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import (
     Boolean,
@@ -41,7 +39,7 @@ class Award(Base):
     __tablename__ = "awards"
 
     competition_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    award_date: Mapped[datetime] = mapped_column(Date, nullable=False)
+    award_date: Mapped[date] = mapped_column(Date, nullable=False)
     level: Mapped[str] = mapped_column(String(50), nullable=False)
     rank: Mapped[str] = mapped_column(String(50), nullable=False)
     certificate_code: Mapped[str | None] = mapped_column(String(128))

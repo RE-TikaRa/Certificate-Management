@@ -1,10 +1,9 @@
-from __future__ import annotations
-
 import csv
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import cast
 
 import pandas as pd
 from sqlalchemy import select
@@ -51,7 +50,7 @@ class ImportExportService:
                 writer.writerow(TEMPLATE_HEADERS)
         xlsx_path = TEMPLATES_DIR / "awards_template.xlsx"
         if not xlsx_path.exists():
-            df = pd.DataFrame(columns=TEMPLATE_HEADERS)
+            df = pd.DataFrame(columns=pd.Index(TEMPLATE_HEADERS))
             df.to_excel(xlsx_path, index=False)
 
     def export_awards(self, export_path: Path, awards: Sequence[Award]) -> Path:
@@ -80,10 +79,7 @@ class ImportExportService:
 
     def import_from_file(self, file_path: Path) -> ImportResult:
         try:
-            if file_path.suffix.lower() == ".xlsx":
-                df = pd.read_excel(file_path)
-            else:
-                df = pd.read_csv(file_path)
+            df = pd.read_excel(file_path) if file_path.suffix.lower() == ".xlsx" else pd.read_csv(file_path)
         except Exception as exc:
             return ImportResult(total=0, success=0, failed=0, errors=[str(exc)])
 
@@ -98,10 +94,12 @@ class ImportExportService:
 
         with self.db.session_scope() as session:
             for idx, row in df.iterrows():
+                row_index = int(idx) if isinstance(idx, (int, float, str)) else 0
                 try:
+                    timestamp = cast(pd.Timestamp, pd.to_datetime(row["获奖日期"]))
                     award = Award(
                         competition_name=str(row["比赛名称"]).strip(),
-                        award_date=pd.to_datetime(row["获奖日期"]).date(),
+                        award_date=timestamp.date(),
                         level=str(row["赛事级别"]).strip(),
                         rank=str(row["奖项等级"]).strip(),
                         certificate_code=str(row.get("证书编号", "") or "").strip() or None,
@@ -118,8 +116,8 @@ class ImportExportService:
                     if files:
                         self.attachments.save_attachments(award.id, award.competition_name, files, session=session)
                     success += 1
-                except Exception as exc:  # noqa: BLE001
-                    errors.append(f"第 {idx + 2} 行: {exc}")
+                except Exception as exc:
+                    errors.append(f"第 {row_index + 2} 行: {exc}")
             session.add(
                 ImportJob(
                     filename=file_path.name,
@@ -152,4 +150,3 @@ class ImportExportService:
         session.flush()
         self._member_cache[name] = member
         return member
-

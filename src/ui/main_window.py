@@ -1,20 +1,32 @@
-from __future__ import annotations
-
-import time
 import logging
-from PySide6.QtGui import QColor
-from PySide6.QtCore import QTimer, QRect
-from PySide6.QtWidgets import QApplication
-from qfluentwidgets import FluentIcon as FIF, FluentWindow, NavigationItemPosition, setTheme, Theme
+import time
+from typing import Any, cast
+
+from PySide6.QtCore import (
+    QEasingCurve,
+    QParallelAnimationGroup,
+    QPoint,
+    QPropertyAnimation,
+    QTimer,
+)
+from PySide6.QtWidgets import QApplication, QGraphicsOpacityEffect, QWidget
+from qfluentwidgets import (
+    FluentIcon as FIF,
+    FluentWindow,
+    NavigationItemPosition,
+    Theme,
+    setTheme,
+)
 
 from ..app_context import AppContext
+from .pages.about_page import AboutPage
+from .pages.base_page import BasePage
 from .pages.dashboard_page import DashboardPage
 from .pages.entry_page import EntryPage
 from .pages.home_page import HomePage
 from .pages.management_page import ManagementPage
 from .pages.overview_page import OverviewPage
 from .pages.recycle_page import RecyclePage
-from .pages.about_page import AboutPage
 from .pages.settings_page import SettingsPage
 from .styled_theme import ThemeManager
 
@@ -26,32 +38,34 @@ class MainWindow(FluentWindow):
         # Set theme BEFORE calling super().__init__()
         q_theme = Theme.DARK if theme_manager.is_dark else Theme.LIGHT
         setTheme(q_theme)
-        
+
         super().__init__()
         self.ctx = ctx
         self.theme_manager = theme_manager
         self.setWindowTitle("证书管理系统")
         self.setMinimumSize(1200, 800)
-        
+
         # 将窗口设置在屏幕中心
         self._center_window()
-        
-        # Apply complete stylesheet AFTER super().__init__() 
+
+        # Apply complete stylesheet AFTER super().__init__()
         # This overrides FluentWindow's default transparent AcrylicWindow background
         self.apply_theme_stylesheet()
-        
-        # ✅ 连接主题变化信号以更新标题栏颜色
+
+        # 连接主题变化信号以更新标题栏颜色
         self.theme_manager.themeChanged.connect(self._on_theme_changed)
-        
-        # ✅ 连接堆栈切换信号以自动刷新页面
+
+        # 连接堆栈切换信号：记录即将显示的页，动画结束再刷新
+        self._pending_refresh_index: int | None = None
         self.stackedWidget.currentChanged.connect(self._on_page_changed)
-        
-        # 快速初始化导航栏和首页
+
+        # qfluentwidgets 使用 PopUpAniStackedWidget，动画结束信号为 aniFinished
+        if hasattr(self.stackedWidget, "view") and hasattr(self.stackedWidget.view, "aniFinished"):
+            self.stackedWidget.view.aniFinished.connect(self._on_page_animation_finished)
+
+        # 初始化导航栏和所有页面
         self._init_navigation_fast()
-        
-        # 后台加载其他页面（不会阻塞 UI）
-        QTimer.singleShot(100, self._load_remaining_pages)
-    
+
     def _center_window(self) -> None:
         """将窗口居中显示在屏幕上"""
         screen = QApplication.primaryScreen()
@@ -60,7 +74,7 @@ class MainWindow(FluentWindow):
         center_point = screen_geometry.center()
         window_geometry.moveCenter(center_point)
         self.move(window_geometry.topLeft())
-    
+
     def apply_theme_stylesheet(self) -> None:
         """Apply complete theme stylesheet to window.
         This includes both FluentWindow background override and page styles.
@@ -74,155 +88,156 @@ class MainWindow(FluentWindow):
         q_theme = Theme.DARK if self.theme_manager.is_dark else Theme.LIGHT
         setTheme(q_theme, lazy=False)
         self.apply_theme_stylesheet()
-    
+
+    def switchTo(self, interface: QWidget) -> None:
+        """页面切换动画"""
+        view = self.stackedWidget.view
+        current_index = view.currentIndex()
+        next_index = view.indexOf(interface)
+
+        if current_index == next_index:
+            return
+
+        content_widget = getattr(interface, "content_widget", None)
+
+        if content_widget:
+            view.setAnimationEnabled(False)
+            view.setCurrentIndex(next_index)
+            view.setAnimationEnabled(True)
+
+            opacity_effect = content_widget.graphicsEffect()
+            if not isinstance(opacity_effect, QGraphicsOpacityEffect):
+                opacity_effect = QGraphicsOpacityEffect(content_widget)
+                content_widget.setGraphicsEffect(opacity_effect)
+
+            end_pos = content_widget.pos()
+            start_pos = end_pos + QPoint(0, 60)
+
+            opacity_ani = QPropertyAnimation(opacity_effect, b"opacity", self)
+            opacity_ani.setStartValue(0.0)
+            opacity_ani.setEndValue(1.0)
+            opacity_ani.setDuration(400)
+            opacity_ani.setEasingCurve(QEasingCurve.Type.OutQuint)
+
+            pos_ani = QPropertyAnimation(content_widget, b"pos", self)
+            pos_ani.setStartValue(start_pos)
+            pos_ani.setEndValue(end_pos)
+            pos_ani.setDuration(400)
+            pos_ani.setEasingCurve(QEasingCurve.Type.OutQuint)
+
+            ani_group = QParallelAnimationGroup(self)
+            ani_group.addAnimation(opacity_ani)
+            ani_group.addAnimation(pos_ani)
+            ani_group.finished.connect(self._on_page_animation_finished)
+            ani_group.start()
+        else:
+            view.setCurrentWidget(
+                interface,
+                needPopOut=False,
+                showNextWidgetDirectly=True,
+                duration=400,
+                easingCurve=QEasingCurve.Type.OutQuint,
+            )
+
     def _on_page_changed(self, index: int) -> None:
-        """页面切换时自动刷新对应页面"""
+        """记录即将显示的页索引，等待动画结束后再刷新"""
+        self._pending_refresh_index = index
+
+    def _on_page_animation_finished(self) -> None:
+        """动画完成后刷新当前页面"""
+        index = self._pending_refresh_index
+        if index is None:
+            index = self.stackedWidget.currentIndex()
         try:
-            current_widget = self.stackedWidget.widget(index)
-            if current_widget and hasattr(current_widget, 'refresh'):
-                # 延迟刷新，确保页面完全显示
-                QTimer.singleShot(50, current_widget.refresh)
-                logger.debug(f"Page at index {index} will be refreshed")
+            current_widget: Any = self.stackedWidget.widget(index)
+            if current_widget and hasattr(current_widget, "refresh"):
+                # 动画结束立即刷新，可按需再加微小延迟
+                QTimer.singleShot(0, current_widget.refresh)
+                logger.debug(f"Page at index {index} refreshed after animation")
         except Exception as e:
             logger.warning(f"Failed to refresh page at index {index}: {e}")
+        finally:
+            self._pending_refresh_index = None
 
     def _init_navigation_fast(self) -> None:
-        """快速初始化导航栏和首页（不加载其他页面）"""
-        # 立即创建首页
+        """初始化导航栏"""
+        # 创建所有页面
         page_start = time.time()
-        home_page = HomePage(self.ctx, self.theme_manager)
+        self.home_page = HomePage(self.ctx, self.theme_manager)
         logger.debug(f"HomePage initialized in {time.time() - page_start:.2f}s")
-        
-        # 保存页面引用（其他页面为None）
-        self.entry_page = None
-        self.dashboard_page = None
-        self.management_page = None
-        self.overview_page = None
-        self.recycle_page = None
-        self.settings_page = None
-        
-        # 只注册首页到导航栏
-        self.route_keys: dict[str, str] = {}
-        key = self.addSubInterface(home_page, FIF.HOME, "首页", position=NavigationItemPosition.TOP)
-        self.route_keys["home"] = key
-        self.navigate("home")
 
-    def _load_remaining_pages(self) -> None:
-        """在后台加载其他页面 - 分阶段优化
-        
-        ✅ 优化：按优先级分三个阶段加载
-        - 阶段 1（100ms）：快速页面（Overview, Entry）
-        - 阶段 2（500ms）：中等页面（Management, Settings）
-        - 阶段 3（1000ms）：重型页面（Dashboard, Recycle）
-        """
-        # 阶段 1：快速加载用户常用页面
-        QTimer.singleShot(100, self._load_fast_pages)
-        
-        # 阶段 2：次要页面
-        QTimer.singleShot(500, self._load_normal_pages)
-        
-        # 阶段 3：重型页面
-        QTimer.singleShot(1000, self._load_heavy_pages)
-
-    def _load_fast_pages(self) -> None:
-        """加载快速页面（Overview, Entry）"""
         page_start = time.time()
-        overview_page = OverviewPage(self.ctx, self.theme_manager)
+        self.overview_page = OverviewPage(self.ctx, self.theme_manager)
         logger.debug(f"OverviewPage initialized in {time.time() - page_start:.2f}s")
-        
+
         page_start = time.time()
-        entry_page = EntryPage(self.ctx, self.theme_manager)
+        self.entry_page = EntryPage(self.ctx, self.theme_manager)
         logger.debug(f"EntryPage initialized in {time.time() - page_start:.2f}s")
-        
-        # 保存页面引用
-        self.entry_page = entry_page
-        self.overview_page = overview_page
-        
-        # 添加页面到导航栏
-        pages = [
-            ("overview", overview_page, FIF.ALIGNMENT, "总览", NavigationItemPosition.TOP),
-            ("entry", entry_page, FIF.ADD, "录入", NavigationItemPosition.TOP),
-        ]
-        
-        for route, widget, icon, text, position in pages:
-            widget.setObjectName(route)
-            key = self.addSubInterface(widget, icon, text, position=position)
-            self.route_keys[route] = key
-        
-        logger.debug("Fast pages (Overview, Entry) loaded")
 
-    def _load_normal_pages(self) -> None:
-        """加载中等页面（Management, Settings）"""
         page_start = time.time()
-        management_page = ManagementPage(self.ctx, self.theme_manager)
+        self.management_page = ManagementPage(self.ctx, self.theme_manager)
         logger.debug(f"ManagementPage initialized in {time.time() - page_start:.2f}s")
-        
-        page_start = time.time()
-        about_page = AboutPage(self.ctx, self.theme_manager)
-        logger.debug(f"AboutPage initialized in {time.time() - page_start:.2f}s")
-        
-        page_start = time.time()
-        settings_page = SettingsPage(self.ctx, self.theme_manager)
-        logger.debug(f"SettingsPage initialized in {time.time() - page_start:.2f}s")
-        
-        # 保存页面引用
-        self.management_page = management_page
-        self.about_page = about_page
-        self.settings_page = settings_page
-        
-        # 添加页面到导航栏
-        pages = [
-            ("management", management_page, FIF.PEOPLE, "成员管理", NavigationItemPosition.TOP),
-            ("about", about_page, FIF.INFO, "关于", NavigationItemPosition.BOTTOM),
-            ("settings", settings_page, FIF.SETTING, "系统设置", NavigationItemPosition.BOTTOM),
-        ]
-        
-        for route, widget, icon, text, position in pages:
-            widget.setObjectName(route)
-            key = self.addSubInterface(widget, icon, text, position=position)
-            self.route_keys[route] = key
-        
-        logger.debug("Normal pages (Management, About, Settings) loaded")
 
-    def _load_heavy_pages(self) -> None:
-        """加载重型页面（Dashboard, Recycle）"""
         page_start = time.time()
-        dashboard_page = DashboardPage(self.ctx, self.theme_manager)
+        self.dashboard_page = DashboardPage(self.ctx, self.theme_manager)
         logger.debug(f"DashboardPage initialized in {time.time() - page_start:.2f}s")
-        
+
         page_start = time.time()
-        recycle_page = RecyclePage(self.ctx, self.theme_manager)
+        self.recycle_page = RecyclePage(self.ctx, self.theme_manager)
         logger.debug(f"RecyclePage initialized in {time.time() - page_start:.2f}s")
-        
-        # 保存页面引用
-        self.dashboard_page = dashboard_page
-        self.recycle_page = recycle_page
-        
-        # 添加页面到导航栏
-        pages = [
-            ("dashboard", dashboard_page, FIF.SPEED_HIGH, "仪表盘", NavigationItemPosition.TOP),
-            ("recycle", recycle_page, FIF.DELETE, "附件回收站", NavigationItemPosition.TOP),
+
+        page_start = time.time()
+        self.about_page = AboutPage(self.ctx, self.theme_manager)
+        logger.debug(f"AboutPage initialized in {time.time() - page_start:.2f}s")
+
+        page_start = time.time()
+        self.settings_page = SettingsPage(self.ctx, self.theme_manager)
+        logger.debug(f"SettingsPage initialized in {time.time() - page_start:.2f}s")
+
+        # 注册所有导航项
+        self.route_keys: dict[str, Any] = {}
+
+        # 顶部导航
+        top_pages = [
+            ("home", self.home_page, FIF.HOME, "首页"),
+            ("overview", self.overview_page, FIF.ALIGNMENT, "总览"),
+            ("entry", self.entry_page, FIF.ADD, "录入"),
+            ("management", self.management_page, FIF.PEOPLE, "成员管理"),
+            ("dashboard", self.dashboard_page, FIF.SPEED_HIGH, "仪表盘"),
+            ("recycle", self.recycle_page, FIF.DELETE, "附件回收站"),
         ]
-        
-        for route, widget, icon, text, position in pages:
+
+        for route, widget, icon, text in top_pages:
             widget.setObjectName(route)
-            key = self.addSubInterface(widget, icon, text, position=position)
+            key = self.addSubInterface(widget, icon, text, position=NavigationItemPosition.TOP)
             self.route_keys[route] = key
-        
-        logger.debug("Heavy pages (Dashboard, Recycle) loaded")
 
+        # 底部导航
+        bottom_pages = [
+            ("about", self.about_page, FIF.INFO, "关于"),
+            ("settings", self.settings_page, FIF.SETTING, "系统设置"),
+        ]
 
-    def navigate(self, route: str) -> None:
-        """导航到指定页面，并自动刷新该页面的数据
-        
-        ✅ 优化：点击任何页面标签时，该页面会自动刷新数据
-        """
+        for route, widget, icon, text in bottom_pages:
+            widget.setObjectName(route)
+            key = self.addSubInterface(widget, icon, text, position=NavigationItemPosition.BOTTOM)
+            self.route_keys[route] = key
+
+        # 优化页面切换动画
+        view = self.stackedWidget.view
+        for ani_info in view.aniInfos:
+            ani_info.deltaY = 100
+
+        self.navigate_to("home")
+
+    def navigate_to(self, route: str) -> None:
+        """导航到指定页面"""
         if route in self.route_keys:
-            self.navigationInterface.setCurrentItem(self.route_keys[route])
-            
-            # ✅ 自动刷新该页面 - 获取对应的页面对象并调用 refresh()
-            page_map = {
-                "home": self.home_page if hasattr(self, 'home_page') else None,
+            self.navigationInterface.setCurrentItem(cast(Any, self.route_keys[route]))
+
+            # 自动刷新该页面 - 获取对应的页面对象并调用 refresh()
+            page_map: dict[str, BasePage | None] = {
+                "home": self.home_page,
                 "overview": self.overview_page,
                 "entry": self.entry_page,
                 "dashboard": self.dashboard_page,
@@ -230,9 +245,9 @@ class MainWindow(FluentWindow):
                 "recycle": self.recycle_page,
                 "settings": self.settings_page,
             }
-            
+
             page = page_map.get(route)
-            if page and hasattr(page, 'refresh'):
+            if page and hasattr(page, "refresh"):
                 try:
                     page.refresh()
                     logger.debug(f"Page '{route}' refreshed")

@@ -1,0 +1,130 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "certificate-management"
+version = "1.0.0"
+description = "荣誉证书管理桌面应用"
+readme = "README.md"
+requires-python = ">=3.14"
+license = { text = "MIT" }
+authors = [{ name = "RE-TikaRa" }]
+keywords = ["certificate", "management", "PySide6", "Qt", "desktop"]
+classifiers = [
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.14",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: MacOS :: MacOS X",
+  "Operating System :: POSIX :: Linux",
+]
+dependencies = [
+  "PySide6",
+  "PySide6-Fluent-Widgets",
+  "SQLAlchemy",
+  "alembic",
+  "pandas",
+  "openpyxl",
+  "pypinyin",
+  "APScheduler",
+  "python-dateutil",
+  "loguru",
+]
+
+[project.optional-dependencies]
+dev = ["ruff", "pyright"]
+
+[project.scripts]
+certificate-management = "src.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+only-include = ["src"]
+
+[tool.hatch.build.targets.sdist]
+only-include = ["src", "README.md", "main.bat", "pyproject.toml"]
+
+[tool.ruff]
+line-length = 120
+indent-width = 4
+target-version = "py314"
+src = ["src", "tools"]
+exclude = [
+  ".git",
+  ".venv",
+  "attachments",
+  "backups",
+  "data",
+  "logs",
+  "img",
+  "docs",
+]
+fix = true
+
+[tool.ruff.lint]
+select = [
+  "E4",
+  "E7",
+  "E9",  # pycodestyle errors
+  "W",   # pycodestyle warnings
+  "F",   # pyflakes
+  "I",   # import sorting
+  "B",   # bugbear
+  "C4",  # comprehensions
+  "SIM", # simplify
+  "UP",  # pyupgrade
+  "N",   # pep8-naming
+  "PTH", # pathlib
+  "RUF", # ruff-specific
+]
+ignore = [
+  "RUF001",  # allow full-width punctuation in strings
+  "RUF002",
+  "RUF003",
+  "PLC0415", # allow local imports when needed
+  "N802",    # Qt method naming
+  "N815",    # Qt signal naming
+  "N814",    # FluentIcon alias naming
+  "PLR0913", # allow more than 5 args (Qt/service APIs)
+  "PLR2004", # magic numbers (UI/layout constants)
+  "B008",    # Qt default QModelIndex usage
+]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+known-first-party = ["src"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+docstring-code-format = true
+docstring-code-line-length = "dynamic"
+
+[tool.pyright]
+pythonVersion = "3.14"
+pythonPlatform = "All"
+include = ["src", "tools"]
+exclude = [
+  ".git",
+  ".venv",
+  "attachments",
+  "backups",
+  "data",
+  "logs",
+  "img",
+  "docs",
+  "**/__pycache__",
+]
+typeCheckingMode = "standard"
+# 与 ruff 配合：ruff 负责代码风格，pyright 负责类型检查
+reportMissingImports = true
+reportMissingTypeStubs = false
+reportUnusedImport = false     # ruff F401 处理
+reportUnusedVariable = false   # ruff F841 处理
+reportUnusedClass = false      # ruff 处理
+reportUnusedFunction = false   # ruff 处理
+reportDuplicateImport = false  # ruff 处理

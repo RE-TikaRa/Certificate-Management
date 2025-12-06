@@ -1,12 +1,11 @@
-from __future__ import annotations
-
 import logging
 import shutil
 import sqlite3
 import tempfile
+import zipfile
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from dataclasses import dataclass
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -21,12 +20,13 @@ logger = logging.getLogger(__name__)
 @dataclass
 class BackupInfo:
     """Information about a backup file."""
+
     path: Path
     size: int  # bytes
     created_time: datetime
     is_valid: bool = True
     error_msg: str = ""
-    
+
     @property
     def size_mb(self) -> float:
         """Return size in megabytes."""
@@ -42,9 +42,17 @@ class BackupManager:
 
     @property
     def backup_root(self) -> Path:
-        root = Path(self.settings.get("backup_root", str(BACKUP_DIR)))
-        root.mkdir(parents=True, exist_ok=True)
-        return root
+        configured = Path(self.settings.get("backup_root", str(BACKUP_DIR))).expanduser()
+        try:
+            configured.mkdir(parents=True, exist_ok=True)
+            return configured
+        except Exception as exc:
+            logger.warning("backup_root '%s' unavailable, fallback to default '%s': %s", configured, BACKUP_DIR, exc)
+            fallback = BACKUP_DIR
+            fallback.mkdir(parents=True, exist_ok=True)
+            # 覆盖无效配置，避免下次启动再次报错
+            self.settings.set("backup_root", str(fallback))
+            return fallback
 
     def _build_archive_name(self) -> Path:
         prefix = self.settings.get("backup_prefix", "awards")
@@ -88,7 +96,7 @@ class BackupManager:
             self.settings.set("last_backup_time", datetime.utcnow().isoformat())
             self._cleanup_old_archives()
             return archive_path
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.exception("Backup failed: %s", exc)
             with self.db.session_scope() as session:
                 session.add(
@@ -139,72 +147,73 @@ class BackupManager:
             try:
                 extra.unlink()
                 logger.info("Removed old backup %s", extra)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.warning("Failed to remove old backup %s", extra)
 
     def verify_backup(self, backup_path: Path) -> tuple[bool, str]:
         """
         Verify backup file integrity by checking SQLite database within.
-        
+
         Args:
             backup_path: Path to backup file
-            
+
         Returns:
             (is_valid, error_message)
         """
         if not backup_path.exists():
             return False, "备份文件不存在"
-        
-        if not backup_path.suffix.lower() == '.zip':
+
+        if backup_path.suffix.lower() != ".zip":
             return False, "备份文件格式不正确"
-        
+
         try:
-            import zipfile
-            with zipfile.ZipFile(backup_path, 'r') as zip_ref:
+            with zipfile.ZipFile(backup_path, "r") as zip_ref:
                 # Check if database exists in backup
-                if 'data/awards.db' not in zip_ref.namelist():
+                if "data/awards.db" not in zip_ref.namelist():
                     return False, "备份中不包含数据库文件"
-                
+
                 # Verify SQLite database integrity
-                with zip_ref.open('data/awards.db') as db_file:
-                    with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
-                        tmp.write(db_file.read())
-                        tmp_path = tmp.name
-                
+                with (
+                    zip_ref.open("data/awards.db") as db_file,
+                    tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp,
+                ):
+                    tmp.write(db_file.read())
+                    tmp_path = Path(tmp.name)
+
                 try:
                     conn = sqlite3.connect(tmp_path)
                     cursor = conn.cursor()
                     cursor.execute("PRAGMA integrity_check;")
                     result = cursor.fetchone()
                     conn.close()
-                    
-                    if result[0] != 'ok':
+
+                    if result[0] != "ok":
                         return False, f"数据库完整性检查失败: {result[0]}"
-                    
+
                     return True, ""
                 finally:
-                    Path(tmp_path).unlink(missing_ok=True)
-        
+                    tmp_path.unlink(missing_ok=True)
+
         except Exception as exc:
-            return False, f"验证失败: {str(exc)}"
+            return False, f"验证失败: {exc!s}"
 
     def list_backups(self) -> list[BackupInfo]:
         """
         List all backups with their information.
-        
+
         Returns:
             List of BackupInfo objects sorted by creation time (newest first)
         """
         backups: list[BackupInfo] = []
-        
-        for backup_file in sorted(self.backup_root.glob('*.zip'), reverse=True):
+
+        for backup_file in sorted(self.backup_root.glob("*.zip"), reverse=True):
             try:
                 stat = backup_file.stat()
                 created_time = datetime.fromtimestamp(stat.st_mtime)
-                
+
                 # Quick validation
                 is_valid, error_msg = self.verify_backup(backup_file)
-                
+
                 backups.append(
                     BackupInfo(
                         path=backup_file,
@@ -225,13 +234,13 @@ class BackupManager:
                         error_msg=str(exc),
                     )
                 )
-        
+
         return backups
 
     def get_latest_valid_backup(self) -> BackupInfo | None:
         """
         Get the latest valid backup.
-        
+
         Returns:
             BackupInfo of the latest valid backup, or None if no valid backups exist
         """
@@ -239,4 +248,3 @@ class BackupManager:
             if backup.is_valid:
                 return backup
         return None
-

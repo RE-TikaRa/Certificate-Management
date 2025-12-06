@@ -1,16 +1,14 @@
-from __future__ import annotations
-
 from dataclasses import dataclass
 
 from .data.database import Database
 from .logger import configure_logging
 from .services.attachment_manager import AttachmentManager
+from .services.award_service import AwardService
 from .services.backup_manager import BackupManager
 from .services.import_export import ImportExportService
 from .services.major_service import MajorService
 from .services.settings_service import SettingsService
 from .services.statistics_service import StatisticsService
-from .services.award_service import AwardService
 
 
 @dataclass
