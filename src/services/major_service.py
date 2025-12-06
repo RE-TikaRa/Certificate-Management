@@ -3,11 +3,13 @@
 提供专业名称的搜索、匹配和管理功能
 """
 
+from typing import Any
+
 from pypinyin import lazy_pinyin
-from sqlalchemy import or_
+from sqlalchemy import and_, func, or_, select
 
 from src.data.database import Database
-from src.data.models import Major
+from src.data.models import Major, TeamMember
 
 
 class MajorService:
@@ -130,3 +132,51 @@ class MajorService:
                 session.add(major)
 
         return len(major_names)
+
+    def get_statistics(self) -> dict[str, float | int | list[tuple[str, int]]]:
+        """统计专业库与成员专业的使用情况"""
+        with self.db.session_scope() as session:
+            clean_major = func.trim(TeamMember.major)
+            valid_condition = and_(TeamMember.major.isnot(None), func.length(clean_major) > 0)
+
+            library_total = session.scalar(select(func.count(Major.id))) or 0
+            member_records_with_major = session.scalar(select(func.count(TeamMember.id)).where(valid_condition)) or 0
+            member_major_count = (
+                session.scalar(select(func.count(func.distinct(clean_major))).where(valid_condition)) or 0
+            )
+            covered_major_count = (
+                session.scalar(
+                    select(func.count(func.distinct(Major.name)))
+                    .select_from(TeamMember)
+                    .join(Major, clean_major == Major.name)
+                    .where(valid_condition)
+                )
+                or 0
+            )
+
+            unmatched_major_count = max(member_major_count - covered_major_count, 0)
+            coverage_percent = (covered_major_count / member_major_count * 100) if member_major_count else 0.0
+
+            top_rows = session.execute(
+                select(clean_major.label("major"), func.count(TeamMember.id).label("count"))
+                .where(valid_condition)
+                .group_by(clean_major)
+                .order_by(func.count(TeamMember.id).desc())
+                .limit(5)
+            ).all()
+            top_majors: list[tuple[str, int]] = []
+            for row in top_rows:
+                major_name: Any = row.major
+                count_value: Any = row.count
+                if major_name:
+                    top_majors.append((str(major_name), int(count_value or 0)))
+
+        return {
+            "library_total": library_total,
+            "member_records_with_major": member_records_with_major,
+            "member_major_count": member_major_count,
+            "covered_major_count": covered_major_count,
+            "unmatched_major_count": unmatched_major_count,
+            "coverage_percent": coverage_percent,
+            "top_majors": top_majors,
+        }

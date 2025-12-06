@@ -3,50 +3,13 @@
 数据来源：index.xlsx 专业列表
 """
 
+import subprocess
 import sys
 from pathlib import Path
 
 from src.data.database import Database
+from src.services.major_importer import read_majors_from_excel
 from src.services.major_service import MajorService
-
-
-def read_majors_from_excel(excel_path: Path) -> list[str]:
-    """
-    从Excel文件读取专业列表
-
-    Args:
-        excel_path: Excel文件路径
-
-    Returns:
-        专业名称列表
-    """
-    try:
-        import openpyxl
-    except ImportError:
-        print("❌ 缺少 openpyxl 库，正在安装...")
-        import subprocess
-
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "openpyxl"])
-        import openpyxl
-
-    majors = []
-
-    # 打开Excel文件
-    wb = openpyxl.load_workbook(excel_path)
-    ws = wb.active
-    if ws is None:
-        wb.close()
-        return majors
-
-    # 读取所有行(第3列是专业名称,索引为2)
-    for row in ws.iter_rows(min_row=2, values_only=True):  # 跳过表头
-        if len(row) > 2 and row[2]:  # 确保第3列有值
-            major_name = str(row[2]).strip()
-            if major_name and major_name != "专业名称":  # 排除空值和表头
-                majors.append(major_name)
-
-    wb.close()
-    return majors
 
 
 def main():
@@ -61,7 +24,14 @@ def main():
     print(f"📂 正在读取专业数据: {excel_path.name}")
 
     # 从Excel读取专业列表
-    majors = read_majors_from_excel(excel_path)
+    try:
+        majors = read_majors_from_excel(excel_path)
+    except ModuleNotFoundError as error:
+        if error.name != "openpyxl":
+            raise
+        print("❌ 缺少 openpyxl 库，正在安装...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "openpyxl"])
+        majors = read_majors_from_excel(excel_path)
 
     if not majors:
         print("❌ 错误: Excel文件中没有找到专业数据")
