@@ -20,11 +20,15 @@ class ObjectTableModel(QAbstractTableModel):
         return 0 if parent.isValid() else len(self._headers)
 
     def data(self, index: QModelIndex | QPersistentModelIndex, role: int = int(Qt.ItemDataRole.DisplayRole)):
-        if not index.isValid() or role not in (int(Qt.ItemDataRole.DisplayRole), int(Qt.ItemDataRole.EditRole)):
+        if not index.isValid():
             return None
-        obj = self._objects[index.row()]
-        value = self._accessors[index.column()](obj)
-        return "" if value is None else str(value)
+        if role in (int(Qt.ItemDataRole.DisplayRole), int(Qt.ItemDataRole.EditRole)):
+            obj = self._objects[index.row()]
+            value = self._accessors[index.column()](obj)
+            return "" if value is None else str(value)
+        if role == int(Qt.ItemDataRole.TextAlignmentRole):
+            return int(Qt.AlignmentFlag.AlignCenter)
+        return None
 
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = int(Qt.ItemDataRole.DisplayRole)):
         if role != int(Qt.ItemDataRole.DisplayRole):
@@ -68,6 +72,6 @@ class AttachmentTableModel(ObjectTableModel):
             lambda r: r["name"],
             lambda r: r["md5"],
             lambda r: r["size"],
-            lambda r: "操作",
+            lambda r: "",
         ]
         super().__init__(headers, accessors, parent)
