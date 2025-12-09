@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import cast
 
 from sqlalchemy import (
     Boolean,
@@ -31,18 +32,16 @@ class Base(DeclarativeBase):
     metadata = metadata
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
-    )
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class AwardMember(Base):
     __tablename__ = "award_members"
-    
+
     # Exclude Base columns that don't exist in the legacy table
-    id = None
-    created_at = None
-    updated_at = None
+    id = cast("Mapped[int]", None)
+    created_at = cast("Mapped[datetime]", None)
+    updated_at = cast("Mapped[datetime]", None)
 
     award_id: Mapped[int] = mapped_column(ForeignKey("awards.id", ondelete="CASCADE"), primary_key=True)
     member_id: Mapped[int] = mapped_column(ForeignKey("team_members.id", ondelete="CASCADE"), primary_key=True)
@@ -75,9 +74,7 @@ class Award(Base):
         "member",
         creator=lambda m: AwardMember(member=m),
     )
-    attachments: Mapped[list["Attachment"]] = relationship(
-        back_populates="award", cascade="all, delete-orphan"
-    )
+    attachments: Mapped[list["Attachment"]] = relationship(back_populates="award", cascade="all, delete-orphan")
 
 
 class TeamMember(Base):
@@ -89,7 +86,10 @@ class TeamMember(Base):
     phone: Mapped[str | None] = mapped_column(String(20))  # 手机号
     student_id: Mapped[str | None] = mapped_column(String(20), unique=True)  # 学号
     email: Mapped[str | None] = mapped_column(String(128))  # 邮箱
+    school: Mapped[str | None] = mapped_column(String(128))  # 学校名称
+    school_code: Mapped[str | None] = mapped_column(String(32))  # 学校标识码
     major: Mapped[str | None] = mapped_column(String(128))  # 专业
+    major_code: Mapped[str | None] = mapped_column(String(32))  # 专业代码
     class_name: Mapped[str | None] = mapped_column(String(128))  # 班级
     college: Mapped[str | None] = mapped_column(String(128))  # 学院
     pinyin: Mapped[str | None] = mapped_column(String(255))
@@ -104,7 +104,6 @@ class TeamMember(Base):
         "award",
         creator=lambda a: AwardMember(award=a),
     )
-
 
 
 class Attachment(Base):
@@ -150,8 +149,48 @@ class ImportJob(Base):
 
 class Major(Base):
     """专业名称数据库"""
-    __tablename__ = "majors"
 
-    name: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    __tablename__ = "majors"
+    __table_args__ = (
+        UniqueConstraint("name", name="uq_majors_name"),
+        UniqueConstraint("code", name="uq_majors_code"),
+    )
+
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    code: Mapped[str | None] = mapped_column(String(32))
     pinyin: Mapped[str | None] = mapped_column(String(255))  # 拼音，用于搜索
     category: Mapped[str | None] = mapped_column(String(64))  # 分类（工学、理学等）
+    discipline_code: Mapped[str | None] = mapped_column(String(16))
+    discipline_name: Mapped[str | None] = mapped_column(String(128))
+    class_code: Mapped[str | None] = mapped_column(String(16))
+    class_name: Mapped[str | None] = mapped_column(String(128))
+
+
+class School(Base):
+    __tablename__ = "schools"
+    __table_args__ = (
+        UniqueConstraint("name", name="uq_schools_name"),
+        UniqueConstraint("code", name="uq_schools_code"),
+    )
+
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    code: Mapped[str | None] = mapped_column(String(32))
+    pinyin: Mapped[str | None] = mapped_column(String(255))
+    region: Mapped[str | None] = mapped_column(String(64))
+
+
+class SchoolMajorMapping(Base):
+    __tablename__ = "school_major_mappings"
+    __table_args__ = (
+        UniqueConstraint("school_code", "major_code", name="uq_school_major_code"),
+        UniqueConstraint("school_name", "major_name", name="uq_school_major_name"),
+    )
+
+    school_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    school_code: Mapped[str | None] = mapped_column(String(32))
+    major_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    major_code: Mapped[str | None] = mapped_column(String(32))
+    college_name: Mapped[str | None] = mapped_column(String(128))
+    category: Mapped[str | None] = mapped_column(String(64))
+    discipline_code: Mapped[str | None] = mapped_column(String(16))
+    discipline_name: Mapped[str | None] = mapped_column(String(128))

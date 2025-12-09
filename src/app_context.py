@@ -8,6 +8,7 @@ from .services.backup_manager import BackupManager
 from .services.import_export import ImportExportService
 from .services.major_service import MajorService
 from .services.member_service import MemberService
+from .services.school_service import SchoolService
 from .services.settings_service import SettingsService
 from .services.statistics_service import StatisticsService
 
@@ -22,6 +23,7 @@ class AppContext:
     statistics: StatisticsService
     awards: AwardService
     majors: MajorService
+    schools: SchoolService
     members: MemberService
 
 
@@ -38,6 +40,7 @@ def bootstrap(debug: bool = False) -> AppContext:
     importer = ImportExportService(db, attachments)
     statistics = StatisticsService(db)
     majors = MajorService(db)
+    schools = SchoolService(db)
     members = MemberService(db)
 
     backup.schedule_jobs()
@@ -51,5 +54,6 @@ def bootstrap(debug: bool = False) -> AppContext:
         statistics=statistics,
         awards=awards,
         majors=majors,
+        schools=schools,
         members=members,
     )

@@ -4,6 +4,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 from sqlalchemy import and_, or_, select
+from sqlalchemy.exc import ArgumentError
 from sqlalchemy.orm import selectinload
 
 from ..data.database import Database
@@ -121,13 +122,19 @@ class AwardService:
     def list_awards(self) -> list[Award]:
         """获取所有未删除的荣誉记录（按日期降序排列）"""
         with self.db.session_scope() as session:
-            # Eager load members to avoid lazy loading
-            awards = session.scalars(
+            stmt = (
                 select(Award)
                 .where(Award.deleted.is_(False))
                 .options(selectinload(Award.award_members).selectinload(AwardMember.member))
                 .order_by(Award.award_date.desc())
-            ).all()
+            )
+            try:
+                awards = session.scalars(stmt).all()
+            except ArgumentError as exc:
+                logger.warning("Failed to prefetch award members, fallback to lazy load: %s", exc)
+                awards = session.scalars(
+                    select(Award).where(Award.deleted.is_(False)).order_by(Award.award_date.desc())
+                ).all()
             return list(awards)
 
     def delete_award(self, award_id: int) -> None:
@@ -286,9 +293,10 @@ class AwardService:
             Number of awards deleted
         """
         with self.db.session_scope() as session:
-            count = session.query(Award).filter(Award.id.in_(award_ids)).update(
-                {Award.deleted: True, Award.deleted_at: datetime.utcnow()},
-                synchronize_session=False
+            count = (
+                session.query(Award)
+                .filter(Award.id.in_(award_ids))
+                .update({Award.deleted: True, Award.deleted_at: datetime.utcnow()}, synchronize_session=False)
             )
             return count
 
@@ -325,12 +333,19 @@ class AwardService:
     def list_deleted_awards(self) -> list[Award]:
         """获取所有已删除的荣誉记录（回收站）"""
         with self.db.session_scope() as session:
-            awards = session.scalars(
+            stmt = (
                 select(Award)
                 .where(Award.deleted.is_(True))
                 .options(selectinload(Award.award_members).selectinload(AwardMember.member))
                 .order_by(Award.deleted_at.desc())
-            ).all()
+            )
+            try:
+                awards = session.scalars(stmt).all()
+            except ArgumentError as exc:
+                logger.warning("Failed to prefetch deleted award members, fallback to lazy load: %s", exc)
+                awards = session.scalars(
+                    select(Award).where(Award.deleted.is_(True)).order_by(Award.deleted_at.desc())
+                ).all()
             return list(awards)
 
     def restore_award(self, award_id: int) -> None:

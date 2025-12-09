@@ -3,7 +3,7 @@
 提供模糊搜索和一键填充功能
 """
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
@@ -19,13 +19,24 @@ from src.ui.styled_theme import ThemeManager
 class MajorSearchWidget(QWidget):
     """专业搜索自动完成组件"""
 
-    # 信号：当选择专业时触发
-    majorSelected = Signal(str)
+    # 信号：当选择专业时触发 (名称, 代码, 学院)
+    majorSelected = Signal(str, str, str)
+
+    MIN_QUERY_LENGTH = 2
 
     def __init__(self, major_service: MajorService, theme_manager: ThemeManager, parent=None):
         super().__init__(parent)
         self.major_service = major_service
         self.theme_manager = theme_manager
+        self._school_code: str | None = None
+        self._school_name: str | None = None
+        self._selected_code: str | None = None
+        self._selected_college: str | None = None
+        self._pending_text = ""
+        self._debounce_timer = QTimer(self)
+        self._debounce_timer.setSingleShot(True)
+        self._debounce_timer.setInterval(200)
+        self._debounce_timer.timeout.connect(self._perform_search)
         self._init_ui()
 
     def _init_ui(self):
@@ -36,7 +47,7 @@ class MajorSearchWidget(QWidget):
 
         # 输入框 - 使用 Fluent LineEdit
         self.input = LineEdit()
-        self.input.setPlaceholderText("输入专业名称搜索...")
+        self.input.setPlaceholderText("输入专业名称/代码...")
         self.input.textChanged.connect(self._on_text_changed)
         layout.addWidget(self.input)
 
@@ -102,23 +113,30 @@ class MajorSearchWidget(QWidget):
 
     def _on_text_changed(self, text: str):
         """输入框文本变化时搜索"""
-        # 清理输入文本
-        import re
+        cleaned = text.strip()
+        self._pending_text = cleaned
+        self._selected_code = None
+        self._selected_college = None
+        if not cleaned:
+            self.results_list.setVisible(False)
+            self._debounce_timer.stop()
+            return
+        self._debounce_timer.start()
 
-        cleaned = re.sub(r"\s+", "", text)
-        if cleaned != text:
-            # 更新输入框
-            self.input.blockSignals(True)
-            self.input.setText(cleaned)
-            self.input.blockSignals(False)
-            text = cleaned
-
+    def _perform_search(self) -> None:
+        text = self._pending_text
         if not text:
             self.results_list.setVisible(False)
             return
-
-        # 搜索专业
-        majors = self.major_service.search_majors(text, limit=8)
+        if len(text) < self.MIN_QUERY_LENGTH and not text.isdigit():
+            self.results_list.setVisible(False)
+            return
+        majors = self.major_service.search_majors(
+            text,
+            limit=8,
+            school_code=self._school_code,
+            school_name=self._school_name,
+        )
 
         if not majors:
             self.results_list.setVisible(False)
@@ -127,8 +145,15 @@ class MajorSearchWidget(QWidget):
         # 显示搜索结果
         self.results_list.clear()
         for major in majors:
-            item = QListWidgetItem(major.name)
+            display = major.name
+            if major.code:
+                display = f"{major.name}（{major.code}）"
+            if major.college:
+                display = f"{display} - {major.college}"
+            item = QListWidgetItem(display)
             item.setData(Qt.ItemDataRole.UserRole, major.name)
+            item.setData(Qt.ItemDataRole.UserRole + 1, major.code or "")
+            item.setData(Qt.ItemDataRole.UserRole + 2, major.college or "")
             self.results_list.addItem(item)
 
         self.results_list.setVisible(True)
@@ -136,26 +161,57 @@ class MajorSearchWidget(QWidget):
     def _on_item_clicked(self, item: QListWidgetItem):
         """点击搜索结果项"""
         major_name = item.data(Qt.ItemDataRole.UserRole)
+        major_code = item.data(Qt.ItemDataRole.UserRole + 1) or ""
+        college = item.data(Qt.ItemDataRole.UserRole + 2) or ""
+
+        self._selected_code = major_code or None
+        self._selected_college = college or None
 
         # 填充输入框
+        self.input.blockSignals(True)
         self.input.setText(major_name)
+        self.input.blockSignals(False)
+        self._debounce_timer.stop()
 
         # 隐藏搜索结果
         self.results_list.setVisible(False)
 
         # 发送信号
-        self.majorSelected.emit(major_name)
+        self.majorSelected.emit(major_name, major_code, college)
 
     def set_text(self, text: str):
         """设置输入框文本"""
+        self.input.blockSignals(True)
         self.input.setText(text)
+        self.input.blockSignals(False)
+        if not text:
+            self._selected_code = None
+            self._selected_college = None
+            self.results_list.setVisible(False)
+            self._debounce_timer.stop()
+        else:
+            self._pending_text = text.strip()
 
     def text(self) -> str:
         """获取输入框文本"""
         return self.input.text()
+
+    def set_school_filter(self, *, name: str | None = None, code: str | None = None) -> None:
+        self._school_name = name
+        self._school_code = code
+
+    def selected_code(self) -> str | None:
+        return self._selected_code
+
+    def selected_college(self) -> str | None:
+        return self._selected_college
 
     def clear(self):
         """清空输入框和搜索结果"""
         self.input.clear()
         self.results_list.clear()
         self.results_list.setVisible(False)
+        self._selected_code = None
+        self._selected_college = None
+        self._pending_text = ""
+        self._debounce_timer.stop()

@@ -1,6 +1,7 @@
 import hashlib
 from collections.abc import Iterable
 from datetime import date
+from functools import partial
 from pathlib import Path
 from typing import cast
 
@@ -43,6 +44,7 @@ from ..theme import create_card, create_page_header, make_section_title
 from ..utils.async_utils import run_in_thread
 from ..widgets.attachment_table_view import AttachmentTableView
 from ..widgets.major_search import MajorSearchWidget
+from ..widgets.school_search import SchoolSearchWidget
 from .base_page import BasePage
 
 
@@ -361,7 +363,10 @@ class EntryPage(BasePage):
             "phone",
             "student_id",
             "email",
+            "school",
+            "school_code",
             "major",
+            "major_code",
             "class_name",
             "college",
         ]
@@ -372,7 +377,10 @@ class EntryPage(BasePage):
             "手机号",
             "学号",
             "邮箱",
+            "学校",
+            "学校代码",
             "专业",
+            "专业代码",
             "班级",
             "学院",
         ]
@@ -385,6 +393,8 @@ class EntryPage(BasePage):
             # 专业字段使用特殊的搜索组件
             if field_name == "major":
                 input_widget = MajorSearchWidget(self.ctx.majors, self.theme_manager, parent=member_card)
+            elif field_name == "school":
+                input_widget = SchoolSearchWidget(self.ctx.schools, self.theme_manager, parent=member_card)
             else:
                 input_widget = LineEdit()
                 clean_input_text(input_widget)
@@ -405,6 +415,7 @@ class EntryPage(BasePage):
             form_grid.addWidget(member_fields[field_name], row, col + 1)
 
         member_layout.addLayout(form_grid)
+        self._connect_member_field_signals(member_fields)
 
         # 导入文档按钮连接
         import_btn.clicked.connect(lambda: self._import_from_doc(member_fields))
@@ -492,6 +503,55 @@ class EntryPage(BasePage):
         # 这里直接更新即可，因为 deleteLater 只是标记删除，但 data 已经 pop 了
         self._update_member_indices()
 
+    def _connect_member_field_signals(self, member_fields: dict) -> None:
+        school_widget = member_fields.get("school")
+        school_code_widget = member_fields.get("school_code")
+        major_widget = member_fields.get("major")
+
+        if isinstance(school_widget, SchoolSearchWidget):
+            school_widget.schoolSelected.connect(partial(self._on_school_selected, member_fields))
+
+        if isinstance(school_code_widget, QLineEdit):
+            school_code_widget.textChanged.connect(partial(self._on_school_code_changed, member_fields))
+
+        if isinstance(major_widget, MajorSearchWidget):
+            major_widget.majorSelected.connect(partial(self._on_major_selected, member_fields))
+
+    def _on_school_selected(self, member_fields: dict, name: str, code: str | None) -> None:
+        school_code_widget = member_fields.get("school_code")
+        major_widget = member_fields.get("major")
+        major_code_widget = member_fields.get("major_code")
+        college_widget = member_fields.get("college")
+
+        if isinstance(school_code_widget, QLineEdit):
+            school_code_widget.blockSignals(True)
+            school_code_widget.setText(code or "")
+            school_code_widget.blockSignals(False)
+
+        if isinstance(major_widget, MajorSearchWidget):
+            major_widget.set_school_filter(name=name, code=code or None)
+            major_widget.clear()
+
+        if isinstance(major_code_widget, QLineEdit):
+            major_code_widget.clear()
+        if isinstance(college_widget, QLineEdit):
+            college_widget.clear()
+
+    def _on_school_code_changed(self, member_fields: dict, code: str) -> None:
+        major_widget = member_fields.get("major")
+        school_widget = member_fields.get("school")
+        school_name = school_widget.text() if isinstance(school_widget, SchoolSearchWidget) else None
+        if isinstance(major_widget, MajorSearchWidget):
+            major_widget.set_school_filter(name=school_name, code=code.strip() or None)
+
+    def _on_major_selected(self, member_fields: dict, name: str, code: str, college: str) -> None:
+        major_code_widget = member_fields.get("major_code")
+        college_widget = member_fields.get("college")
+        if isinstance(major_code_widget, QLineEdit):
+            major_code_widget.setText(code or "")
+        if isinstance(college_widget, QLineEdit) and college:
+            college_widget.setText(college)
+
     def _select_from_history(self, member_fields: dict) -> None:
         """从历史成员中选择"""
         # 获取所有历史成员
@@ -517,12 +577,29 @@ class EntryPage(BasePage):
                 member_fields["phone"].setText(selected_member.phone)
                 member_fields["student_id"].setText(selected_member.student_id)
                 member_fields["email"].setText(selected_member.email)
-                # 专业字段特殊处理
+                # 学校及专业字段特殊处理
+                school_widget = member_fields.get("school")
+                if isinstance(school_widget, SchoolSearchWidget):
+                    school_widget.set_school(selected_member.school or "", selected_member.school_code)
+                else:
+                    widget = member_fields.get("school")
+                    if isinstance(widget, QLineEdit):
+                        widget.setText(selected_member.school or "")
+
+                school_code_widget = member_fields.get("school_code")
+                if isinstance(school_code_widget, QLineEdit):
+                    school_code_widget.setText(selected_member.school_code or "")
+
                 major_widget = member_fields["major"]
                 if isinstance(major_widget, MajorSearchWidget):
-                    major_widget.set_text(selected_member.major)
+                    major_widget.set_text(selected_member.major or "")
                 else:
-                    major_widget.setText(selected_member.major)
+                    major_widget.setText(selected_member.major or "")
+
+                major_code_widget = member_fields.get("major_code")
+                if isinstance(major_code_widget, QLineEdit):
+                    major_code_widget.setText(selected_member.major_code or "")
+
                 member_fields["class_name"].setText(selected_member.class_name)
                 member_fields["college"].setText(selected_member.college)
                 InfoBar.success("成功", f"已选择成员: {selected_member.name}", parent=self.window())
@@ -642,7 +719,10 @@ class EntryPage(BasePage):
                 "phone": "phone",
                 "student_id": "student_id",
                 "email": "email",
+                "school": "school",
+                "school_code": "school_code",
                 "major": "major",
+                "major_code": "major_code",
                 "class_name": "class_name",
                 "college": "college",
             }
@@ -652,11 +732,10 @@ class EntryPage(BasePage):
                 value = member_info.get(dict_key)
                 if value and field_key in member_fields:
                     widget = member_fields[field_key]
-                    # 支持MajorSearchWidget和QLineEdit
-                    from ..widgets.major_search import MajorSearchWidget
-
                     if isinstance(widget, MajorSearchWidget):
                         widget.set_text(value)
+                    elif isinstance(widget, SchoolSearchWidget):
+                        widget.set_school(value, member_info.get("school_code"))
                     else:
                         widget.setText(value)
                     filled_fields.append(field_key)
@@ -697,7 +776,10 @@ class EntryPage(BasePage):
             "phone",
             "student_id",
             "email",
+            "school",
+            "school_code",
             "major",
+            "major_code",
             "class_name",
             "college",
         ]
@@ -715,8 +797,10 @@ class EntryPage(BasePage):
                     # 收集其他字段
                     for field_name in field_names[1:]:
                         widget = member_fields.get(field_name)
-                        # 支持MajorSearchWidget和QLineEdit
-                        value = widget.text().strip() if isinstance(widget, (MajorSearchWidget, QLineEdit)) else ""
+                        if isinstance(widget, (MajorSearchWidget, SchoolSearchWidget, QLineEdit)):
+                            value = widget.text().strip()
+                        else:
+                            value = ""
 
                         if value:
                             member_info[field_name] = value
@@ -846,14 +930,24 @@ class EntryPage(BasePage):
                 "phone": member.phone or "",
                 "student_id": member.student_id or "",
                 "email": member.email or "",
+                "school": member.school or "",
+                "school_code": member.school_code or "",
                 "major": member.major or "",
+                "major_code": member.major_code or "",
                 "class_name": member.class_name or "",
                 "college": member.college or "",
             }
 
             for field_name, value in field_mapping.items():
-                if field_name in member_fields:
-                    member_fields[field_name].setText(value)
+                widget = member_fields.get(field_name)
+                if widget is None:
+                    continue
+                if field_name == "school" and isinstance(widget, SchoolSearchWidget):
+                    widget.set_school(member.school or "", member.school_code)
+                elif isinstance(widget, MajorSearchWidget):
+                    widget.set_text(value)
+                else:
+                    widget.setText(value)
 
         self.selected_files = []
 
@@ -1267,11 +1361,14 @@ class HistoryMemberDialog(MaskDialogBase):
         info_layout.setColumnStretch(3, 1)
 
         info_data = [
-            ("性别", member.gender or "-"),
-            ("手机", member.phone or "-"),
+            ("学校", member.school or "-"),
+            ("学校代码", member.school_code or "-"),
             ("学院", member.college or "-"),
             ("专业", member.major or "-"),
+            ("专业代码", member.major_code or "-"),
             ("班级", member.class_name or "-"),
+            ("性别", member.gender or "-"),
+            ("手机", member.phone or "-"),
             ("邮箱", member.email or "-"),
         ]
 

@@ -19,12 +19,13 @@ class _Worker(QRunnable):
         self.invoker.finished.connect(callback)
 
     def run(self) -> None:  # Runs in thread pool worker thread
+        result: Any
         try:
             result = self.func()
         except Exception as exc:
             logger.exception("Async task failed: %s", exc)
-            return
-        # Emit from worker thread; Qt delivers to connected slot in GUI thread
+            result = exc
+        # Always emit so GUI thread can clean up state even when errors occur
         self.invoker.finished.emit(result)
 
 

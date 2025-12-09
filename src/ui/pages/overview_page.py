@@ -1,5 +1,6 @@
 import hashlib
 import logging
+from functools import partial
 from pathlib import Path
 from typing import cast
 
@@ -46,6 +47,7 @@ from ..table_models import AttachmentTableModel
 from ..theme import create_card, create_page_header, make_section_title
 from ..utils.async_utils import run_in_thread
 from ..widgets.major_search import MajorSearchWidget
+from ..widgets.school_search import SchoolSearchWidget
 from .base_page import BasePage
 
 logger = logging.getLogger(__name__)
@@ -688,7 +690,7 @@ class OverviewPage(BasePage):
             widget = item.widget()
             if widget and widget.property("card"):
                 # 查找操作按钮并反向显示
-                buttons = widget.findChildren(PushButton) # 编辑和删除按钮
+                buttons = widget.findChildren(PushButton)  # 编辑和删除按钮
                 for btn in buttons:
                     if btn.text() in ["编辑", "删除"]:
                         btn.setVisible(not checked)
@@ -697,7 +699,7 @@ class OverviewPage(BasePage):
 
     def _on_card_checked(self, state, award_id):
         """处理卡片选中状态"""
-        if state == 2: # Checked
+        if state == 2:  # Checked
             self.selected_award_ids.add(award_id)
         else:
             self.selected_award_ids.discard(award_id)
@@ -1177,7 +1179,10 @@ class AwardDetailDialog(MaskDialogBase):
             "phone",
             "student_id",
             "email",
+            "school",
+            "school_code",
             "major",
+            "major_code",
             "class_name",
             "college",
         ]
@@ -1188,7 +1193,10 @@ class AwardDetailDialog(MaskDialogBase):
             "手机号",
             "学号",
             "邮箱",
+            "学校",
+            "学校代码",
             "专业",
+            "专业代码",
             "班级",
             "学院",
         ]
@@ -1198,11 +1206,14 @@ class AwardDetailDialog(MaskDialogBase):
             # 专业字段使用特殊的搜索组件
             if field_name == "major":
                 input_widget = MajorSearchWidget(self.ctx.majors, self.theme_manager, parent=member_card)
-                # 如果是编辑现有成员，填充数据
                 if member:
                     value = getattr(member, field_name, "")
                     if value:
                         input_widget.set_text(str(value))
+            elif field_name == "school":
+                input_widget = SchoolSearchWidget(self.ctx.schools, self.theme_manager, parent=member_card)
+                if member:
+                    input_widget.set_school(member.school or "", member.school_code)
             else:
                 input_widget = LineEdit()
                 clean_input_text(input_widget)  # 自动删除空白字符
@@ -1232,6 +1243,7 @@ class AwardDetailDialog(MaskDialogBase):
         # 组装
         member_layout.addLayout(header_layout)
         member_layout.addLayout(form_grid)
+        self._connect_member_field_signals(member_fields)
 
         # 连接按钮信号
         import_btn.clicked.connect(lambda: self._import_from_doc(member_fields))
@@ -1274,6 +1286,55 @@ class AwardDetailDialog(MaskDialogBase):
                 break
         member_card.deleteLater()
         self._update_member_indices()
+
+    def _connect_member_field_signals(self, member_fields: dict) -> None:
+        school_widget = member_fields.get("school")
+        school_code_widget = member_fields.get("school_code")
+        major_widget = member_fields.get("major")
+
+        if isinstance(school_widget, SchoolSearchWidget):
+            school_widget.schoolSelected.connect(partial(self._on_school_selected, member_fields))
+
+        if isinstance(school_code_widget, QLineEdit):
+            school_code_widget.textChanged.connect(partial(self._on_school_code_changed, member_fields))
+
+        if isinstance(major_widget, MajorSearchWidget):
+            major_widget.majorSelected.connect(partial(self._on_major_selected, member_fields))
+
+    def _on_school_selected(self, member_fields: dict, name: str, code: str | None) -> None:
+        school_code_widget = member_fields.get("school_code")
+        major_widget = member_fields.get("major")
+        major_code_widget = member_fields.get("major_code")
+        college_widget = member_fields.get("college")
+
+        if isinstance(school_code_widget, QLineEdit):
+            school_code_widget.blockSignals(True)
+            school_code_widget.setText(code or "")
+            school_code_widget.blockSignals(False)
+
+        if isinstance(major_widget, MajorSearchWidget):
+            major_widget.set_school_filter(name=name, code=code or None)
+            major_widget.clear()
+
+        if isinstance(major_code_widget, QLineEdit):
+            major_code_widget.clear()
+        if isinstance(college_widget, QLineEdit):
+            college_widget.clear()
+
+    def _on_school_code_changed(self, member_fields: dict, code: str) -> None:
+        major_widget = member_fields.get("major")
+        school_widget = member_fields.get("school")
+        school_name = school_widget.text() if isinstance(school_widget, SchoolSearchWidget) else None
+        if isinstance(major_widget, MajorSearchWidget):
+            major_widget.set_school_filter(name=school_name, code=code.strip() or None)
+
+    def _on_major_selected(self, member_fields: dict, name: str, code: str, college: str) -> None:
+        major_code_widget = member_fields.get("major_code")
+        college_widget = member_fields.get("college")
+        if isinstance(major_code_widget, QLineEdit):
+            major_code_widget.setText(code or "")
+        if isinstance(college_widget, QLineEdit) and college:
+            college_widget.setText(college)
 
     def _move_member_up(self, member_card: QWidget) -> None:
         """将成员卡片上移一位"""
@@ -1413,7 +1474,10 @@ class AwardDetailDialog(MaskDialogBase):
                 "phone": "phone",
                 "student_id": "student_id",
                 "email": "email",
+                "school": "school",
+                "school_code": "school_code",
                 "major": "major",
+                "major_code": "major_code",
                 "class_name": "class_name",
                 "college": "college",
             }
@@ -1423,9 +1487,10 @@ class AwardDetailDialog(MaskDialogBase):
                 value = member_info.get(dict_key)
                 if value and field_key in member_fields:
                     widget = member_fields[field_key]
-                    # 支持MajorSearchWidget和QLineEdit
                     if isinstance(widget, MajorSearchWidget):
                         widget.set_text(value)
+                    elif isinstance(widget, SchoolSearchWidget):
+                        widget.set_school(value, member_info.get("school_code"))
                     else:
                         widget.setText(value)
                     filled_fields.append(field_key)
@@ -1479,12 +1544,29 @@ class AwardDetailDialog(MaskDialogBase):
                 member_fields["phone"].setText(selected_member.phone or "")
                 member_fields["student_id"].setText(selected_member.student_id or "")
                 member_fields["email"].setText(selected_member.email or "")
+                school_widget = member_fields.get("school")
+                if isinstance(school_widget, SchoolSearchWidget):
+                    school_widget.set_school(selected_member.school or "", selected_member.school_code)
+                else:
+                    widget = member_fields.get("school")
+                    if isinstance(widget, QLineEdit):
+                        widget.setText(selected_member.school or "")
+
+                school_code_widget = member_fields.get("school_code")
+                if isinstance(school_code_widget, QLineEdit):
+                    school_code_widget.setText(selected_member.school_code or "")
+
                 # 专业字段特殊处理
                 major_widget = member_fields["major"]
                 if isinstance(major_widget, MajorSearchWidget):
                     major_widget.set_text(selected_member.major or "")
                 else:
                     major_widget.setText(selected_member.major or "")
+
+                major_code_widget = member_fields.get("major_code")
+                if isinstance(major_code_widget, QLineEdit):
+                    major_code_widget.setText(selected_member.major_code or "")
+
                 member_fields["class_name"].setText(selected_member.class_name or "")
                 member_fields["college"].setText(selected_member.college or "")
                 InfoBar.success("成功", f"已选择成员: {selected_member.name}", parent=self)
@@ -1612,7 +1694,10 @@ class AwardDetailDialog(MaskDialogBase):
             "phone",
             "student_id",
             "email",
+            "school",
+            "school_code",
             "major",
+            "major_code",
             "class_name",
             "college",
         ]
@@ -1626,8 +1711,10 @@ class AwardDetailDialog(MaskDialogBase):
                     member_info = {"name": name}
                     for field_name in field_names[1:]:
                         widget = member_fields.get(field_name)
-                        # 支持MajorSearchWidget和QLineEdit
-                        value = widget.text().strip() if isinstance(widget, (MajorSearchWidget, QLineEdit)) else ""
+                        if isinstance(widget, (MajorSearchWidget, SchoolSearchWidget, QLineEdit)):
+                            value = widget.text().strip()
+                        else:
+                            value = ""
 
                         if value:
                             member_info[field_name] = value

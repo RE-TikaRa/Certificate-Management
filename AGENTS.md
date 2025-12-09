@@ -32,7 +32,7 @@
 - TeamMember：姓名、性别、身份证、手机号、学号、邮箱、专业、班级、学院 + pinyin、active、sort_index；关系 awards（m2m）。
 - Attachment：award_id、stored_name、original_name、relative_path（唯一）、file_md5、file_size、deleted 标记。
 - Setting/BackupRecord：应用设置与备份记录。
-- Major 数据由 major_service 提供，支持中文/拼音模糊搜索（66 项，来源 docs/index.xlsx）。
+- Major 数据由 major_service 提供，支持中文/拼音模糊搜索（66 项，来源 docs/index.xlsx）。学校代码缺失时会回退使用学校名称匹配，以便仍能填充学院。
 
 ## 主要特性（按页面）
 - **MainWindow**：`_center_window()` 居中；快速加载首页，余下页面 100ms 后异步载入；route_keys 管理导航；主题变化事件转发。
@@ -62,4 +62,5 @@
 - 添加数据字段：同步更新模型、对应 service、UI 表单/列表、统计或刷新逻辑（管理页的 10 字段监控需保持一致）。
 - 成员字段在 UI 约定为 9 项；管理页刷新依赖该集合。
 - 导入/导出：CSV 模板 `resources/templates/awards_template.csv`；专业导入使用 `docs/index.xlsx`。
+- 学院自动填充依赖 `SchoolMajorMapping`，如导入数据缺少学校代码会自动用学校名称回退匹配；若要禁用回退需同步保证 school_code 完整。
 - 运行/调试前确认运行目录为仓库根目录；避免提交 `data/`、`attachments/`、`backups/`、`logs/`、`temp/` 生成物。

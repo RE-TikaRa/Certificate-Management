@@ -34,9 +34,9 @@ class StatisticsService:
 
             latest_awards = session.scalars(
                 select(Award)
-                    .options(selectinload(Award.award_members).selectinload(AwardMember.member))
-                    .order_by(Award.award_date.desc())
-                    .limit(10)
+                .options(selectinload(Award.award_members).selectinload(AwardMember.member))
+                .order_by(Award.award_date.desc())
+                .limit(10)
             ).all()
 
         totals = {
