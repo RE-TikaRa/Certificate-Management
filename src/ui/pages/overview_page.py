@@ -83,6 +83,7 @@ class OverviewPage(BasePage):
         self.awards_list = []
         self.selected_award_ids = set()
         self.is_batch_mode = False
+        self.card_checkboxes: dict[int, CheckBox] = {}
 
         self.PAGE_SIZE = 20
         self.current_page = 0
@@ -142,10 +143,30 @@ class OverviewPage(BasePage):
         header_layout.addStretch()
         from qfluentwidgets import FluentIcon, TransparentToolButton
 
+        # 批量选择操作按钮
+        self.select_all_btn = PushButton("全选")
+        self.select_all_btn.setFixedWidth(72)
+        self.select_all_btn.setVisible(False)
+        self.select_all_btn.clicked.connect(self._select_all_awards)
+        header_layout.addWidget(self.select_all_btn)
+
+        self.invert_selection_btn = PushButton("反选")
+        self.invert_selection_btn.setFixedWidth(72)
+        self.invert_selection_btn.setVisible(False)
+        self.invert_selection_btn.clicked.connect(self._invert_selection)
+        header_layout.addWidget(self.invert_selection_btn)
+
+        self.clear_selection_btn = PushButton("全不选")
+        self.clear_selection_btn.setFixedWidth(72)
+        self.clear_selection_btn.setVisible(False)
+        self.clear_selection_btn.clicked.connect(self._clear_selection)
+        header_layout.addWidget(self.clear_selection_btn)
+
         # 批量删除按钮
         self.batch_delete_btn = TransparentToolButton(FluentIcon.DELETE, self)
         self.batch_delete_btn.setToolTip("删除选中项目")
         self.batch_delete_btn.clicked.connect(self._batch_delete_awards)
+        self.batch_delete_btn.setEnabled(False)
         self.batch_delete_btn.hide()
         header_layout.addWidget(self.batch_delete_btn)
 
@@ -430,9 +451,11 @@ class OverviewPage(BasePage):
             # 应用排序
             self.awards_list = self._apply_sorting(filtered_awards)
             self.total_awards = len(self.awards_list)
+            self._prune_selection()
 
             if not self.awards_list:
                 self._show_empty_state()
+                self._update_batch_actions_state()
                 return
 
             # 首次只加载 20 条
@@ -445,11 +468,13 @@ class OverviewPage(BasePage):
                 self.awards_layout.addStretch()
 
             logger.debug(f"已加载 {min(self.PAGE_SIZE, self.total_awards)}/{self.total_awards} 个荣誉项目")
+            self._update_batch_actions_state()
         except Exception as e:
             logger.error(f"刷新失败: {e}", exc_info=True)
 
     def _clear_awards_layout(self) -> None:
         """清空布局"""
+        self.card_checkboxes.clear()
         widgets_to_delete = []
         while self.awards_layout.count():
             item = self.awards_layout.takeAt(0)
@@ -568,6 +593,7 @@ class OverviewPage(BasePage):
         checkbox.setFixedSize(24, 24)
         checkbox.setVisible(self.is_batch_mode)
         checkbox.setChecked(award.id in self.selected_award_ids)
+        self.card_checkboxes[award.id] = checkbox
         # 使用闭包捕获 award.id
         checkbox.stateChanged.connect(lambda state, aid=award.id: self._on_card_checked(state, aid))
         top_layout.addWidget(checkbox)
@@ -645,28 +671,29 @@ class OverviewPage(BasePage):
         """切换批量管理模式"""
         self.is_batch_mode = checked
         self.batch_delete_btn.setVisible(checked)
+        self.select_all_btn.setVisible(checked)
+        self.invert_selection_btn.setVisible(checked)
+        self.clear_selection_btn.setVisible(checked)
 
         # 如果退出批量模式，清空选择
         if not checked:
             self.selected_award_ids.clear()
-            self.batch_delete_btn.setEnabled(False)
+
+        for checkbox in self.card_checkboxes.values():
+            checkbox.setVisible(checked)
 
         # 更新所有卡片的显示状态
         for i in range(self.awards_layout.count()):
             item = self.awards_layout.itemAt(i)
             widget = item.widget()
             if widget and widget.property("card"):
-                # 查找复选框
-                checkbox = widget.findChild(CheckBox)
-                if checkbox:
-                    checkbox.setVisible(checked)
-                    checkbox.setChecked(False)
-
                 # 查找操作按钮并反向显示
                 buttons = widget.findChildren(PushButton) # 编辑和删除按钮
                 for btn in buttons:
                     if btn.text() in ["编辑", "删除"]:
                         btn.setVisible(not checked)
+        self._sync_checkboxes_with_selection()
+        self._update_batch_actions_state()
 
     def _on_card_checked(self, state, award_id):
         """处理卡片选中状态"""
@@ -675,6 +702,54 @@ class OverviewPage(BasePage):
         else:
             self.selected_award_ids.discard(award_id)
 
+        self._update_batch_actions_state()
+
+    def _select_all_awards(self) -> None:
+        """选中当前筛选条件下的全部荣誉"""
+        if not self.awards_list:
+            return
+        self.selected_award_ids = {award.id for award in self.awards_list}
+        self._sync_checkboxes_with_selection()
+        self._update_batch_actions_state()
+
+    def _clear_selection(self) -> None:
+        """取消所有选中"""
+        if not self.selected_award_ids:
+            return
+        self.selected_award_ids.clear()
+        self._sync_checkboxes_with_selection()
+        self._update_batch_actions_state()
+
+    def _invert_selection(self) -> None:
+        """反选当前筛选结果"""
+        if not self.awards_list:
+            return
+        all_ids = {award.id for award in self.awards_list}
+        self.selected_award_ids = all_ids - self.selected_award_ids
+        self._sync_checkboxes_with_selection()
+        self._update_batch_actions_state()
+
+    def _prune_selection(self) -> None:
+        """移除已不在当前列表中的选中项"""
+        if not self.selected_award_ids:
+            return
+        valid_ids = {award.id for award in self.awards_list}
+        self.selected_award_ids.intersection_update(valid_ids)
+
+    def _sync_checkboxes_with_selection(self) -> None:
+        """同步所有复选框为当前的选中状态"""
+        for award_id, checkbox in self.card_checkboxes.items():
+            checkbox.blockSignals(True)
+            checkbox.setChecked(award_id in self.selected_award_ids)
+            checkbox.blockSignals(False)
+
+    def _update_batch_actions_state(self) -> None:
+        """更新批量操作按钮状态"""
+        has_awards = bool(self.awards_list)
+        allow_batch_ops = self.is_batch_mode and has_awards
+        self.select_all_btn.setEnabled(allow_batch_ops)
+        self.invert_selection_btn.setEnabled(allow_batch_ops)
+        self.clear_selection_btn.setEnabled(self.is_batch_mode and bool(self.selected_award_ids))
         self.batch_delete_btn.setEnabled(bool(self.selected_award_ids))
 
     def _batch_delete_awards(self):
