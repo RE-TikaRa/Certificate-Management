@@ -10,7 +10,7 @@ from sqlalchemy import select
 
 from ..config import TEMPLATES_DIR
 from ..data.database import Database
-from ..data.models import Award, ImportJob, TeamMember
+from ..data.models import Award, AwardMember, ImportJob, TeamMember
 from .attachment_manager import AttachmentManager
 
 logger = logging.getLogger(__name__)
@@ -109,7 +109,10 @@ class ImportExportService:
                     session.flush()
 
                     members = self._parse_items(str(row.get("成员", "")))
-                    award.members = [self._get_or_create_member(session, name) for name in members]
+                    member_objs = [self._get_or_create_member(session, name) for name in members]
+                    award.award_members = [
+                        AwardMember(member=member, sort_order=index) for index, member in enumerate(member_objs)
+                    ]
 
                     attachment_paths = self._parse_items(str(row.get("附件路径", "")), sep=";")
                     files = [Path(path) for path in attachment_paths if path]

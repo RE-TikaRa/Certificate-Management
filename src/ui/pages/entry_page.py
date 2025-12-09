@@ -308,12 +308,24 @@ class EntryPage(BasePage):
 
         # 成员编号和删除按钮
         header_layout = QHBoxLayout()
-        header_layout.setSpacing(12)  # 增加按钮间距
+        header_layout.setSpacing(8)  # 增加按钮间距
         member_index = len(self.members_data) + 1
         member_label = QLabel(f"成员 #{member_index}")
         member_label.setStyleSheet("font-weight: bold; font-size: 13px;")
         header_layout.addWidget(member_label)
         header_layout.addStretch()
+
+        # 上移按钮
+        up_btn = TransparentToolButton(FluentIcon.UP)
+        up_btn.setToolTip("上移")
+        up_btn.setFixedSize(28, 28)
+        header_layout.addWidget(up_btn)
+
+        # 下移按钮
+        down_btn = TransparentToolButton(FluentIcon.DOWN)
+        down_btn.setToolTip("下移")
+        down_btn.setFixedSize(28, 28)
+        header_layout.addWidget(down_btn)
 
         # 导入文档按钮
         import_btn = PushButton("导入文档")
@@ -400,17 +412,69 @@ class EntryPage(BasePage):
         # 从历史成员选择按钮连接
         history_btn.clicked.connect(lambda: self._select_from_history(member_fields))
 
+        # 移动按钮连接
+        up_btn.clicked.connect(lambda: self._move_member_up(member_card))
+        down_btn.clicked.connect(lambda: self._move_member_down(member_card))
+
         # 删除按钮连接
         delete_btn.clicked.connect(lambda: self._remove_member_card(member_card, member_fields))
 
         # 保存成员数据
-        member_data = {"card": member_card, "fields": member_fields}
+        member_data = {"card": member_card, "fields": member_fields, "label": member_label}
         self.members_data.append(member_data)
 
         # 添加到列表
         self.members_list_layout.addWidget(member_card)
 
         logger.debug(f"成员 #{member_index} 已添加，总成员数：{len(self.members_data)}")
+
+    def _move_member_up(self, member_card: QWidget) -> None:
+        """上移成员卡片"""
+        idx = -1
+        for i, data in enumerate(self.members_data):
+            if data["card"] == member_card:
+                idx = i
+                break
+
+        if idx <= 0:
+            return
+
+        # 交换数据
+        self.members_data[idx], self.members_data[idx - 1] = self.members_data[idx - 1], self.members_data[idx]
+
+        # 交换UI位置
+        self.members_list_layout.removeWidget(member_card)
+        self.members_list_layout.insertWidget(idx - 1, member_card)
+
+        # 更新编号
+        self._update_member_indices()
+
+    def _move_member_down(self, member_card: QWidget) -> None:
+        """下移成员卡片"""
+        idx = -1
+        for i, data in enumerate(self.members_data):
+            if data["card"] == member_card:
+                idx = i
+                break
+
+        if idx == -1 or idx >= len(self.members_data) - 1:
+            return
+
+        # 交换数据
+        self.members_data[idx], self.members_data[idx + 1] = self.members_data[idx + 1], self.members_data[idx]
+
+        # 交换UI位置
+        self.members_list_layout.removeWidget(member_card)
+        self.members_list_layout.insertWidget(idx + 1, member_card)
+
+        # 更新编号
+        self._update_member_indices()
+
+    def _update_member_indices(self) -> None:
+        """更新所有成员卡片的编号"""
+        for i, data in enumerate(self.members_data):
+            if "label" in data:
+                data["label"].setText(f"成员 #{i + 1}")
 
     def _remove_member_card(self, member_card: QWidget, member_fields: dict) -> None:
         """删除一个成员卡片"""
@@ -422,6 +486,11 @@ class EntryPage(BasePage):
 
         # 从UI中移除
         member_card.deleteLater()
+
+        # 更新编号
+        # 使用 QTimer.singleShot 确保在 deleteLater 处理完后更新，或者直接更新
+        # 这里直接更新即可，因为 deleteLater 只是标记删除，但 data 已经 pop 了
+        self._update_member_indices()
 
     def _select_from_history(self, member_fields: dict) -> None:
         """从历史成员中选择"""
@@ -822,12 +891,11 @@ class EntryPage(BasePage):
             with self.ctx.db.session_scope() as session:
                 db_award = session.get(type(award), award.id)
                 if db_award:
-                    # 清空现有成员
-                    db_award.members.clear()
-                    # 添加新成员
-                    for member_info in members_data:
-                        member = self.ctx.awards._get_or_create_member_with_info(session, member_info)
-                        db_award.members.append(member)
+                    ordered_members = [
+                        self.ctx.awards._get_or_create_member_with_info(session, member_info)
+                        for member_info in members_data
+                    ]
+                    self.ctx.awards._set_award_members(db_award, ordered_members)
                     session.commit()
 
             InfoBar.success("成功", f"已更新：{award.competition_name}", parent=self.window())

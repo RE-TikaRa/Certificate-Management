@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Sequence
 from datetime import date, datetime
 from pathlib import Path
@@ -6,8 +7,10 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import selectinload
 
 from ..data.database import Database
-from ..data.models import Award, TeamMember
+from ..data.models import Award, AwardMember, TeamMember
 from .attachment_manager import AttachmentManager
+
+logger = logging.getLogger(__name__)
 
 
 class AwardService:
@@ -37,7 +40,8 @@ class AwardService:
                 remarks=remarks,
             )
             # 处理成员信息（可能是字符串或字典）
-            award.members = [self._get_or_create_member_with_info(session, item) for item in member_names]
+            members = [self._get_or_create_member_with_info(session, item) for item in member_names]
+            self._set_award_members(award, members)
             session.add(award)
             session.flush()
 
@@ -52,10 +56,10 @@ class AwardService:
 
     def list_members(self) -> list[TeamMember]:
         with self.db.session_scope() as session:
-            # Eager load the awards relationship to avoid lazy loading errors
+            # Eager load award associations to avoid lazy loading
             members = session.scalars(
                 select(TeamMember)
-                .options(selectinload(TeamMember.awards))
+                .options(selectinload(TeamMember.award_associations).selectinload(AwardMember.award))
                 .order_by(TeamMember.sort_index, TeamMember.name)
             ).all()
             return list(members)
@@ -108,6 +112,12 @@ class AwardService:
         session.flush()
         return member
 
+    def _set_award_members(self, award: Award, members: Sequence[TeamMember]) -> None:
+        """重建 award_members 关联并写入排序索引"""
+        award.award_members.clear()
+        for index, member in enumerate(members):
+            award.award_members.append(AwardMember(member=member, sort_order=index))
+
     def list_awards(self) -> list[Award]:
         """获取所有未删除的荣誉记录（按日期降序排列）"""
         with self.db.session_scope() as session:
@@ -115,7 +125,7 @@ class AwardService:
             awards = session.scalars(
                 select(Award)
                 .where(Award.deleted.is_(False))
-                .options(selectinload(Award.members))
+                .options(selectinload(Award.award_members).selectinload(AwardMember.member))
                 .order_by(Award.award_date.desc())
             ).all()
             return list(awards)
@@ -184,8 +194,8 @@ class AwardService:
 
             # Update member associations
             if member_names is not None:
-                award.members.clear()
-                award.members = [self._get_or_create_member_with_info(session, item) for item in member_names]
+                members = [self._get_or_create_member_with_info(session, item) for item in member_names]
+                self._set_award_members(award, members)
 
             session.add(award)
             session.flush()  # Validate before commit
@@ -267,7 +277,7 @@ class AwardService:
 
     def batch_delete_awards(self, award_ids: list[int]) -> int:
         """
-        Delete multiple awards in a single transaction.
+        Batch soft delete multiple awards.
 
         Args:
             award_ids: List of award IDs to delete
@@ -276,7 +286,10 @@ class AwardService:
             Number of awards deleted
         """
         with self.db.session_scope() as session:
-            count = session.query(Award).filter(Award.id.in_(award_ids)).delete()
+            count = session.query(Award).filter(Award.id.in_(award_ids)).update(
+                {Award.deleted: True, Award.deleted_at: datetime.utcnow()},
+                synchronize_session=False
+            )
             return count
 
     def batch_update_level(self, award_ids: list[int], new_level: str) -> int:
@@ -315,7 +328,7 @@ class AwardService:
             awards = session.scalars(
                 select(Award)
                 .where(Award.deleted.is_(True))
-                .options(selectinload(Award.members))
+                .options(selectinload(Award.award_members).selectinload(AwardMember.member))
                 .order_by(Award.deleted_at.desc())
             ).all()
             return list(awards)
@@ -331,6 +344,12 @@ class AwardService:
 
     def permanently_delete_award(self, award_id: int) -> None:
         """彻底删除荣誉记录（不可恢复）"""
+        # 先清理物理文件
+        try:
+            self.attachments.delete_all_for_award(award_id)
+        except Exception as e:
+            logger.error(f"Failed to delete attachment files for award {award_id}: {e}")
+
         with self.db.session_scope() as session:
             award = session.get(Award, award_id)
             if award:

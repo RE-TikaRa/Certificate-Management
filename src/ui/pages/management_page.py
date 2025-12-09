@@ -15,7 +15,14 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from qfluentwidgets import InfoBar, MaskDialogBase, MessageBox, PushButton
+from qfluentwidgets import (
+    FluentIcon,
+    InfoBar,
+    MaskDialogBase,
+    MessageBox,
+    PushButton,
+    TransparentToolButton,
+)
 
 from ..styled_theme import ThemeManager
 from ..table_models import MembersTableModel
@@ -96,7 +103,12 @@ class ManagementPage(BasePage):
         header_layout = QHBoxLayout()
         header_layout.addWidget(make_section_title("成员列表"))
         header_layout.addStretch()
-        from qfluentwidgets import FluentIcon, TransparentToolButton
+
+        # 批量删除按钮
+        self.batch_delete_btn = TransparentToolButton(FluentIcon.DELETE, self)
+        self.batch_delete_btn.setToolTip("批量删除选中成员")
+        self.batch_delete_btn.clicked.connect(self._batch_delete_members)
+        header_layout.addWidget(self.batch_delete_btn)
 
         refresh_btn = TransparentToolButton(FluentIcon.SYNC)
         refresh_btn.setToolTip("刷新数据")
@@ -112,7 +124,7 @@ class ManagementPage(BasePage):
         self.members_table.setMinimumHeight(400)
         self.members_table.horizontalHeader().setStretchLastSection(False)
         self.members_table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
-        self.members_table.setSelectionMode(QTableView.SelectionMode.SingleSelection)
+        self.members_table.setSelectionMode(QTableView.SelectionMode.ExtendedSelection)
         self.members_table.horizontalHeader().setDefaultSectionSize(110)
         self.members_table.verticalHeader().setDefaultSectionSize(44)
         self.members_table.clicked.connect(self._on_table_clicked)
@@ -161,6 +173,33 @@ class ManagementPage(BasePage):
         dialog = MemberDetailDialog(member, parent=self)
         if dialog.exec() and dialog.member_deleted:
             self.refresh()
+
+    def _batch_delete_members(self):
+        """批量删除选中的成员"""
+        selected_indexes = self.members_table.selectionModel().selectedRows()
+        if not selected_indexes:
+            InfoBar.warning("提示", "请先选择要删除的成员", parent=self.window())
+            return
+
+        count = len(selected_indexes)
+        title = "确认批量删除"
+        content = f"确定要删除选中的 {count} 位成员吗？\n此操作不可恢复，且会从相关荣誉记录中移除这些成员。"
+
+        w = MessageBox(title, content, self.window())
+        if w.exec():
+            member_ids = []
+            for index in selected_indexes:
+                member = self.members_model.object_at(index.row())
+                if member:
+                    member_ids.append(member.id)
+
+            try:
+                deleted_count = self.ctx.members.delete_members(member_ids)
+                InfoBar.success("成功", f"已删除 {deleted_count} 位成员", parent=self.window())
+                self.refresh()
+            except Exception as e:
+                logger.exception("批量删除成员失败")
+                InfoBar.error("错误", f"批量删除失败: {e}", parent=self.window())
 
 
 class MemberDetailDialog(MaskDialogBase):

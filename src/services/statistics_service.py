@@ -42,14 +42,14 @@ class StatisticsService:
                     latest_awards.append(award)
 
         totals = {
-            "total": int(result.total) if result else 0,
-            "national": int(result.national) if result else 0,
-            "provincial": int(result.provincial) if result else 0,
-            "school": int(result.school) if result else 0,
-            "first_prize": int(result.first_prize) if result else 0,
-            "second_prize": int(result.second_prize) if result else 0,
-            "third_prize": int(result.third_prize) if result else 0,
-            "excellent_prize": int(result.excellent_prize) if result else 0,
+            "total": int(result.total or 0) if result else 0,
+            "national": int(result.national or 0) if result else 0,
+            "provincial": int(result.provincial or 0) if result else 0,
+            "school": int(result.school or 0) if result else 0,
+            "first_prize": int(result.first_prize or 0) if result else 0,
+            "second_prize": int(result.second_prize or 0) if result else 0,
+            "third_prize": int(result.third_prize or 0) if result else 0,
+            "excellent_prize": int(result.excellent_prize or 0) if result else 0,
         }
 
         return {**totals, "latest_awards": latest_awards}

@@ -96,6 +96,20 @@ class AttachmentManager:
                 saved.append(attachment)
         return saved
 
+    def delete_all_for_award(self, award_id: int) -> None:
+        """物理删除指定荣誉的所有附件文件及目录"""
+        root = self.ensure_root()
+
+        # 删除正常目录
+        award_dir = root / f"award_{award_id}"
+        if award_dir.exists() and award_dir.is_dir():
+            shutil.rmtree(award_dir)
+
+        # 删除回收站中的目录
+        trash_dir = root / ".trash" / f"award_{award_id}"
+        if trash_dir.exists() and trash_dir.is_dir():
+            shutil.rmtree(trash_dir)
+
     def mark_deleted(self, attachment_ids: Iterable[int]) -> None:
         root = self.ensure_root()
         with self.db.session_scope() as session:

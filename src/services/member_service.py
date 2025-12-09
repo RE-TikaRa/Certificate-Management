@@ -39,6 +39,17 @@ class MemberService:
                 session.delete(member)
                 session.flush()
 
+    def delete_members(self, member_ids: list[int]) -> int:
+        """批量删除成员"""
+        with self.db.session_scope() as session:
+            stmt = select(TeamMember).where(TeamMember.id.in_(member_ids))
+            members = session.execute(stmt).scalars().all()
+            count = len(members)
+            for member in members:
+                session.delete(member)
+            session.flush()
+            return count
+
     def list_members(self) -> list[TeamMember]:
         """列出所有成员"""
         with self.db.session_scope() as session:

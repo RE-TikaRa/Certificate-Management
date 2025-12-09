@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
 from qfluentwidgets import (
     BodyLabel,
     CaptionLabel,
+    CheckBox,
     ComboBox,
     DateEdit,
     FluentIcon,
@@ -80,6 +81,8 @@ class OverviewPage(BasePage):
     def __init__(self, ctx, theme_manager: ThemeManager):
         super().__init__(ctx, theme_manager)
         self.awards_list = []
+        self.selected_award_ids = set()
+        self.is_batch_mode = False
 
         self.PAGE_SIZE = 20
         self.current_page = 0
@@ -138,6 +141,20 @@ class OverviewPage(BasePage):
         header_layout.addWidget(make_section_title("荣誉列表"))
         header_layout.addStretch()
         from qfluentwidgets import FluentIcon, TransparentToolButton
+
+        # 批量删除按钮
+        self.batch_delete_btn = TransparentToolButton(FluentIcon.DELETE, self)
+        self.batch_delete_btn.setToolTip("删除选中项目")
+        self.batch_delete_btn.clicked.connect(self._batch_delete_awards)
+        self.batch_delete_btn.hide()
+        header_layout.addWidget(self.batch_delete_btn)
+
+        # 批量管理按钮
+        self.batch_mode_btn = TransparentToolButton(FluentIcon.EDIT, self)
+        self.batch_mode_btn.setToolTip("批量管理")
+        self.batch_mode_btn.setCheckable(True)
+        self.batch_mode_btn.toggled.connect(self._toggle_batch_mode)
+        header_layout.addWidget(self.batch_mode_btn)
 
         refresh_btn = TransparentToolButton(FluentIcon.SYNC)
         refresh_btn.setToolTip("刷新数据")
@@ -546,6 +563,15 @@ class OverviewPage(BasePage):
         # 顶部：标题 + 级别标签
         top_layout = QHBoxLayout()
 
+        # 批量选择复选框
+        checkbox = CheckBox()
+        checkbox.setFixedSize(24, 24)
+        checkbox.setVisible(self.is_batch_mode)
+        checkbox.setChecked(award.id in self.selected_award_ids)
+        # 使用闭包捕获 award.id
+        checkbox.stateChanged.connect(lambda state, aid=award.id: self._on_card_checked(state, aid))
+        top_layout.addWidget(checkbox)
+
         # 标题和级别
         title_level_layout = QVBoxLayout()
 
@@ -602,6 +628,11 @@ class OverviewPage(BasePage):
         delete_btn.setFixedHeight(28)
         delete_btn.clicked.connect(lambda: self._delete_award(award))
 
+        # 批量模式下隐藏单个操作按钮
+        if self.is_batch_mode:
+            edit_btn.hide()
+            delete_btn.hide()
+
         action_layout.addWidget(edit_btn)
         action_layout.addSpacing(6)
         action_layout.addWidget(delete_btn)
@@ -609,6 +640,64 @@ class OverviewPage(BasePage):
         card_layout.addLayout(action_layout)
 
         return card
+
+    def _toggle_batch_mode(self, checked: bool):
+        """切换批量管理模式"""
+        self.is_batch_mode = checked
+        self.batch_delete_btn.setVisible(checked)
+
+        # 如果退出批量模式，清空选择
+        if not checked:
+            self.selected_award_ids.clear()
+            self.batch_delete_btn.setEnabled(False)
+
+        # 更新所有卡片的显示状态
+        for i in range(self.awards_layout.count()):
+            item = self.awards_layout.itemAt(i)
+            widget = item.widget()
+            if widget and widget.property("card"):
+                # 查找复选框
+                checkbox = widget.findChild(CheckBox)
+                if checkbox:
+                    checkbox.setVisible(checked)
+                    checkbox.setChecked(False)
+
+                # 查找操作按钮并反向显示
+                buttons = widget.findChildren(PushButton) # 编辑和删除按钮
+                for btn in buttons:
+                    if btn.text() in ["编辑", "删除"]:
+                        btn.setVisible(not checked)
+
+    def _on_card_checked(self, state, award_id):
+        """处理卡片选中状态"""
+        if state == 2: # Checked
+            self.selected_award_ids.add(award_id)
+        else:
+            self.selected_award_ids.discard(award_id)
+
+        self.batch_delete_btn.setEnabled(bool(self.selected_award_ids))
+
+    def _batch_delete_awards(self):
+        """批量删除选中的荣誉"""
+        if not self.selected_award_ids:
+            return
+
+        count = len(self.selected_award_ids)
+        title = "确认批量删除"
+        content = f"确定要删除选中的 {count} 个荣誉项目吗？\n这些项目将被移至回收站。"
+
+        w = MessageBox(title, content, self.window())
+        if w.exec():
+            try:
+                deleted_count = self.ctx.awards.batch_delete_awards(list(self.selected_award_ids))
+                InfoBar.success("成功", f"已删除 {deleted_count} 个项目", parent=self.window())
+
+                # 退出批量模式并刷新
+                self.batch_mode_btn.setChecked(False)
+                self.refresh()
+            except Exception as e:
+                logger.exception("批量删除失败")
+                InfoBar.error("错误", f"批量删除失败: {e}", parent=self.window())
 
     def _edit_award(self, award) -> None:
         """编辑荣誉"""
@@ -968,6 +1057,17 @@ class AwardDetailDialog(MaskDialogBase):
         header_layout.addWidget(member_label)
         header_layout.addStretch()
 
+        # 上/下移动按钮
+        up_btn = TransparentToolButton(FluentIcon.UP)
+        up_btn.setToolTip("上移")
+        up_btn.setFixedSize(28, 28)
+        header_layout.addWidget(up_btn)
+
+        down_btn = TransparentToolButton(FluentIcon.DOWN)
+        down_btn.setToolTip("下移")
+        down_btn.setFixedSize(28, 28)
+        header_layout.addWidget(down_btn)
+
         # 导入文档按钮
         import_btn = PushButton("导入文档")
         import_btn.setIcon(FluentIcon.DOCUMENT)
@@ -1062,10 +1162,13 @@ class AwardDetailDialog(MaskDialogBase):
         import_btn.clicked.connect(lambda: self._import_from_doc(member_fields))
         history_btn.clicked.connect(lambda: self._select_from_history(member_fields))
         delete_btn.clicked.connect(lambda: self._remove_member_card(member_card, member_fields))
+        up_btn.clicked.connect(lambda: self._move_member_up(member_card))
+        down_btn.clicked.connect(lambda: self._move_member_down(member_card))
 
-        member_data = {"card": member_card, "fields": member_fields}
+        member_data = {"card": member_card, "fields": member_fields, "label": member_label}
         self.members_data.append(member_data)
         self.members_list_layout.addWidget(member_card)
+        self._update_member_indices()
 
     def _add_member_row(self):
         """添加空白成员卡片"""
@@ -1095,6 +1198,34 @@ class AwardDetailDialog(MaskDialogBase):
                 self.members_data.pop(idx)
                 break
         member_card.deleteLater()
+        self._update_member_indices()
+
+    def _move_member_up(self, member_card: QWidget) -> None:
+        """将成员卡片上移一位"""
+        idx = next((i for i, data in enumerate(self.members_data) if data["card"] == member_card), -1)
+        if idx <= 0:
+            return
+        self.members_data[idx - 1], self.members_data[idx] = self.members_data[idx], self.members_data[idx - 1]
+        self.members_list_layout.removeWidget(member_card)
+        self.members_list_layout.insertWidget(idx - 1, member_card)
+        self._update_member_indices()
+
+    def _move_member_down(self, member_card: QWidget) -> None:
+        """将成员卡片下移一位"""
+        idx = next((i for i, data in enumerate(self.members_data) if data["card"] == member_card), -1)
+        if idx == -1 or idx >= len(self.members_data) - 1:
+            return
+        self.members_data[idx + 1], self.members_data[idx] = self.members_data[idx], self.members_data[idx + 1]
+        self.members_list_layout.removeWidget(member_card)
+        self.members_list_layout.insertWidget(idx + 1, member_card)
+        self._update_member_indices()
+
+    def _update_member_indices(self) -> None:
+        """同步成员索引标签"""
+        for index, data in enumerate(self.members_data, start=1):
+            label = data.get("label")
+            if label:
+                label.setText(f"成员 #{index}")
 
     def _import_from_doc(self, member_fields: dict) -> None:
         """从 .doc 文档导入成员信息"""

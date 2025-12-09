@@ -13,6 +13,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
+from sqlalchemy.ext.associationproxy import AssociationProxy, association_proxy
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 metadata = MetaData(
@@ -35,6 +36,22 @@ class Base(DeclarativeBase):
     )
 
 
+class AwardMember(Base):
+    __tablename__ = "award_members"
+    
+    # Exclude Base columns that don't exist in the legacy table
+    id = None
+    created_at = None
+    updated_at = None
+
+    award_id: Mapped[int] = mapped_column(ForeignKey("awards.id", ondelete="CASCADE"), primary_key=True)
+    member_id: Mapped[int] = mapped_column(ForeignKey("team_members.id", ondelete="CASCADE"), primary_key=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+    member: Mapped["TeamMember"] = relationship(back_populates="award_associations")
+    award: Mapped["Award"] = relationship(back_populates="award_members")
+
+
 class Award(Base):
     __tablename__ = "awards"
 
@@ -48,8 +65,15 @@ class Award(Base):
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime)
 
-    members: Mapped[list["TeamMember"]] = relationship(
-        secondary=lambda: award_members_table, back_populates="awards", lazy="joined"
+    award_members: Mapped[list["AwardMember"]] = relationship(
+        back_populates="award",
+        order_by="AwardMember.sort_order",
+        cascade="all, delete-orphan",
+    )
+    members: AssociationProxy[list["TeamMember"]] = association_proxy(
+        "award_members",
+        "member",
+        creator=lambda m: AwardMember(member=m),
     )
     attachments: Mapped[list["Attachment"]] = relationship(
         back_populates="award", cascade="all, delete-orphan"
@@ -72,17 +96,15 @@ class TeamMember(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     sort_index: Mapped[int] = mapped_column(Integer, default=0)
 
-    awards: Mapped[list[Award]] = relationship(
-        secondary=lambda: award_members_table, back_populates="members"
+    award_associations: Mapped[list["AwardMember"]] = relationship(
+        back_populates="member", cascade="all, delete-orphan"
+    )
+    awards: AssociationProxy[list["Award"]] = association_proxy(
+        "award_associations",
+        "award",
+        creator=lambda a: AwardMember(award=a),
     )
 
-
-award_members_table = Table(
-    "award_members",
-    Base.metadata,
-    Column("award_id", ForeignKey("awards.id", ondelete="CASCADE"), primary_key=True),
-    Column("member_id", ForeignKey("team_members.id", ondelete="CASCADE"), primary_key=True),
-)
 
 
 class Attachment(Base):
