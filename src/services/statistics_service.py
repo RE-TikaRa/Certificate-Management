@@ -2,9 +2,10 @@ from datetime import date
 from typing import Any
 
 from sqlalchemy import func, select
+from sqlalchemy.orm import selectinload
 
 from ..data.database import Database
-from ..data.models import Award
+from ..data.models import Award, AwardMember
 
 
 class StatisticsService:
@@ -31,15 +32,12 @@ class StatisticsService:
                 func.sum(case((Award.rank == "优秀奖", 1), else_=0)).label("excellent_prize"),
             ).first()
 
-            # Separate query for latest awards (needed for UI display)
-            # Get only award IDs first to avoid loading relationships
-            award_ids = session.query(Award.id).order_by(Award.award_date.desc()).limit(10).all()
-            # Now load full Award objects by ID
-            latest_awards = []
-            for (aid,) in award_ids:
-                award = session.get(Award, aid)
-                if award:
-                    latest_awards.append(award)
+            latest_awards = session.scalars(
+                select(Award)
+                    .options(selectinload(Award.award_members).selectinload(AwardMember.member))
+                    .order_by(Award.award_date.desc())
+                    .limit(10)
+            ).all()
 
         totals = {
             "total": int(result.total or 0) if result else 0,
