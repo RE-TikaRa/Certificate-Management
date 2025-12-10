@@ -1,16 +1,15 @@
-# 荣誉证书管理系统
-
-![Python](https://img.shields.io/badge/Python-3.14+-blue)
-![PySide6](https://img.shields.io/badge/PySide6-latest-green)
-![License](https://img.shields.io/badge/License-MIT-orange)
+<h1 align="center">荣誉证书管理系统</h1>
 
 <p align="center">
-  <table>
-    <tr>
-      <td align="center"><img src="img/LOGO.svg" alt="Logo" width="360" /></td>
-      <td align="center"><img src="img/NewLogo.svg" alt="Logo" width="360" /></td>
-    </tr>
-  </table>
+  <img src="https://img.shields.io/badge/Python-3.14+-blue" />
+  <img src="https://img.shields.io/badge/PySide6-latest-green" />
+  <img src="https://img.shields.io/badge/License-MIT-orange" />
+</p>
+
+<p align="center">
+  <img src="img/LOGO.svg" alt="Logo" width="360" />
+  &nbsp;&nbsp;&nbsp;
+  <img src="img/NewLogo.svg" alt="Logo" width="360" />
 </p>
 
 一款功能完整、界面精美的荣誉证书管理桌面应用，基于 PySide6 和 QFluentWidgets 开发。支持荣誉证书的全生命周期管理：从录入、统计分析、成员管理到附件管理，一应俱全。
