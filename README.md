@@ -1,525 +1,457 @@
-<h1 align="center">荣誉证书管理系统</h1>
+<div align="center">
+  <!-- Logo Section -->
+  <img src="img/LOGO.svg" alt="Logo" width="180" />
+  <img src="img/NewLogo.svg" alt="Logo" width="180" />
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Python-3.14+-blue" />
-  <img src="https://img.shields.io/badge/PySide6-latest-green" />
-  <img src="https://img.shields.io/badge/License-MIT-orange" />
-</p>
+  <!-- Typing Effect Title -->
+  <h1>荣誉证书管理系统</h1>
+  <a href="https://git.io/typing-svg">
+    <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&pause=1000&color=36BCF7&background=00000000&center=true&vCenter=true&width=500&lines=全生命周期荣誉管理;PySide6+%2B+QFluentWidgets+打造;精美界面+极致体验;数据本地化+自动备份" alt="Typing SVG" />
+  </a>
 
-<p align="center">
-  <img src="img/LOGO.svg" alt="Logo" width="360" />
-  &nbsp;&nbsp;&nbsp;
-  <img src="img/NewLogo.svg" alt="Logo" width="360" />
-</p>
+  <p>
+    一款功能完整、界面精美的荣誉证书管理桌面应用。<br/>
+    支持荣誉证书的全生命周期管理：从录入、统计分析、成员管理到附件管理，一应俱全。
+  </p>
 
-一款功能完整、界面精美的荣誉证书管理桌面应用，基于 PySide6 和 QFluentWidgets 开发。支持荣誉证书的全生命周期管理：从录入、统计分析、成员管理到附件管理，一应俱全。
+  <!-- Badges -->
+  <p>
+    <img src="https://img.shields.io/badge/Python-3.14+-3776AB?style=for-the-badge&logo=python&logoColor=white" />
+    <img src="https://img.shields.io/badge/PySide6-Latest-41CD52?style=for-the-badge&logo=qt&logoColor=white" />
+    <img src="https://img.shields.io/badge/License-MIT-orange?style=for-the-badge" />
+    <img src="https://img.shields.io/badge/Platform-Win%20%7C%20Mac%20%7C%20Linux-lightgrey?style=for-the-badge&logo=linux&logoColor=black" />
+  </p>
 
-[查看Demo](#快速开始) · [报告Bug](https://github.com/RE-TikaRa/Certificate-Management/issues) · [提出新特性](https://github.com/RE-TikaRa/Certificate-Management/issues)
-
----
-
-## 核心功能
-
-### 仪表盘与数据统计
-- **实时指标卡片**：8 个关键指标卡片，采用彩色梯度设计
-  - 综合统计：总荣誉数、国家级、省级、校级
-  - 等级统计：一等奖、二等奖、三等奖、优秀奖
-- **可视化分析**：
-  - 饼图：荣誉级别分布
-  - 柱状图：奖项等级分布
-  - 汇总表：按级别和等级的数量统计
-- **最近录入**：展示最新 10 条荣誉记录，快速查看最新数据
-
-### 荣誉录入与编辑
-- **完整信息录入**：
-  - 基本信息：比赛名称、获奖日期
-  - 赛事级别：国家级、省级、校级
-  - 奖项等级：一等奖、二等奖、三等奖、优秀奖
-  - 其他信息：证书编号、备注说明
-- **成员管理**：支持添加多名参与成员，实时编辑和删除
-  - 基本信息：姓名、性别
-  - 身份信息：身份证号
-  - 联系方式：手机号、邮箱
-  - 学生信息：学号、专业、班级、学院
-- **专业智能搜索**：
-  - 66 个专业数据库，支持中文和拼音模糊搜索
-  - 下拉列表自动完成，最多显示 8 个结果
-  - 点击选择即可自动填充，包含专业代码与学院信息
-  - 学校代码缺失时自动回退用学校名称匹配，学院照常带出
-  - 支持从 Excel 导入专业列表
-- **动态卡片界面**：成员以卡片形式展示，支持二列布局，响应式设计
-
-### 荣誉总览与快速编辑
-- **完整荣誉列表**：展示所有荣誉及其关键信息
-- **全文搜索 + 筛选**：FTS5 支持多关键词命中比赛名/证书号/成员姓名；配合等级、奖项、日期范围筛选
-- **灵活排序**：8 种排序方式（日期/等级/奖项/名称正反）
-- **对话框编辑**：在专用编辑窗口中修改荣誉信息
-- **成员在线编辑**：直接在对话框中添加、修改或删除成员
-- **快速删除**：确认后删除荣誉记录及所有关联数据
-
-### 成员管理与历史追踪
-- **成员列表视图**：显示所有成员及其详细信息
-- **参与荣誉查看**：每个成员对应的所有荣誉记录
-- **信息编辑**：支持修改成员的各类信息
-- **完整字段支持**：9 个信息字段（姓名、性别、身份证号、手机号、学号、邮箱、专业、班级、学院）
-- **自动数据刷新**：修改成员信息后自动更新所有关联视图
-
-### 附件管理与回收站
-- **灵活的附件上传**：为每条荣誉记录上传相关证明文件
-- **回收站管理**：删除的附件可恢复或彻底删除
-- **快速访问**：直接打开附件所在文件夹，方便查看和整理
-
-### 数据管理与备份
-- **自动备份机制**：支持设置自动备份频率，恢复前可勾选“自动创建当前备份”
-- **批量导入导出**：支持 CSV / XLSX 导入、导出；导入预检、错误行导出与进度 ETA
-- **清理工具**：一键或分项清空日志、备份目录和数据库（双重确认）
-- **本地数据库**：SQLite 数据库，数据完全本地化存储
-- **事务支持**：基于 SQLAlchemy ORM，支持事务回滚
-
-### 系统设置
-- **主题切换**：支持浅色和深色两种主题，自动适配系统设置
-  - 实时主题切换：无需重启，所有页面立即响应
-  - 动态样式更新：包括滚动区域、卡片、输入框等所有组件
-- **日志管理**：可配置的日志记录策略，便于问题追踪
-- **数据目录设置**：灵活设置数据存储位置
-- **备份频率配置**：自定义自动备份时间间隔
-
-### 关于页面
-- **系统信息**：展示应用名称、版本号、开发者信息
-- **功能特性**：展示核心功能列表和技术栈
-- **项目链接**：GitHub 仓库、问题反馈链接
-- **版权声明**：许可证和版权信息
+  <!-- Action Buttons -->
+  <p>
+    <a href="#-快速开始">
+      <img src="https://img.shields.io/badge/🚀_立即运行-Start_Demo-blue?style=flat-square" alt="Start Demo">
+    </a>
+    &nbsp;
+    <a href="https://github.com/RE-TikaRa/Certificate-Management/issues">
+      <img src="https://img.shields.io/badge/🐛_反馈问题-Report_Bug-red?style=flat-square" alt="Report Bug">
+    </a>
+    &nbsp;
+    <a href="#-文件目录说明">
+      <img src="https://img.shields.io/badge/📚_浏览文档-Explore_Docs-green?style=flat-square" alt="Explore Docs">
+    </a>
+  </p>
+</div>
 
 ---
 
-## 快速开始
+<!-- Table of Contents -->
+<details>
+  <summary><strong>📖 目录导航 (点击展开)</strong></summary>
 
-### 系统要求
-- **操作系统**：Windows / macOS / Linux
-- **Python 版本**：3.14 或更高版本
-- **内存**：建议 4GB 以上
-- **磁盘**：至少 200MB 可用空间
+- [✨ 核心特性](#-核心特性)
+  - [🎯 功能详情](#-功能详情)
+- [🛠️ 技术栈](#️-技术栈)
+- [📸 界面预览](#-界面预览)
+- [🚀 快速开始](#-快速开始)
+  - [📥 安装步骤](#-安装步骤)
+  - [🛠️ 常用命令](#️-常用命令)
+- [📂 文件目录说明](#-文件目录说明)
+- [🏗️ 项目架构](#️-项目架构)
+- [💾 数据模型](#-数据模型)
+  - [🏆 荣誉记录 (Awards)](#-荣誉记录-awards)
+  - [👤 参与成员 (TeamMembers)](#-参与成员-teammembers)
+- [🔐 数据安全与备份](#-数据安全与备份)
+- [🎨 主题系统](#-主题系统)
+- [🛠️ 开发指南](#️-开发指南)
+- [🧰 故障排查](#-故障排查)
+- [📈 Star History](#-star-history)
+- [🤝 如何贡献](#-如何贡献)
+- [📄 许可证](#-许可证)
 
-### 安装步骤
+</details>
+
+---
+
+## ✨ 核心特性
+
+<div align="center">
+  <table>
+    <tr>
+      <td align="center" width="25%">
+        <h3>⚡ 极速检索</h3>
+        <p>500ms 防抖全文检索<br/>FTS5 引擎加持</p>
+      </td>
+      <td align="center" width="25%">
+        <h3>📊 数据可视化</h3>
+        <p>8 张动态指标卡<br/>图表实时联动</p>
+      </td>
+      <td align="center" width="25%">
+        <h3>🧭 丝滑体验</h3>
+        <p>页面异步懒加载<br/>启动速度飞快</p>
+      </td>
+      <td align="center" width="25%">
+        <h3>🛡️ 数据安全</h3>
+        <p>本地 SQLite 存储<br/>自动定时备份</p>
+      </td>
+    </tr>
+    <tr>
+      <td align="center">
+        <h3>🧠 智能补全</h3>
+        <p>专业/学院自动匹配<br/>支持拼音/代码搜索</p>
+      </td>
+      <td align="center">
+        <h3>🗑️ 后悔药</h3>
+        <p>附件回收站机制<br/>双重删除确认</p>
+      </td>
+      <td align="center">
+        <h3>🎨 炫彩主题</h3>
+        <p>深色/浅色模式<br/>一键实时切换</p>
+      </td>
+      <td align="center">
+        <h3>🛠️ 运维工具</h3>
+        <p>一键清理日志/备份<br/>数据库维护工具</p>
+      </td>
+    </tr>
+  </table>
+</div>
+
+### 🎯 功能详情
+
+- **仪表盘**: 实时指标卡片 (总数/级别/等级)，饼图/柱状图可视化，最近录入速览。
+- **荣誉管理**: 完整字段录入 (比赛/日期/级别/等级/证书号)，多成员动态卡片管理。
+- **智能搜索**: 基于 2025 教育部目录，支持中文/拼音/代码模糊搜索，自动回退匹配。
+- **高级筛选**: 多维度排序 (8种)，组合筛选 (等级/奖项/日期)，CSV/XLSX 导入导出。
+- **系统设置**: 自动备份频率，数据目录迁移，日志级别控制，一键重置。
+
+---
+
+## 🛠️ 技术栈
+
+<div align="center">
+
+| **核心框架** | **数据存储** | **工具链** |
+| :---: | :---: | :---: |
+| ![PySide6](https://img.shields.io/badge/PySide6-41CD52?style=for-the-badge&logo=qt&logoColor=white) | ![SQLite](https://img.shields.io/badge/SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white) | ![UV](https://img.shields.io/badge/UV-Workflow-purple?style=for-the-badge) |
+| ![QFluentWidgets](https://img.shields.io/badge/QFluentWidgets-Fluent_UI-0078D4?style=for-the-badge&logo=microsoft&logoColor=white) | ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-ORM-D71F00?style=for-the-badge&logo=sqlalchemy&logoColor=white) | ![Ruff](https://img.shields.io/badge/Ruff-Linter-FCC21B?style=for-the-badge&logo=python&logoColor=black) |
+
+</div>
+
+---
+
+## 📸 界面预览
+
+> 💡 **提示**: 点击图片可查看大图
+
+<div align="center">
+  <table>
+    <tr>
+      <td align="center">
+        <img src="https://s2.loli.net/2025/12/10/KbLFB2Ta3E8rCsf.jpg" alt="Home" width="100%" />
+        <br/><b>🏠 首页</b><br/>快速导航与最近动态
+      </td>
+      <td align="center">
+        <img src="https://s2.loli.net/2025/12/10/18nQ5Mt9yos4G7j.png" alt="Dashboard" width="100%" />
+        <br/><b>📊 仪表盘</b><br/>指标卡 + 统计图表
+      </td>
+    </tr>
+    <tr>
+      <td align="center">
+        <img src="https://s2.loli.net/2025/12/10/IA1hHyCiEGlfNSx.png" alt="Entry" width="100%" />
+        <br/><b>📝 录入页</b><br/>成员卡片式表单
+      </td>
+      <td align="center">
+        <img src="https://s2.loli.net/2025/12/10/dKcrQUTo3xghDNq.png" alt="Overview" width="100%" />
+        <br/><b>👀 总览页</b><br/>FTS5 搜索 + 筛选排序
+      </td>
+    </tr>
+    <tr>
+      <td align="center">
+        <img src="https://s2.loli.net/2025/12/10/whom7bQ8pHrvdiT.png" alt="Members" width="100%" />
+        <br/><b>👥 成员管理</b><br/>10 字段监控与详情
+      </td>
+      <td align="center">
+        <img src="https://s2.loli.net/2025/12/10/eC2vklNYSyF5ipo.png" alt="Settings" width="100%" />
+        <br/><b>⚙️ 设置页</b><br/>主题/备份/清理/日志
+      </td>
+    </tr>
+  </table>
+</div>
+
+---
+
+## 🚀 快速开始
+
+<div align="center">
+  <img src="https://img.shields.io/badge/Python-3.14+-3776AB?style=flat-square&logo=python&logoColor=white" />
+  <img src="https://img.shields.io/badge/UV-Package_Manager-purple?style=flat-square" />
+  <img src="https://img.shields.io/badge/SQLite-Database-003B57?style=flat-square&logo=sqlite&logoColor=white" />
+</div>
+
+### 📥 安装步骤
 
 1. **克隆仓库**
-```bash
-git clone https://github.com/RE-TikaRa/Certificate-Management.git
-cd Certificate-Management
-```
+   ```bash
+   git clone https://github.com/RE-TikaRa/Certificate-Management.git
+   cd Certificate-Management
+   ```
 
-2. **安装依赖**
-```bash
-# 安装 uv（如已安装则跳过）
-# pip install uv
+2. **安装依赖** (推荐使用 `uv`)
+   ```bash
+   # 安装 uv (如果尚未安装)
+   # pip install uv
 
-# 同步虚拟环境
-uv sync
-```
+   # 同步环境
+   uv sync
+   ```
 
-3. **运行应用**
+3. **启动应用**
+   ```bash
+   # Windows 快捷启动
+   ./main.bat
 
-Windows：
-```bash
-main.bat
-```
+   # 或使用 uv 启动
+   uv run python -m src.main
+   ```
 
-或使用 uv 运行：
-```bash
-uv run python -m src.main
-```
+### 🛠️ 常用命令
 
-调试模式：
-```bash
-uv run python -m src.main --debug
-```
+| 操作 | 命令 | 说明 |
+| :--- | :--- | :--- |
+| **运行** | `uv run python -m src.main` | 启动主程序 |
+| **调试** | `uv run python -m src.main --debug` | 开启调试日志 |
+| **检查** | `uv run ruff check .` | 代码 Lint 检查 |
+| **格式化** | `uv run ruff format .` | 代码自动格式化 |
 
 ---
 
-## 文件目录说明
+## 📂 文件目录说明
+
+<details>
+<summary><strong>点击展开完整目录树</strong></summary>
 
 ```
 Certificate-Management/
-├── README.md                    # 本文件
-├── pyproject.toml               # 依赖与构建配置
-├── uv.lock                      # uv 生成的锁定文件
-├── main.bat                     # Windows 启动脚本
-├── .gitignore                   # Git 忽略规则
+├── 📄 README.md                    # 项目文档
+├── ⚙️ pyproject.toml               # 依赖配置
+├── 🔒 uv.lock                      # 依赖锁定
+├── 🚀 main.bat                     # Windows 启动脚本
+├── 🚫 .gitignore                   # Git 忽略规则
 │
-├── src/                         # 源代码目录
-│   ├── __init__.py
-│   ├── main.py                  # 应用入口
-│   ├── app_context.py           # 应用上下文，初始化和引导
-│   ├── config.py                # 配置管理
-│   ├── logger.py                # 日志系统配置
+├── 📦 src/                         # 源代码
+│   ├── 🏁 main.py                  # 入口文件
+│   ├── 🌍 app_context.py           # DI 容器
+│   ├── ⚙️ config.py                # 配置加载
+│   ├── 📝 logger.py                # 日志配置
 │   │
-│   ├── data/                    # 数据层（ORM 模型和数据库操作）
-│   │   ├── __init__.py
-│   │   ├── models.py            # SQLAlchemy 数据模型
-│   │   ├── database.py          # 数据库连接和会话管理
-│   │   └── __pycache__/
+│   ├── 💾 data/                    # 数据层
+│   │   ├── models.py               # SQLAlchemy 模型
+│   │   └── database.py             # 数据库会话
 │   │
-│   ├── services/                # 业务层（业务逻辑和数据服务）
-│   │   ├── __init__.py
-│   │   ├── award_service.py     # 荣誉相关服务
-│   │   ├── statistics_service.py # 统计分析服务
-│   │   ├── import_export.py     # 数据导入导出服务
-│   │   ├── backup_manager.py    # 备份管理服务
-│   │   ├── attachment_manager.py # 附件管理服务
-│   │   ├── settings_service.py  # 设置管理服务
-│   │   ├── major_service.py     # 专业搜索服务
-│   │   └── __pycache__/
+│   ├── 🔧 services/                # 业务层
+│   │   ├── award_service.py        # 荣誉逻辑
+│   │   ├── statistics_service.py   # 统计分析
+│   │   ├── import_export.py        # 导入导出
+│   │   └── ...
 │   │
-│   ├── ui/                      # 表现层（用户界面）
-│   │   ├── __init__.py
-│   │   ├── main_window.py       # 主窗口框架
-│   │   ├── theme.py             # UI 主题工具函数
-│   │   ├── styled_theme.py      # 主题管理和样式应用
-│   │   ├── __pycache__/
-│   │   │
-│   │   ├── widgets/             # 自定义组件
-│   │   │   └── major_search.py  # 专业搜索组件
-│   │   │
-│   │   └── pages/               # 页面模块
-│   │       ├── __init__.py
-│   │       ├── base_page.py     # 页面基类
-│   │       ├── home_page.py     # 首页
-│   │       ├── dashboard_page.py # 仪表盘页面
-│   │       ├── entry_page.py    # 荣誉录入页面
-│   │       ├── overview_page.py # 荣誉总览页面
-│   │       ├── management_page.py # 成员管理页面
-│   │       ├── recycle_page.py  # 附件回收站页面
-│   │       ├── about_page.py    # 关于页面
-│   │       ├── settings_page.py # 系统设置页面
-│   │       └── __pycache__/
+│   ├── 🎨 ui/                      # 表现层
+│   │   ├── main_window.py          # 主窗口
+│   │   ├── styled_theme.py         # 主题管理
+│   │   ├── pages/                  # 各功能页面
+│   │   └── widgets/                # 自定义组件
 │   │
-│   └── resources/               # 资源文件
-│       ├── styles/              # QSS 样式文件
-│       │   ├── styled_light.qss  # 浅色主题样式
-│       │   └── styled_dark.qss   # 深色主题样式
-│       └── templates/           # 数据导入模板
-│           └── awards_template.csv
+│   └── 📂 resources/               # 静态资源
+│       ├── styles/                 # QSS 样式
+│       └── templates/              # 导入模板
 │
-├── tools/                       # 工具脚本
-│   ├── import_majors.py         # 专业数据导入脚本
-│   └── index.xlsx               # 专业列表模板
-│
-├── data/                        # 本地数据存储（由应用自动创建）
-│   └── awards.db                # SQLite 数据库文件
-│
-├── attachments/                 # 附件存储目录
-├── backups/                     # 自动备份目录
-├── logs/                        # 应用日志目录
-├── docs/                        # 文档目录
-│   └── system_design.md         # 系统设计文档
-└── temp/                        # 临时文件目录
+├── 📂 data/                        # 数据库存储 (自动生成)
+├── 📂 attachments/                 # 附件存储
+├── 📂 backups/                     # 自动备份
+├── 📂 logs/                        # 运行日志
+└── 📂 docs/                        # 文档与参考数据
+```
+</details>
+
+---
+
+## 🏗️ 项目架构
+
+```mermaid
+flowchart TD
+    subgraph UI [表现层 Presentation]
+        direction TB
+        MainWindow[主窗口 MainWindow]
+        Pages[页面 Pages]
+        Widgets[组件 Widgets]
+        Theme[主题 ThemeManager]
+    end
+
+    subgraph Service [业务层 Business Logic]
+        direction TB
+        AwardSvc[荣誉服务 AwardService]
+        StatSvc[统计服务 StatisticsService]
+        BackupSvc[备份服务 BackupManager]
+        ImportSvc[导入服务 ImportExport]
+    end
+
+    subgraph Data [数据层 Data Access]
+        direction TB
+        ORM[SQLAlchemy ORM]
+        SQLite[(SQLite Database)]
+    end
+
+    UI --> Service
+    Service --> Data
+    
+    style UI fill:#e1f5fe,stroke:#01579b
+    style Service fill:#fff3e0,stroke:#ff6f00
+    style Data fill:#e8f5e9,stroke:#2e7d32
 ```
 
----
-
-## 项目架构
-
-本项目采用经典的分层架构模式：
-
-```
-┌─────────────────────────────────────┐
-│       表现层（Presentation）         │
-│  PySide6 + QFluentWidgets           │
-│  (UI Pages, Windows, Dialogs)       │
-└──────────────┬──────────────────────┘
-               │
-┌──────────────▼──────────────────────┐
-│       业务层（Business Logic）       │
-│  Services                           │
-│  (Award, Statistics, Backup, etc)   │
-└──────────────┬──────────────────────┘
-               │
-┌──────────────▼──────────────────────┐
-│       数据层（Data Access）          │
-│  SQLAlchemy ORM + SQLite            │
-│  (Models, Database Operations)      │
-└─────────────────────────────────────┘
-```
-
-### 核心特性
-
-- **ORM 数据访问**：使用 SQLAlchemy 实现数据模型和数据库操作，代码整洁
-- **事务管理**：采用 session_scope() 会话管理，支持事务回滚
-- **主题系统**：通过 QSS (Qt StyleSheet) 实现深色和浅色主题动态切换
-- **响应式设计**：页面自适应布局，支持不同窗口大小
-- **异步加载**：后台加载页面，避免启动时界面卡顿
-- **数据验证**：每个操作都有数据完整性检查
+> **架构说明**：本项目采用经典的三层架构（表现层、业务层、数据层），各层职责分明，通过依赖注入（DI）容器 `AppContext` 进行解耦。
 
 ---
 
-## 数据模型
+## 💾 数据模型
 
-### 荣誉记录
-| 字段                | 类型         | 说明                                    |
-| ------------------- | ------------ | --------------------------------------- |
-| `id`                | Integer      | 主键，自增                              |
-| `competition_name`  | String       | 比赛名称                                |
-| `award_date`        | Date         | 获奖日期                                |
-| `level`             | String       | 赛事级别（国家级/省级/校级）            |
-| `rank`              | String       | 奖项等级（一等奖/二等奖/三等奖/优秀奖） |
-| `certificate_code`  | String       | 证书编号                                |
-| `remarks`           | Text         | 备注说明                                |
-| `attachment_folder` | String       | 附件目录相对路径                        |
-| `deleted`           | Boolean      | 软删除标记                              |
-| `deleted_at`        | DateTime     | 软删除时间                              |
-| `members`           | Relationship | 参与成员（多对多关系）                  |
-| `attachments`       | Relationship | 附件记录（级联删除）                    |
-| `created_at`        | DateTime     | 创建时间                                |
-| `updated_at`        | DateTime     | 更新时间                                |
+<details>
+<summary><strong>查看详细数据库表结构</strong></summary>
 
-### 参与成员
-| 字段         | 类型         | 说明                     |
-| ------------ | ------------ | ------------------------ |
-| `id`         | Integer      | 主键，自增               |
-| `name`       | String       | 姓名                     |
-| `gender`     | String       | 性别                     |
-| `id_card`    | String       | 身份证号                 |
-| `phone`      | String       | 手机号                   |
-| `student_id` | String       | 学号                     |
-| `email`      | String       | 邮箱地址                 |
-| `major`      | String       | 专业                     |
-| `class_name` | String       | 班级                     |
-| `college`    | String       | 学院                     |
-| `pinyin`     | String       | 姓名拼音（搜索加速）     |
-| `active`     | Boolean      | 启用状态                 |
-| `sort_index` | Integer      | 自定义排序权重           |
-| `awards`     | Relationship | 参与的荣誉（多对多关系） |
-| `created_at` | DateTime     | 创建时间                 |
-| `updated_at` | DateTime     | 更新时间                 |
+### 🏆 荣誉记录 (Awards)
+| 字段 | 类型 | 说明 |
+| :--- | :--- | :--- |
+| `id` | Integer | 主键 |
+| `competition_name` | String | 比赛名称 |
+| `level` | String | 级别 (国家/省/校) |
+| `rank` | String | 等级 (一/二/三/优秀) |
+| `members` | Relation | 关联成员 |
+| `attachments` | Relation | 关联附件 |
 
-### 专业信息
-| 字段         | 类型     | 说明             |
-| ------------ | -------- | ---------------- |
-| `id`         | Integer  | 主键，自增       |
-| `name`       | String   | 专业名称（唯一） |
-| `pinyin`     | String   | 拼音（用于搜索） |
-| `category`   | String   | 专业分类         |
-| `created_at` | DateTime | 创建时间         |
-| `updated_at` | DateTime | 更新时间         |
+### 👤 参与成员 (TeamMembers)
+| 字段 | 类型 | 说明 |
+| :--- | :--- | :--- |
+| `id` | Integer | 主键 |
+| `name` | String | 姓名 |
+| `student_id` | String | 学号 (唯一) |
+| `school` | String | 学校 |
+| `major` | String | 专业 |
+| `awards` | Relation | 关联荣誉 |
+
+*(更多模型细节请查阅源码 `src/data/models.py`)*
+</details>
 
 ---
 
-## 主题系统
+## 🔐 数据安全与备份
 
-应用支持浅色和深色两种主题，自动适配系统设置。主题样式通过 QSS 定义。
+<div align="center">
+  <table>
+    <tr>
+      <td width="50%">
+        <h4>🛡️ 本地优先</h4>
+        <p>数据存于 <code>data/awards.db</code>，附件在 <code>attachments/</code>，默认不上传云端。</p>
+      </td>
+      <td width="50%">
+        <h4>🔄 自动备份</h4>
+        <p>支持每日/每周/启动前自动备份，恢复前可自动创建还原点。</p>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <h4>🗑️ 附件安全</h4>
+        <p>MD5 校验去重，删除操作进入回收站，支持一键还原。</p>
+      </td>
+      <td>
+        <h4>🧹 清理策略</h4>
+        <p>提供日志/备份/数据库清理工具，操作前需双重确认。</p>
+      </td>
+    </tr>
+  </table>
+</div>
 
-### 指标卡片色彩方案
-
-| 指标     | 颜色方案                   | 使用场景   |
-| -------- | -------------------------- | ---------- |
-| 总荣誉数 | 紫色 (#a071ff → #7b6cff)   | 总体统计   |
-| 国家级   | 蓝色 (#5a80f3 → #4ac6ff)   | 国家级荣誉 |
-| 省级     | 金色 (#ffb347 → #ffcc33)   | 省级荣誉   |
-| 校级     | 绿色 (#3ec8a0 → #45dd8e)   | 校级荣誉   |
-| 一等奖   | 青色 (#00b4d8 → #48cae4)   | 一等奖     |
-| 二等奖   | 紫粉色 (#b54cb8 → #d896ff) | 二等奖     |
-| 三等奖   | 红色 (#ff6b6b → #ff8787)   | 三等奖     |
-| 优秀奖   | 蓝色 (#5a80f3 → #4ac6ff)   | 优秀奖     |
-
-主题切换通过设置页面完成，用户偏好自动保存。
-
----
-
-## 开发指南
-
-### 添加新功能的步骤
-
-1. **定义数据模型**（`src/data/models.py`）
-   - 继承 Base 类
-   - 定义数据库字段和关系
-
-2. **编写服务逻辑**（`src/services/`）
-   - 创建 Service 类处理业务逻辑
-   - 实现 CRUD 操作
-
-3. **创建 UI 页面**（`src/ui/pages/`）
-   - 继承 BasePage 基类
-   - 实现页面布局和交互
-
-4. **在主窗口注册**（`src/ui/main_window.py`）
-   - 在导航栏添加新页面
-   - 配置路由和图标
-
-### 代码规范
-
-- 使用 PEP 8 编码规范
-- 为所有函数添加文档字符串
-- 使用类型提示（Type Hints）
-- 日志记录使用 logger，避免 print()
-
-### 运行测试与验证
-
-使用 Ruff 进行代码风格检查与格式化：
-```bash
-uv run ruff check .
-uv run ruff format .
-```
-
-使用 Pyright 进行类型检查：
-```bash
-uv run pyright
-```
+> ⚠️ **隐私提醒**：请勿将 `data/`、`backups/`、`attachments/`、`logs/`、`.env` 等敏感目录提交到版本控制系统。
 
 ---
 
-## 依赖列表
+## 🎨 主题系统
 
-主要依赖通过 `pyproject.toml` 管理：
+应用内置了一套精美的色彩系统，适配深色/浅色模式。
 
-| 包名                   | 说明                                       |
-| ---------------------- | ------------------------------------------ |
-| PySide6                | Qt 6 Python 绑定，GUI 框架                 |
-| PySide6-Fluent-Widgets | Fluent Design 风格组件库                   |
-| SQLAlchemy             | ORM 框架，数据库抽象                       |
-| pandas                 | 数据处理和分析                             |
-| openpyxl               | Excel 文件读写                             |
-| APScheduler            | 定时任务调度                               |
-| loguru                 | 日志记录库                                 |
-| alembic                | 数据库迁移工具（预留，当前未使用迁移脚本） |
-| python-dateutil        | 日期时间处理                               |
-| pypinyin               | 拼音转换工具，用于专业搜索                 |
-
-完整依赖与版本策略请见 `pyproject.toml`，精确解析版本记录在 `uv.lock`（如需保持一致可运行 `uv sync --locked`）。
+| 指标类型 | 渐变色 (Light -> Dark) | 语义 |
+| :--- | :--- | :--- |
+| **总荣誉** | `💜 #a071ff` → `#7b6cff` | 综合实力 |
+| **国家级** | `💙 #5a80f3` → `#4ac6ff` | 最高荣誉 |
+| **省级** | `💛 #ffb347` → `#ffcc33` | 中坚力量 |
+| **校级** | `💚 #3ec8a0` → `#45dd8e` | 基础积累 |
+| **一等奖** | `💠 #00b4d8` → `#48cae4` | 顶尖表现 |
+| **三等奖** | `❤️ #ff6b6b` → `#ff8787` | 鼓励奖项 |
 
 ---
 
-## 数据安全与隐私
+## 🛠️ 开发指南
 
-- ✅ **本地存储**：所有数据存储在本地 SQLite 数据库中，不上传到云端
-- ✅ **自动备份**：支持定期自动备份，防止数据丢失
-- ✅ **文件隐私**：敏感数据文件（数据库、备份等）配置在 `.gitignore` 中
-- ✅ **回收站**：删除操作可在回收站中恢复
-
-### .gitignore 配置
-
-```
-# 数据库和备份
-*.db
-*.sqlite
-*.sqlite3
-data/awards.db
-backups/
-
-# Python 缓存
-__pycache__/
-*.pyc
-*.pyo
-build/
-dist/
-
-# 应用数据
-attachments/
-logs/
-temp/
-
-# IDE 编辑器
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# 环境变量
-.env
-secrets.json
-```
+1. **环境准备**: 确保 Python 3.14+，推荐使用 `uv` 管理虚拟环境。
+2. **新增页面**: 继承 `BasePage`，在 `main_window.py` 中注册路由。
+3. **数据库变更**: 修改 `models.py`，目前使用自动建表，生产环境建议引入 Alembic。
+4. **代码规范**: 提交前请运行 `ruff check` 和 `pyright`。
 
 ---
 
-## 使用示例
+## 🧰 故障排查
 
-### 场景：学校管理学生荣誉
+<details>
+<summary><strong>点击查看常见问题解决方案</strong></summary>
 
-1. **录入新荣誉**
-   - 点击"录入"页面
-   - 填写比赛名称、日期、级别、等级
-   - 添加参与成员信息
-   - 点击保存
+| 问题现象 | 可能原因 | 解决方案 |
+| :--- | :--- | :--- |
+| **启动缺少 Qt 插件** | 环境依赖不完整 | 运行 `uv sync`，若无效则删除 `.venv` 重试 |
+| **界面文字乱码** | 字体缺失或编码问题 | 检查系统字体，确认未强制覆盖 `QFontDatabase` |
+| **数据库被锁** | 异常退出导致锁文件残留 | 关闭应用，删除 `data/awards.db-shm` 和 `.db-wal` |
+| **导入无响应** | 模板格式错误 | 确认 CSV/XLSX 表头与模板一致，查看设置页日志 |
+| **主题不更新** | 信号未连接 | 检查 `__init__` 是否连接 `themeChanged` 信号 |
+| **附件校验失败** | 文件被占用或修改 | 检查文件权限，清空回收站后重试 |
 
-2. **查看统计分析**
-   - 进入"仪表盘"
-   - 查看各类荣誉数量和分布
-   - 观察最近录入的荣誉
-
-3. **管理成员信息**
-   - 进入“成员管理”
-   - 搜索或浏览成员
-   - 编辑成员信息
-   - 查看成员参与的所有荣誉
-
-4. **备份和导出**
-   - 进入"系统设置"
-   - 配置自动备份频率
-   - 导出数据为 CSV 格式
+</details>
 
 ---
 
-## 后续计划
+## 📈 Star History
 
-- [x] 专业智能搜索功能
-- [x] 荣誉筛选和排序
-- [x] 关于页面
-- [ ] 数据加密存储
-- [ ] 网络备份功能
-- [ ] 报表生成和打印
-- [ ] 用户权限管理
-- [ ] 数据同步功能
+<a href="https://star-history.com/#RE-TikaRa/Certificate-Management&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=RE-TikaRa/Certificate-Management&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=RE-TikaRa/Certificate-Management&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=RE-TikaRa/Certificate-Management&type=Date" />
+ </picture>
+</a>
 
 ---
 
-## 如何贡献
+## 🤝 如何贡献
 
-欢迎提交 Issue 和 Pull Request！
+非常欢迎您的贡献！请遵循以下流程：
 
-1. Fork 本项目
+1. Fork 本仓库
 2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
 3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
 4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 打开 Pull Request
+5. 提交 Pull Request
 
 ---
 
-## 许可证
+## 📄 许可证
 
-本项目签署了 MIT 授权许可。详见 [LICENSE](https://github.com/RE-TikaRa/Certificate-Management/blob/main/LICENSE) 文件。
-
----
-
-## 作者
-
-**RE-TikaRa**
-
-- GitHub: [@RE-TikaRa](https://github.com/RE-TikaRa)
-
----
-
-## 致谢
-
-感谢以下项目和工具的支持：
-
-- [PySide6](https://wiki.qt.io/PySide6) - Qt for Python
-- [QFluentWidgets](https://github.com/zhiyiYo/QFluentWidgets) - Fluent Design 组件库
-- [SQLAlchemy](https://www.sqlalchemy.org/) - Python ORM 框架
-- [Loguru](https://github.com/Delgan/loguru) - 日志库
-- [GitHub](https://github.com) - 版本管理平台
-
----
-
-## 反馈与支持
-
-如有问题或建议，欢迎通过以下方式联系：
-
-- 提交 [Issue](https://github.com/RE-TikaRa/Certificate-Management/issues)
-- 发起 [Discussion](https://github.com/RE-TikaRa/Certificate-Management/discussions)
+本项目基于 [MIT License](LICENSE) 开源。
 
 ---
 
 <div align="center">
-
-**如果本项目对你有帮助，请给个 Star 吧！**
-
+  <p>
+    <b>Author:</b> <a href="https://github.com/RE-TikaRa">RE-TikaRa</a> |
+    <b>Powered by:</b> PySide6 & QFluentWidgets
+  </p>
+  
+  <p>
+    <a href="https://github.com/RE-TikaRa/Certificate-Management/stargazers">
+      <img src="https://img.shields.io/github/stars/RE-TikaRa/Certificate-Management?style=social" alt="GitHub stars">
+    </a>
+    <a href="https://github.com/RE-TikaRa/Certificate-Management/network/members">
+      <img src="https://img.shields.io/github/forks/RE-TikaRa/Certificate-Management?style=social" alt="GitHub forks">
+    </a>
+  </p>
 </div>

@@ -72,40 +72,56 @@ class AboutPage(BasePage):
         version.setFont(version_font)
         header_layout.addWidget(version)
 
+        # 标签条
+        tags_layout = QHBoxLayout()
+        tags_layout.setSpacing(8)
+        tags_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        for text in ("Desktop", "Offline-first", "Open Source MIT", "SQLite Local"):
+            tag = BodyLabel(text)
+            tag.setObjectName("tagChip")
+            tag_font = QFont()
+            tag_font.setPointSize(10)
+            tag.setFont(tag_font)
+            tag.setMargin(6)
+            tags_layout.addWidget(tag)
+        header_layout.addLayout(tags_layout)
+
         layout.addLayout(header_layout)
         layout.addSpacing(20)
 
         # ============ 信息卡片区域 ============
         info_card = self._create_info_card(
             "系统简介",
-            "荣誉证书管理系统是一款基于 PySide6 开发的桌面应用程序，"
-            "个人向用途，用于管理各类竞赛荣誉证书、成员信息和附件文档。\n\n"
-            "系统提供了证书录入、数据统计、成员管理、文档导入等功能，"
-            "帮助用户高效地组织和查询荣誉信息。",
+            "荣誉证书管理系统是一款基于 PySide6 + QFluentWidgets 的桌面端应用，"
+            "用于管理竞赛/科研荣誉证书、成员信息与附件材料，完全离线运行。\n\n"
+            "内置证书录入、全文检索（FTS5）、成员管理、附件回收站、自动备份与导入/导出等功能，"
+            "帮助学校/团队高效组织与查询荣誉数据。",
         )
         layout.addWidget(info_card)
 
         # ============ 技术栈卡片 ============
         tech_card = self._create_info_card(
             "技术栈",
-            "• GUI 框架: PySide6 6.10.1 + QFluentWidgets 1.9.2\n"
-            "• 数据库: SQLAlchemy 2.0.32 + SQLite\n"
-            "• 编程语言: Python 3.9+\n"
-            "• 文档处理: python-docx, openpyxl\n"
-            "• 数据分析: pandas, matplotlib",
+            "• GUI: PySide6 + QFluentWidgets\n"
+            "• 数据: SQLAlchemy 2.x + SQLite（本地）\n"
+            "• 语言: Python 3.14+\n"
+            "• 定时/任务: APScheduler\n"
+            "• 日志: loguru\n"
+            "• 工具: ruff / pyright / uv\n"
+            "• 文档/表格: python-docx, openpyxl",
         )
         layout.addWidget(tech_card)
 
         # ============ 功能特性卡片 ============
         features_card = self._create_info_card(
             "核心功能",
-            "• 荣誉录入: 支持手动录入、批量导入、文档提取\n"
-            "• 数据统计: 多维度可视化数据分析与报表\n"
-            "• 成员管理: 成员信息管理、历史记录查询\n"
-            "• 智能搜索: 模糊搜索、专业名称自动补全\n"
-            "• 附件管理: 文件上传、MD5校验、回收站\n"
-            "• 主题切换: 深色/浅色主题无缝切换\n"
-            "• 数据备份: 自动/手动备份、数据导出",
+            "• 荣誉录入：手动/批量导入（CSV、XLSX），字段校验与预检\n"
+            "• 全文检索：FTS5 + 筛选/排序，500ms 防抖\n"
+            "• 成员管理：10 字段监控，学校/专业代码自动补全\n"
+            "• 附件管理：MD5 校验、回收站还原/彻底删除\n"
+            "• 统计看板：8 张指标卡 + 饼/柱图 + 最近荣誉\n"
+            "• 主题与样式：亮/暗主题即时切换\n"
+            "• 备份与清理：自动/手动备份，日志与数据库一键清理",
         )
         layout.addWidget(features_card)
 
@@ -114,7 +130,7 @@ class AboutPage(BasePage):
             "开发者信息",
             "• 开发者: RE-TikaRa\n"
             "• 项目地址: https://github.com/RE-TikaRa/Certificate-Management\n"
-            "• 开发时间: 2025年12月\n"
+            "• 最新构建: 2025-12\n"
             "• 许可证: MIT License",
         )
         layout.addWidget(dev_card)
@@ -184,11 +200,15 @@ class AboutPage(BasePage):
             card_bg = "#2b2b3c"
             card_border = "#3a3a4a"
             text_color = "#e0e0e0"
+            chip_bg = "#32364a"
+            chip_text = "#e8e8f5"
         else:
             scroll_bg = "#f4f6fb"
             card_bg = "#ffffff"
             card_border = "#e0e0e0"
             text_color = "#333333"
+            chip_bg = "#e8ecf7"
+            chip_text = "#1f2540"
 
         self.setStyleSheet(f"""
             QWidget#pageRoot {{
@@ -202,6 +222,12 @@ class AboutPage(BasePage):
                 background-color: {card_bg};
                 border: 1px solid {card_border};
                 border-radius: 8px;
+            }}
+            QLabel#tagChip {{
+                background-color: {chip_bg};
+                color: {chip_text};
+                border-radius: 12px;
+                padding: 2px 10px;
             }}
             QLabel {{
                 color: {text_color};

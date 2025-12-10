@@ -20,26 +20,27 @@
 
 ## 目录速览
 - `src/main.py` 应用入口；`app_context.py` 构建 DI 容器与服务；`logger.py` 日志配置；`config.py` 配置加载。
-- 数据层 `src/data/`: `models.py`（Base 提供 id/created_at/updated_at；表包括 Award、TeamMember、Attachment、Setting、BackupRecord、award_members_table）；`database.py` 提供 `session_scope`。
+- 数据层 `src/data/`: `models.py`（Base 提供 id/created_at/updated_at；表包括 Award、TeamMember、Attachment、Setting、BackupRecord、ImportJob、Major、School、SchoolMajorMapping、AwardMember）；`database.py` 提供 `session_scope`。
 - 服务层 `src/services/`: award_service、statistics_service、import_export、backup_manager、attachment_manager、settings_service、major_service 等。
 - 表现层 `src/ui/`: `main_window.py`（窗口与导航，懒加载页面，窗口居中），`styled_theme.py`（ThemeManager），`theme.py`（通用 UI 工具），`widgets/major_search.py`，`pages/`（home、dashboard、overview、entry、management、recycle、settings、about、base_page）。
 - 资源 `src/resources/`: `styles/styled_light.qss`、`styles/styled_dark.qss`，`templates/awards_template.csv`。
-- 文档 `docs/index.xlsx`（66 个专业导入模板）。
+- 数据/文档 `docs/`: `china_bachelor_majors_2025.csv`（本科专业目录约 840 条）、`china_universities_2025.csv`、`GSAU_majors.xlsx` 示例映射、`personal_info_template.doc`。
 
 ## 模型与数据
 - Base：统一主键、自增、时间戳。
 - Award：competition_name、award_date、level、rank、certificate_code、remarks、attachment_folder、deleted/deleted_at；关系 members（m2m）与 attachments（级联删除）。
-- TeamMember：姓名、性别、身份证、手机号、学号、邮箱、专业、班级、学院 + pinyin、active、sort_index；关系 awards（m2m）。
+- TeamMember：姓名、性别、身份证（唯一）、手机号、学号（唯一）、邮箱、学校/学校代码、专业/专业代码、班级、学院、pinyin、active、sort_index；关系 awards（m2m）。
 - Attachment：award_id、stored_name、original_name、relative_path（唯一）、file_md5、file_size、deleted 标记。
-- Setting/BackupRecord：应用设置与备份记录。
-- Major 数据由 major_service 提供，支持中文/拼音模糊搜索（66 项，来源 docs/index.xlsx）。学校代码缺失时会回退使用学校名称匹配，以便仍能填充学院。
+- Setting/BackupRecord/ImportJob：应用设置、备份记录、导入任务。
+- Major：name/code 唯一，含学科/专业类信息与 pinyin；School、SchoolMajorMapping 存储学校与学校-专业-学院映射。
+- 专业与学校数据源：`docs/china_bachelor_majors_2025.csv`（约 840 条）+ `china_universities_2025.csv`；搜索支持中文/拼音/代码，学校代码缺失时回退学校名称匹配学院。
 
 ## 主要特性（按页面）
 - **MainWindow**：`_center_window()` 居中；快速加载首页，余下页面 100ms 后异步载入；route_keys 管理导航；主题变化事件转发。
 - **Dashboard**：8 个梯度指标卡 + 饼/柱图 + 最近荣誉表（只读）。颜色：总紫、国家蓝、省金、校绿、一等青、二等紫粉、三等红、优秀蓝。
-- **Entry**：动态成员卡两列布局，9 字段；可增删；集成 MajorSearchWidget（中文/拼音自动完成，最多 8 条）。
+- **Entry**：动态成员卡两列布局；字段覆盖姓名/性别/身份证/手机号/学号/邮箱/学校/学校代码/专业/专业代码/班级/学院；集成 MajorSearchWidget（中文/拼音/代码自动完成，最多 8 条）。
 - **Overview**：列表卡；FTS5 全文搜索（比赛名/证书号/成员），筛选（级别/奖项/日期范围）、8 种排序（日期/级别/奖项/名称正反），500ms 防抖；分页与重置；编辑对话框可增删成员，保存后通过父链刷新管理页。
-- **Management**：成员列表与详情；监控 10 字段（id、name、gender、id_card、phone、student_id、email、major、class_name、college）自动刷新。
+- **Management**：成员列表与详情；核心字段含学校/学院/专业代码，支持自动刷新。
 - **Recycle**：附件回收与还原/彻底删除。
 - **Settings**：主题、自动备份频率、日志级别、数据目录；备份列表验证/恢复前可自动备份；索引重建按钮；导入/导出日志面板；清理工具卡片（日志/备份/数据库/一键清空，均双重确认）。
 - **About**：版本/特性/技术栈/链接。
@@ -60,8 +61,8 @@
 - 访问服务总用 `AppContext`（ctx.awards/statistics/settings/members/attachment/backup/major），数据库操作包裹 `session_scope`，勿手写裸会话。
 - 添加页面：继承 `BasePage`，实现 `_init_ui`；在 `main_window.py` 注册（导航项、_load_* 分组、route_keys），按需处理主题信号。
 - 添加数据字段：同步更新模型、对应 service、UI 表单/列表、统计或刷新逻辑（管理页的 10 字段监控需保持一致）。
-- 成员字段在 UI 约定为 9 项；管理页刷新依赖该集合。
-- 导入/导出：CSV 模板 `resources/templates/awards_template.csv`；专业导入使用 `docs/index.xlsx`。
+- 成员字段在 UI 约定为 10 项（含学校）；管理页刷新依赖该集合。
+- 导入/导出：CSV 模板 `resources/templates/awards_template.csv`；专业与学校/学院映射导入来自 `docs/china_bachelor_majors_2025.csv`、`china_universities_2025.csv`、`GSAU_majors.xlsx`。
 - 导入荣誉：支持 CSV/XLSX，带预检、错误行导出、进度 ETA；导入/预检记录写入 imports 表并显示在设置页日志面板。
 - 学院自动填充依赖 `SchoolMajorMapping`，如导入数据缺少学校代码会自动用学校名称回退匹配；若要禁用回退需同步保证 school_code 完整。
 - 运行/调试前确认运行目录为仓库根目录；避免提交 `data/`、`attachments/`、`backups/`、`logs/`、`temp/` 生成物。
