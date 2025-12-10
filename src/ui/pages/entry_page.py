@@ -1146,7 +1146,12 @@ class EntryPage(BasePage):
                 size_value = resolved.stat().st_size
             except OSError:
                 size_value = None
-            if md5_value and md5_value != "无法计算" and self.ctx.attachments.has_duplicate(md5_value, size_value):
+            current_award_id = self.editing_award.id if getattr(self, "editing_award", None) else None
+            if (
+                md5_value
+                and md5_value != "无法计算"
+                and self.ctx.attachments.has_duplicate(md5_value, size_value, award_id=current_award_id)
+            ):
                 duplicates.append(resolved.name)
                 continue
 

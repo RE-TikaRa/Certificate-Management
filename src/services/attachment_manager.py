@@ -45,18 +45,31 @@ class AttachmentManager:
                 md5_hash.update(chunk)
         return md5_hash.hexdigest()
 
-    def find_duplicates(self, file_md5: str, file_size: int | None = None) -> list[Attachment]:
-        """根据 MD5（可选文件大小）查找已存在的附件"""
+    def find_duplicates(
+        self,
+        file_md5: str,
+        file_size: int | None = None,
+        *,
+        award_id: int | None = None,
+    ) -> list[Attachment]:
+        """根据 MD5（可选文件大小）查找附件，可限定在指定 award 内"""
         with self.db.session_scope() as session:
             query = session.query(Attachment).filter(Attachment.file_md5 == file_md5)
             if file_size is not None:
                 query = query.filter(Attachment.file_size == file_size)
+            if award_id is not None:
+                query = query.filter(Attachment.award_id == award_id)
             return list(query.all())
 
-    def has_duplicate(self, file_md5: str, file_size: int | None = None) -> bool:
-        """快捷判断是否存在重复附件"""
+    def has_duplicate(self, file_md5: str, file_size: int | None = None, *, award_id: int | None = None) -> bool:
+        """判断指定 award 内是否存在重复附件；未传 award_id 时不做全局查重"""
+        if award_id is None:
+            return False
         with self.db.session_scope() as session:
-            query = session.query(Attachment.id).filter(Attachment.file_md5 == file_md5)
+            query = (
+                session.query(Attachment.id)
+                .filter(Attachment.award_id == award_id, Attachment.file_md5 == file_md5)
+            )
             if file_size is not None:
                 query = query.filter(Attachment.file_size == file_size)
             return session.query(query.exists()).scalar() is True
@@ -95,8 +108,8 @@ class AttachmentManager:
                 file_size = src.stat().st_size
 
                 # 若已存在相同 MD5 的附件则跳过，避免重复占用空间
-                if self.has_duplicate(file_md5, file_size):
-                    logger.info("Skip duplicate attachment (md5=%s): %s", file_md5, src)
+                if self.has_duplicate(file_md5, file_size, award_id=award_id):
+                    logger.info("Skip duplicate attachment for award %s (md5=%s): %s", award_id, file_md5, src)
                     continue
 
                 suffix = src.suffix

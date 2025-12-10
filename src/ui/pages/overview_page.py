@@ -1587,7 +1587,12 @@ class AwardDetailDialog(MaskDialogBase):
 
             md5_value = self._calculate_md5(path)
             size_value = path.stat().st_size if path.exists() else None
-            if md5_value and md5_value != "无法计算" and self.ctx.attachments.has_duplicate(md5_value, size_value):
+            current_award_id = self.award.id if getattr(self, "award", None) else None
+            if (
+                md5_value
+                and md5_value != "无法计算"
+                and self.ctx.attachments.has_duplicate(md5_value, size_value, award_id=current_award_id)
+            ):
                 duplicates.append(path.name)
                 continue
 
