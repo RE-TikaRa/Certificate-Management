@@ -1134,10 +1134,22 @@ class EntryPage(BasePage):
 
     def _add_attachment_files(self, files: Iterable[Path]) -> int:
         added = 0
+        duplicates: list[str] = []
         for file_path in files:
             resolved = Path(file_path).resolve()
             if not resolved.exists():
                 continue
+
+            # MD5 去重：若数据库已有相同文件则提示并跳过
+            md5_value = self._calculate_md5(resolved)
+            try:
+                size_value = resolved.stat().st_size
+            except OSError:
+                size_value = None
+            if md5_value and md5_value != "无法计算" and self.ctx.attachments.has_duplicate(md5_value, size_value):
+                duplicates.append(resolved.name)
+                continue
+
             key = self._to_file_key(resolved)
             if key in self._selected_file_keys:
                 continue
@@ -1147,6 +1159,10 @@ class EntryPage(BasePage):
 
         if added:
             self._update_attachment_table()
+        if duplicates:
+            sample = "，".join(duplicates[:3])
+            more = "" if len(duplicates) <= 3 else f" 等 {len(duplicates)} 个"
+            InfoBar.warning("重复附件", f"{sample}{more} 与已有附件 MD5 相同，已跳过", parent=self.window())
         return added
 
     def _resize_attachment_table(self, row_count: int) -> None:

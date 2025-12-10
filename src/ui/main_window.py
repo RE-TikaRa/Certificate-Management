@@ -200,10 +200,10 @@ class MainWindow(FluentWindow):
         # 顶部导航
         top_pages = [
             ("home", self.home_page, FIF.HOME, "首页"),
+            ("dashboard", self.dashboard_page, FIF.SPEED_HIGH, "仪表盘"),
             ("overview", self.overview_page, FIF.ALIGNMENT, "总览"),
             ("entry", self.entry_page, FIF.ADD, "录入"),
             ("management", self.management_page, FIF.PEOPLE, "成员管理"),
-            ("dashboard", self.dashboard_page, FIF.SPEED_HIGH, "仪表盘"),
             ("recycle", self.recycle_page, FIF.DELETE, "附件回收站"),
         ]
 

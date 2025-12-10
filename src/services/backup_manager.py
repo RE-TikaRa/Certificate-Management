@@ -112,6 +112,58 @@ class BackupManager:
         finally:
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
+    def restore_backup(self, backup_path: Path, *, restore_attachments: bool = True, restore_logs: bool = True) -> None:
+        """
+        Restore data from a backup zip.
+
+        Overwrites current database file and optionally attachments/logs.
+        """
+        if not backup_path.exists():
+            raise FileNotFoundError(f"备份文件不存在：{backup_path}")
+        if backup_path.suffix.lower() != ".zip":
+            raise ValueError("请选择 zip 格式的备份文件")
+
+        # 释放数据库连接，避免文件被占用
+        try:
+            self.db.engine.dispose()
+        except Exception:
+            logger.warning("Failed to dispose engine before restore", exc_info=True)
+
+        temp_dir = Path(tempfile.mkdtemp(prefix="restore-"))
+        try:
+            with zipfile.ZipFile(backup_path, "r") as zip_ref:
+                zip_ref.extractall(temp_dir)
+
+            db_src = temp_dir / "data" / DB_PATH.name
+            if not db_src.exists():
+                raise FileNotFoundError("备份中未找到数据库文件 data/awards.db")
+
+            DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(db_src, DB_PATH)
+
+            if restore_attachments:
+                attach_src = temp_dir / "attachments"
+                if attach_src.exists():
+                    dest = Path(self.settings.get("attachment_root", str(ATTACHMENTS_DIR)))
+                    dest.mkdir(parents=True, exist_ok=True)
+                    shutil.copytree(attach_src, dest, dirs_exist_ok=True)
+
+            if restore_logs:
+                log_src = temp_dir / "logs"
+                if log_src.exists():
+                    LOG_DIR.mkdir(parents=True, exist_ok=True)
+                    shutil.copytree(log_src, LOG_DIR, dirs_exist_ok=True)
+
+            # 重新应用迁移，确保旧备份兼容当前版本
+            try:
+                self.db.initialize()
+            except Exception:
+                logger.warning("Re-initialize database after restore failed", exc_info=True)
+
+            logger.info("Restored backup from %s", backup_path)
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
     def schedule_jobs(self) -> None:
         self.scheduler.remove_all_jobs()
         frequency = self.settings.get("backup_frequency", "manual")

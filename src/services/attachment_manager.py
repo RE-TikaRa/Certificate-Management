@@ -45,6 +45,22 @@ class AttachmentManager:
                 md5_hash.update(chunk)
         return md5_hash.hexdigest()
 
+    def find_duplicates(self, file_md5: str, file_size: int | None = None) -> list[Attachment]:
+        """根据 MD5（可选文件大小）查找已存在的附件"""
+        with self.db.session_scope() as session:
+            query = session.query(Attachment).filter(Attachment.file_md5 == file_md5)
+            if file_size is not None:
+                query = query.filter(Attachment.file_size == file_size)
+            return list(query.all())
+
+    def has_duplicate(self, file_md5: str, file_size: int | None = None) -> bool:
+        """快捷判断是否存在重复附件"""
+        with self.db.session_scope() as session:
+            query = session.query(Attachment.id).filter(Attachment.file_md5 == file_md5)
+            if file_size is not None:
+                query = query.filter(Attachment.file_size == file_size)
+            return session.query(query.exists()).scalar() is True
+
     def _ensure_unique_path(self, folder: Path, filename: str) -> Path:
         dest = folder / filename
         counter = 1
@@ -77,6 +93,11 @@ class AttachmentManager:
                 # 计算MD5和文件大小
                 file_md5 = self._calculate_md5(src)
                 file_size = src.stat().st_size
+
+                # 若已存在相同 MD5 的附件则跳过，避免重复占用空间
+                if self.has_duplicate(file_md5, file_size):
+                    logger.info("Skip duplicate attachment (md5=%s): %s", file_md5, src)
+                    continue
 
                 suffix = src.suffix
                 safe_name = self._sanitize_name(f"{competition_name}-附件{index:02d}{suffix}")

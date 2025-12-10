@@ -1577,14 +1577,32 @@ class AwardDetailDialog(MaskDialogBase):
         if not files:
             return
 
-        # 添加到已选文件列表
+        added = 0
+        duplicates: list[str] = []
+
         for file_path in files:
-            path = Path(file_path)
+            path = Path(file_path).resolve()
+            if not path.exists():
+                continue
+
+            md5_value = self._calculate_md5(path)
+            size_value = path.stat().st_size if path.exists() else None
+            if md5_value and md5_value != "无法计算" and self.ctx.attachments.has_duplicate(md5_value, size_value):
+                duplicates.append(path.name)
+                continue
+
             if path not in self.selected_files:
                 self.selected_files.append(path)
+                added += 1
 
         # 更新表格显示
         self._update_attachment_table()
+        if added:
+            InfoBar.success("成功", f"已添加 {added} 个附件", parent=self)
+        if duplicates:
+            sample = "，".join(duplicates[:3])
+            more = "" if len(duplicates) <= 3 else f" 等 {len(duplicates)} 个"
+            InfoBar.warning("重复附件", f"{sample}{more} 与已有附件 MD5 相同，已跳过", parent=self)
 
     def _update_attachment_table(self) -> None:
         """更新附件表格显示（异步计算 MD5/大小）"""

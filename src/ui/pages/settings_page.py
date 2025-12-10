@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QListWidget,
+    QListWidgetItem,
     QProgressDialog,
     QScrollArea,
     QVBoxLayout,
@@ -25,6 +26,7 @@ from qfluentwidgets import (
     ComboBox,
     InfoBar,
     LineEdit,
+    MessageBox,
     PrimaryPushButton,
     PushButton,
 )
@@ -82,6 +84,9 @@ class SettingsPage(BasePage):
         self.logger = logging.getLogger(__name__)
         self.attach_dir = QLabel()
         self.backup_dir = QLabel()
+        self.backup_list = QListWidget()
+        self.restore_btn = PrimaryPushButton("恢复选中")
+        self.verify_btn = PushButton("验证选中")
         self.frequency = ComboBox()
         self.frequency.addItems(list(self.FREQUENCY_OPTIONS.values()))
         self.include_attachments = CheckBox("包含附件")
@@ -166,6 +171,7 @@ class SettingsPage(BasePage):
         action_row.addStretch()
         settings_layout.addLayout(action_row)
         layout.addWidget(settings_card)
+        layout.addWidget(self._build_backup_card())
         layout.addWidget(self._build_major_card())
         layout.addStretch()
 
@@ -183,6 +189,7 @@ class SettingsPage(BasePage):
     def refresh(self) -> None:
         self.attach_dir.setText(self.ctx.attachments.root.as_posix())
         self.backup_dir.setText(self.ctx.backup.backup_root.as_posix())
+        self._refresh_backup_list()
 
         # Convert stored frequency value to display text
         stored_frequency = self.ctx.settings.get("backup_frequency", "manual")
@@ -299,6 +306,95 @@ class SettingsPage(BasePage):
         card_layout.addWidget(self.school_major_list)
 
         return card
+
+    def _build_backup_card(self) -> QWidget:
+        card, card_layout = create_card()
+        card_layout.addWidget(make_section_title("备份管理"))
+
+        btn_row = QHBoxLayout()
+        refresh_btn = PushButton("刷新列表")
+        refresh_btn.clicked.connect(self._refresh_backup_list)
+        self.verify_btn.clicked.connect(self._verify_selected_backup)
+        self.restore_btn.clicked.connect(self._restore_selected_backup)
+        self.restore_btn.setEnabled(False)
+        self.verify_btn.setEnabled(False)
+        btn_row.addWidget(refresh_btn)
+        btn_row.addWidget(self.verify_btn)
+        btn_row.addWidget(self.restore_btn)
+        btn_row.addStretch()
+        card_layout.addLayout(btn_row)
+
+        self.backup_list.setMinimumHeight(200)
+        self.backup_list.itemSelectionChanged.connect(self._on_backup_selected)
+        card_layout.addWidget(self.backup_list)
+        return card
+
+    def _format_size(self, size: int) -> str:
+        size_f = float(size)
+        for unit in ("B", "KB", "MB", "GB"):
+            if size_f < 1024:
+                return f"{size_f:.1f} {unit}"
+            size_f /= 1024
+        return f"{size_f:.1f} TB"
+
+    def _refresh_backup_list(self) -> None:
+        self.backup_list.clear()
+        backups = self.ctx.backup.list_backups()
+        if not backups:
+            self.backup_list.addItem("暂无备份，请点击“立即备份”。")
+            self.restore_btn.setEnabled(False)
+            self.verify_btn.setEnabled(False)
+            return
+
+        for info in backups:
+            status = "✓有效" if info.is_valid else "✕损坏"
+            time_str = info.created_time.strftime("%Y-%m-%d %H:%M")
+            text = f"{info.path.name} | {time_str} | {self._format_size(info.size)} | {status}"
+            item = QListWidgetItem(text)
+            item.setData(Qt.ItemDataRole.UserRole, info)
+            if not info.is_valid:
+                item.setForeground(Qt.GlobalColor.red)
+            self.backup_list.addItem(item)
+        self._on_backup_selected()
+
+    def _on_backup_selected(self) -> None:
+        has_selection = bool(self.backup_list.selectedItems())
+        self.restore_btn.setEnabled(has_selection)
+        self.verify_btn.setEnabled(has_selection)
+
+    def _verify_selected_backup(self) -> None:
+        item = self.backup_list.currentItem()
+        if not item:
+            InfoBar.info("提示", "请先选择一个备份", parent=self.window())
+            return
+        info = item.data(Qt.ItemDataRole.UserRole)
+        ok, message = self.ctx.backup.verify_backup(info.path)
+        if ok:
+            InfoBar.success("验证通过", f"{info.path.name} 完整有效", parent=self.window())
+        else:
+            InfoBar.error("验证失败", message or "备份文件损坏", parent=self.window())
+        self._refresh_backup_list()
+
+    def _restore_selected_backup(self) -> None:
+        item = self.backup_list.currentItem()
+        if not item:
+            InfoBar.info("提示", "请先选择一个备份", parent=self.window())
+            return
+        info = item.data(Qt.ItemDataRole.UserRole)
+        box = MessageBox(
+            "确认恢复",
+            f"将从备份 {info.path.name} 覆盖当前数据库和附件/日志。\n此操作不可撤销，建议先备份当前数据。是否继续？",
+            self.window(),
+        )
+        if not box.exec():
+            return
+
+        try:
+            self.ctx.backup.restore_backup(info.path)
+            InfoBar.success("已恢复", f"已从 {info.path.name} 恢复数据", parent=self.window())
+        except Exception as exc:
+            self.logger.exception("Restore backup failed: %s", exc)
+            InfoBar.error("恢复失败", str(exc), parent=self.window())
 
     def _create_stat_block(self, title: str, value_label: QLabel) -> QWidget:
         wrapper = QWidget()
