@@ -31,6 +31,7 @@ from qfluentwidgets import (
     PushButton,
 )
 
+from src.services.import_export import ImportResult
 from src.services.major_importer import read_major_catalog_from_csv, read_majors_from_excel
 from src.services.school_importer import read_school_list
 
@@ -112,6 +113,11 @@ class SettingsPage(BasePage):
         self.school_import_btn: PrimaryPushButton | None = None
         self.major_import_btn: PushButton | None = None
         self.mapping_import_btn: PushButton | None = None
+        self.award_import_btn: PrimaryPushButton | None = None
+        self.award_export_btn: PushButton | None = None
+        self.award_dry_run: CheckBox | None = None
+        self.import_log_list = QListWidget()
+        self.rebuild_fts_btn: PrimaryPushButton | None = None
         self._import_busy = False
         self._progress_dialog: QProgressDialog | None = None
 
@@ -171,7 +177,9 @@ class SettingsPage(BasePage):
         action_row.addStretch()
         settings_layout.addLayout(action_row)
         layout.addWidget(settings_card)
+        layout.addWidget(self._build_award_import_card())
         layout.addWidget(self._build_backup_card())
+        layout.addWidget(self._build_index_card())
         layout.addWidget(self._build_major_card())
         layout.addStretch()
 
@@ -206,6 +214,7 @@ class SettingsPage(BasePage):
         email_suffix = self.ctx.settings.get("email_suffix", "@st.gsau.edu.cn")
         self.email_suffix.setText(email_suffix)
         self._refresh_academic_stats()
+        self._refresh_import_log()
 
     def _choose_attach_dir(self) -> None:
         path = QFileDialog.getExistingDirectory(self, "选择附件目录", self.attach_dir.text())
@@ -329,6 +338,52 @@ class SettingsPage(BasePage):
         card_layout.addWidget(self.backup_list)
         return card
 
+    def _build_award_import_card(self) -> QWidget:
+        card, card_layout = create_card()
+        card_layout.addWidget(make_section_title("数据导入 / 导出"))
+
+        btn_row = QHBoxLayout()
+        self.award_import_btn = PrimaryPushButton("导入荣誉 (CSV/XLSX)")
+        self.award_import_btn.clicked.connect(self._import_awards)
+        self.award_export_btn = PushButton("导出全部荣誉 (CSV)")
+        self.award_export_btn.clicked.connect(self._export_awards)
+        btn_row.addWidget(self.award_import_btn)
+        btn_row.addWidget(self.award_export_btn)
+
+        self.award_dry_run = CheckBox("仅预检（不写入数据库）")
+        self.award_dry_run.setChecked(False)
+        btn_row.addWidget(self.award_dry_run)
+        btn_row.addStretch()
+        card_layout.addLayout(btn_row)
+
+        log_header = QHBoxLayout()
+        log_header.addWidget(BodyLabel("最近导入记录（含预检）"))
+        refresh = PushButton("刷新")
+        refresh.clicked.connect(self._refresh_import_log)
+        log_header.addStretch()
+        log_header.addWidget(refresh)
+        card_layout.addLayout(log_header)
+
+        self.import_log_list.setMinimumHeight(160)
+        card_layout.addWidget(self.import_log_list)
+        return card
+
+    def _build_index_card(self) -> QWidget:
+        card, card_layout = create_card()
+        card_layout.addWidget(make_section_title("索引维护"))
+
+        hint = BodyLabel("若搜索结果异常，可重建全文索引（荣誉/成员）。")
+        hint.setStyleSheet("color: #7a7a7a;")
+        card_layout.addWidget(hint)
+
+        row = QHBoxLayout()
+        self.rebuild_fts_btn = PrimaryPushButton("重建全文索引")
+        self.rebuild_fts_btn.clicked.connect(self._rebuild_fts)
+        row.addWidget(self.rebuild_fts_btn)
+        row.addStretch()
+        card_layout.addLayout(row)
+        return card
+
     def _format_size(self, size: int) -> str:
         size_f = float(size)
         for unit in ("B", "KB", "MB", "GB"):
@@ -361,6 +416,24 @@ class SettingsPage(BasePage):
         has_selection = bool(self.backup_list.selectedItems())
         self.restore_btn.setEnabled(has_selection)
         self.verify_btn.setEnabled(has_selection)
+
+    def _refresh_import_log(self) -> None:
+        self.import_log_list.clear()
+        jobs = self.ctx.importer.list_jobs(limit=30)
+        if not jobs:
+            self.import_log_list.addItem("暂无导入记录。")
+            return
+        for job in jobs:
+            status = job.status or "unknown"
+            title = f"{job.filename} | {status}"
+            if job.created_at:
+                title += f" | {job.created_at.strftime('%Y-%m-%d %H:%M')}"
+            if job.message:
+                title += f" | {job.message.splitlines()[0][:60]}"
+            item = QListWidgetItem(title)
+            if status != "success":
+                item.setForeground(Qt.GlobalColor.darkYellow)
+            self.import_log_list.addItem(item)
 
     def _verify_selected_backup(self) -> None:
         item = self.backup_list.currentItem()
@@ -404,6 +477,135 @@ class SettingsPage(BasePage):
             self.logger.exception("Restore backup failed: %s", exc)
             InfoBar.error("恢复失败", str(exc), parent=self.window())
 
+    def _rebuild_fts(self) -> None:
+        btn = self.rebuild_fts_btn
+        if btn:
+            btn.setDisabled(True)
+        try:
+            awards, members = self.ctx.db.rebuild_fts()
+            InfoBar.success(
+                "索引已重建",
+                f"荣誉 {awards} 条，成员 {members} 条",
+                parent=self.window(),
+            )
+        except Exception as exc:
+            self.logger.exception("Rebuild FTS failed: %s", exc)
+            InfoBar.error("重建失败", str(exc), parent=self.window())
+        finally:
+            if btn:
+                btn.setDisabled(False)
+
+    def _import_awards(self) -> None:
+        start_dir = Path(self.ctx.settings.get("last_import_dir", "data")).resolve()
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "选择荣誉数据文件 (CSV/XLSX)",
+            str(start_dir),
+            "数据文件 (*.csv *.xlsx)",
+        )
+        if not file_path:
+            return
+        path = Path(file_path)
+        self.ctx.settings.set("last_import_dir", str(path.parent))
+        dry_run = bool(self.award_dry_run and self.award_dry_run.isChecked())
+
+        if self._import_busy:
+            InfoBar.info("正在导入", "请等待当前导入完成", parent=self.window())
+            return
+
+        progress_queue: SimpleQueue[int | tuple[str, object] | tuple[int, int, float]] = SimpleQueue()
+        progress = {"processed": 0, "total": 0, "eta": 0.0}
+        progress_timer = QTimer(self)
+        progress_timer.setInterval(200)
+        finished = {"done": False}
+        done_token = "__done__"
+
+        def poll_queue() -> None:
+            if self._progress_dialog is None:
+                return
+            updated = False
+            while True:
+                try:
+                    value = progress_queue.get_nowait()
+                except Empty:
+                    break
+                if isinstance(value, tuple) and value and value[0] == done_token:
+                    finalize(value[1])
+                    return
+                if isinstance(value, tuple) and len(value) == 3 and all(isinstance(v, (int, float)) for v in value):
+                    progress["processed"], progress["total"], progress["eta"] = (
+                        int(value[0]),
+                        int(value[1]),
+                        float(value[2]),
+                    )
+                    updated = True
+                elif isinstance(value, int):
+                    progress["processed"] = value
+                    updated = True
+            if updated:
+                eta_text = ""
+                if progress["eta"] > 0:
+                    eta_text = f"；预计剩余 {progress['eta']:.1f} 秒"
+                base = f"已处理 {progress['processed']} 条"
+                if progress["total"]:
+                    base += f" / {progress['total']} 条"
+                self._progress_dialog.setLabelText(f"正在导入… {base}{eta_text}")
+
+        def finalize(result: object) -> None:
+            if finished["done"]:
+                return
+            finished["done"] = True
+            progress_timer.stop()
+            self._set_import_busy(False)
+            if isinstance(result, Exception):
+                self.logger.error("荣誉导入失败：%s", result)
+                InfoBar.error("导入失败", str(result), parent=self.window())
+                return
+            if not isinstance(result, ImportResult):
+                InfoBar.error("导入失败", "未知错误，请查看日志。", parent=self.window())
+                return
+            if result.failed == 0:
+                InfoBar.success("导入完成", f"成功 {result.success} 条", parent=self.window())
+            else:
+                msg = f"成功 {result.success} 条，失败 {result.failed} 条"
+                if result.error_file:
+                    msg += f"（错误行已导出到 {result.error_file.name}）"
+                InfoBar.warning("导入部分成功", msg, parent=self.window())
+            self._refresh_import_log()
+
+        def worker():
+            def progress_cb(processed: int, total: int, eta: float) -> None:
+                progress_queue.put((processed, total, eta))
+
+            try:
+                result = self.ctx.importer.import_from_file(path, progress_callback=progress_cb, dry_run=dry_run)
+                progress_queue.put((done_token, result))
+            except Exception as exc:
+                progress_queue.put((done_token, exc))
+
+        self._set_import_busy(True, "正在导入…")
+        progress_timer.timeout.connect(poll_queue)
+        progress_timer.start()
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _export_awards(self) -> None:
+        save_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "导出全部荣誉",
+            str(Path("exports/awards.csv").resolve()),
+            "CSV 文件 (*.csv);;Excel 文件 (*.xlsx)",
+        )
+        if not save_path:
+            return
+        path = Path(save_path)
+        try:
+            awards = self.ctx.awards.list_awards()
+            exported = self.ctx.importer.export_awards(path, awards)
+            InfoBar.success("已导出", exported.name, parent=self.window())
+        except Exception as exc:
+            self.logger.exception("Export awards failed: %s", exc)
+            InfoBar.error("导出失败", str(exc), parent=self.window())
+
     def _create_stat_block(self, title: str, value_label: QLabel) -> QWidget:
         wrapper = QWidget()
         layout = QVBoxLayout(wrapper)
@@ -420,9 +622,17 @@ class SettingsPage(BasePage):
 
     def _set_import_busy(self, busy: bool, message: str | None = None) -> None:
         self._import_busy = busy
-        for btn in (self.school_import_btn, self.major_import_btn, self.mapping_import_btn):
+        for btn in (
+            self.school_import_btn,
+            self.major_import_btn,
+            self.mapping_import_btn,
+            self.award_import_btn,
+            self.award_export_btn,
+        ):
             if btn is not None:
                 btn.setDisabled(busy)
+        if self.award_dry_run is not None:
+            self.award_dry_run.setDisabled(busy)
         if busy:
             if self._progress_dialog is None:
                 self._progress_dialog = QProgressDialog("正在导入数据…", "", 0, 0, self)

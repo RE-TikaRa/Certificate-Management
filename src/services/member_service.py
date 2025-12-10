@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
 from ..data.database import Database
 from ..data.models import TeamMember
@@ -22,6 +22,36 @@ class MemberService:
             stmt = select(TeamMember).where(TeamMember.id == member_id)
             return session.execute(stmt).scalar_one_or_none()
 
+    def search_members(self, query: str, limit: int = 50) -> list[TeamMember]:
+        """FTS 优先的成员搜索"""
+        if not query:
+            return self.list_members()
+
+        fts_ids = self.db.search_members_fts(query, limit)
+        with self.db.session_scope() as session:
+            stmt = select(TeamMember)
+            if fts_ids:
+                stmt = stmt.where(TeamMember.id.in_(fts_ids))
+            else:
+                pattern = f"%{query}%"
+                stmt = stmt.where(
+                    or_(
+                        TeamMember.name.like(pattern),
+                        TeamMember.pinyin.like(pattern.lower()),
+                        TeamMember.student_id.like(pattern),
+                        TeamMember.phone.like(pattern),
+                        TeamMember.email.like(pattern),
+                        TeamMember.college.like(pattern),
+                        TeamMember.major.like(pattern),
+                    )
+                )
+            stmt = stmt.limit(limit)
+            results = list(session.scalars(stmt).all())
+            if fts_ids:
+                order = {mid: idx for idx, mid in enumerate(fts_ids)}
+                results.sort(key=lambda m: order.get(m.id, len(order)))
+            return results
+
     def update_member(self, member: TeamMember) -> TeamMember:
         """更新成员信息"""
         with self.db.session_scope() as session:
@@ -29,6 +59,16 @@ class MemberService:
             merged = session.merge(member)
             session.add(merged)
             session.flush()
+            self.db.upsert_member_fts(
+                merged.id,
+                name=merged.name,
+                pinyin=merged.pinyin,
+                student_id=merged.student_id,
+                phone=merged.phone,
+                email=merged.email,
+                college=merged.college,
+                major=merged.major,
+            )
             return merged
 
     def delete_member(self, member_id: int) -> None:
@@ -38,6 +78,7 @@ class MemberService:
             if member:
                 session.delete(member)
                 session.flush()
+                self.db.delete_member_fts(member_id)
 
     def delete_members(self, member_ids: list[int]) -> int:
         """批量删除成员"""

@@ -1,5 +1,6 @@
 import hashlib
 import logging
+from datetime import date
 from functools import partial
 from pathlib import Path
 from typing import cast
@@ -95,8 +96,8 @@ class OverviewPage(BasePage):
         # 筛选条件
         self.filter_level = "全部"  # 等级筛选
         self.filter_rank = "全部"  # 奖项筛选
-        self.filter_start_date = None  # 开始日期
-        self.filter_end_date = None  # 结束日期
+        self.filter_start_date: date | None = None  # 开始日期
+        self.filter_end_date: date | None = None  # 结束日期
         self.filter_keyword = ""  # 关键词搜索
 
         # 排序条件
@@ -331,8 +332,8 @@ class OverviewPage(BasePage):
         """筛选条件改变时触发"""
         self.filter_level = self.level_combo.currentText()
         self.filter_rank = self.rank_combo.currentText()
-        self.filter_start_date = self.start_date_edit.date().toPython()
-        self.filter_end_date = self.end_date_edit.date().toPython()
+        self.filter_start_date = cast(date, self.start_date_edit.date().toPython())
+        self.filter_end_date = cast(date, self.end_date_edit.date().toPython())
         self.refresh()
 
     def _on_sort_changed(self, text: str) -> None:
@@ -362,8 +363,8 @@ class OverviewPage(BasePage):
         self.sort_combo.setCurrentText("日期降序")
         self.filter_level = "全部"
         self.filter_rank = "全部"
-        self.filter_start_date = self.start_date_edit.date().toPython()
-        self.filter_end_date = self.end_date_edit.date().toPython()
+        self.filter_start_date = cast(date, self.start_date_edit.date().toPython())
+        self.filter_end_date = cast(date, self.end_date_edit.date().toPython())
         self.filter_keyword = ""
         self.sort_by = "日期降序"
         self.refresh()
@@ -383,16 +384,6 @@ class OverviewPage(BasePage):
         # 日期范围筛选
         if self.filter_start_date and self.filter_end_date:
             filtered = [a for a in filtered if self.filter_start_date <= a.award_date <= self.filter_end_date]
-
-        # 关键词搜索（竞赛名称或证书编号）
-        if self.filter_keyword:
-            keyword_lower = self.filter_keyword.lower()
-            filtered = [
-                a
-                for a in filtered
-                if keyword_lower in (a.competition_name or "").lower()
-                or keyword_lower in (a.certificate_code or "").lower()
-            ]
 
         return filtered
 
@@ -445,10 +436,16 @@ class OverviewPage(BasePage):
         try:
             self._clear_awards_layout()
 
-            all_awards = self.ctx.awards.list_awards()
-
-            # 应用筛选条件
-            filtered_awards = self._apply_filters(all_awards)
+            level = None if self.filter_level == "全部" else self.filter_level
+            rank = None if self.filter_rank == "全部" else self.filter_rank
+            filtered_awards = self.ctx.awards.search_awards(
+                query=self.filter_keyword,
+                level=level,
+                rank=rank,
+                date_from=self.filter_start_date,
+                date_to=self.filter_end_date,
+                limit=5000,
+            )
 
             # 应用排序
             self.awards_list = self._apply_sorting(filtered_awards)

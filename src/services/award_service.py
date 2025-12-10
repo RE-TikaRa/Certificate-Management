@@ -53,6 +53,7 @@ class AwardService:
                     attachment_files,
                     session=session,
                 )
+            self._refresh_award_fts(award, members)
             return award
 
     def list_members(self) -> list[TeamMember]:
@@ -85,6 +86,16 @@ class AwardService:
         member = TeamMember(name=name, pinyin=name)
         session.add(member)
         session.flush()
+        self.db.upsert_member_fts(
+            member.id,
+            name=member.name,
+            pinyin=member.pinyin,
+            student_id=member.student_id,
+            phone=member.phone,
+            email=member.email,
+            college=member.college,
+            major=member.major,
+        )
         return member
 
     def _get_or_create_member_with_info(self, session, member_info: str | dict) -> TeamMember:
@@ -105,12 +116,32 @@ class AwardService:
                 if key != "name" and value:
                     setattr(member, key, value)
             session.flush()
+            self.db.upsert_member_fts(
+                member.id,
+                name=member.name,
+                pinyin=member.pinyin,
+                student_id=member.student_id,
+                phone=member.phone,
+                email=member.email,
+                college=member.college,
+                major=member.major,
+            )
             return member
 
         # 创建新成员
         member = TeamMember(name=name, pinyin=name, **{k: v for k, v in member_info.items() if k != "name"})
         session.add(member)
         session.flush()
+        self.db.upsert_member_fts(
+            member.id,
+            name=member.name,
+            pinyin=member.pinyin,
+            student_id=member.student_id,
+            phone=member.phone,
+            email=member.email,
+            college=member.college,
+            major=member.major,
+        )
         return member
 
     def _set_award_members(self, award: Award, members: Sequence[TeamMember]) -> None:
@@ -145,6 +176,7 @@ class AwardService:
                 award.deleted = True
                 award.deleted_at = datetime.utcnow()
                 session.add(award)
+                self.db.delete_award_fts(award_id)
 
     def update_award(
         self,
@@ -203,6 +235,9 @@ class AwardService:
             if member_names is not None:
                 members = [self._get_or_create_member_with_info(session, item) for item in member_names]
                 self._set_award_members(award, members)
+                self._refresh_award_fts(award, members)
+            else:
+                self._refresh_award_fts(award, award.members)
 
             session.add(award)
             session.flush()  # Validate before commit
@@ -247,40 +282,51 @@ class AwardService:
             List of matching Award objects
         """
         with self.db.session_scope() as session:
-            q = select(Award)
+            fts_ids: list[int] = []
+            if query:
+                fts_ids = self.db.search_awards_fts(query, limit)
+
+            q = select(Award).options(selectinload(Award.award_members).selectinload(AwardMember.member))
             conditions = []
 
-            # Text search
             if query:
-                conditions.append(
-                    or_(
-                        Award.competition_name.ilike(f"%{query}%"),
-                        Award.certificate_code.ilike(f"%{query}%"),
+                if fts_ids:
+                    conditions.append(Award.id.in_(fts_ids))
+                else:
+                    conditions.append(
+                        or_(
+                            Award.competition_name.ilike(f"%{query}%"),
+                            Award.certificate_code.ilike(f"%{query}%"),
+                        )
                     )
-                )
 
-            # Level filter
             if level:
                 conditions.append(Award.level == level)
-
-            # Rank filter
             if rank:
                 conditions.append(Award.rank == rank)
-
-            # Date range filter
             if date_from:
                 conditions.append(Award.award_date >= date_from)
             if date_to:
                 conditions.append(Award.award_date <= date_to)
-
-            # Apply all conditions
             if conditions:
                 q = q.where(and_(*conditions))
 
-            # Order by date (newest first) and apply limit
             q = q.order_by(Award.award_date.desc()).limit(limit)
+            results = list(session.scalars(q).all())
 
-            return list(session.scalars(q).all())
+            if fts_ids:
+                order = {id_: idx for idx, id_ in enumerate(fts_ids)}
+                results = sorted(results, key=lambda a: order.get(a.id, len(order)))
+            return results
+
+    def _refresh_award_fts(self, award: Award, members: Sequence[TeamMember]) -> None:
+        member_names = " ".join(member.name for member in members)
+        self.db.upsert_award_fts(
+            award.id,
+            award.competition_name,
+            award.certificate_code,
+            member_names,
+        )
 
     def batch_delete_awards(self, award_ids: list[int]) -> int:
         """

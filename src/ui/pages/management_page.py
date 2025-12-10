@@ -102,6 +102,12 @@ class ManagementPage(BasePage):
         # 标题和刷新按钮
         header_layout = QHBoxLayout()
         header_layout.addWidget(make_section_title("成员列表"))
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("搜索姓名/拼音/学号/电话/邮箱/学院/专业…")
+        self.search_input.setFixedWidth(280)
+        clean_input_text(self.search_input)
+        self.search_input.textChanged.connect(self._on_search_text_changed)
+        header_layout.addWidget(self.search_input)
         header_layout.addStretch()
 
         # 批量删除按钮
@@ -157,6 +163,7 @@ class ManagementPage(BasePage):
     def refresh(self) -> None:
         """异步刷新成员表格"""
         run_in_thread(self.ctx.awards.list_members, self._on_members_loaded)
+        self.search_input.setText("")
 
     def _on_members_loaded(self, members) -> None:
         self._cached_member_ids = {m.id for m in members}
@@ -173,6 +180,17 @@ class ManagementPage(BasePage):
         dialog = MemberDetailDialog(member, parent=self)
         if dialog.exec() and dialog.member_deleted:
             self.refresh()
+
+    def _on_search_text_changed(self, text: str) -> None:
+        query = text.strip()
+        if not query:
+            self.refresh()
+            return
+
+        def task():
+            return self.ctx.members.search_members(query, limit=100)
+
+        run_in_thread(task, self._on_members_loaded)
 
     def _batch_delete_members(self):
         """批量删除选中的成员"""

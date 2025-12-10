@@ -1,6 +1,6 @@
 import csv
 import logging
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
@@ -33,6 +33,7 @@ class ImportResult:
     success: int
     failed: int
     errors: list[str]
+    error_file: Path | None = None
 
 
 class ImportExportService:
@@ -77,7 +78,13 @@ class ImportExportService:
         logger.info("Exported %s awards to %s", len(awards), export_path)
         return export_path
 
-    def import_from_file(self, file_path: Path) -> ImportResult:
+    def import_from_file(
+        self,
+        file_path: Path,
+        *,
+        progress_callback: Callable[[int, int, float], None] | None = None,
+        dry_run: bool = False,
+    ) -> ImportResult:
         try:
             df = pd.read_excel(file_path) if file_path.suffix.lower() == ".xlsx" else pd.read_csv(file_path)
         except Exception as exc:
@@ -91,6 +98,11 @@ class ImportExportService:
         total = len(df)
         success = 0
         errors: list[str] = []
+        error_rows: list[dict] = []
+
+        import time
+
+        start_time = time.time()
 
         with self.db.session_scope() as session:
             for idx, row in df.iterrows():
@@ -119,8 +131,19 @@ class ImportExportService:
                     if files:
                         self.attachments.save_attachments(award.id, award.competition_name, files, session=session)
                     success += 1
+                    if dry_run:
+                        session.rollback()
                 except Exception as exc:
                     errors.append(f"第 {row_index + 2} 行: {exc}")
+                    error_rows.append({"行号": row_index + 2, "错误": str(exc), **row.to_dict()})
+
+                # 进度与 ETA
+                processed = int(row_index) + 1
+                if progress_callback and processed % 10 == 0:
+                    elapsed = time.time() - start_time
+                    rate = elapsed / max(processed, 1)
+                    remaining = max(total - processed, 0) * rate
+                    progress_callback(processed, total, float(remaining))
             session.add(
                 ImportJob(
                     filename=file_path.name,
@@ -129,7 +152,15 @@ class ImportExportService:
                 )
             )
 
-        return ImportResult(total=total, success=success, failed=total - success, errors=errors)
+        error_file: Path | None = None
+        if error_rows:
+            error_file = file_path.parent / f"{file_path.stem}_errors.csv"
+            try:
+                pd.DataFrame(error_rows).to_csv(error_file, index=False)
+            except Exception:
+                error_file = None
+
+        return ImportResult(total=total, success=success, failed=total - success, errors=errors, error_file=error_file)
 
     def _parse_items(self, value: str, sep: str = ",") -> list[str]:
         unique: list[str] = []
@@ -140,6 +171,11 @@ class ImportExportService:
                 seen.add(cleaned.lower())
                 unique.append(cleaned)
         return unique
+
+    def list_jobs(self, limit: int = 20) -> list[ImportJob]:
+        with self.db.session_scope() as session:
+            q = select(ImportJob).order_by(ImportJob.created_at.desc()).limit(max(1, limit))
+            return list(session.scalars(q).all())
 
     def _get_or_create_member(self, session, name: str) -> TeamMember:
         if name in self._member_cache:
