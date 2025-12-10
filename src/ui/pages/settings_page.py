@@ -1,5 +1,7 @@
 import logging
+import shutil
 import threading
+from contextlib import suppress
 from pathlib import Path
 from queue import Empty, SimpleQueue
 from typing import Any, ClassVar
@@ -31,6 +33,7 @@ from qfluentwidgets import (
     PushButton,
 )
 
+from src.config import DB_PATH, LOG_DIR
 from src.services.import_export import ImportResult
 from src.services.major_importer import read_major_catalog_from_csv, read_majors_from_excel
 from src.services.school_importer import read_school_list
@@ -177,6 +180,7 @@ class SettingsPage(BasePage):
         action_row.addStretch()
         settings_layout.addLayout(action_row)
         layout.addWidget(settings_card)
+        layout.addWidget(self._build_cleanup_card())
         layout.addWidget(self._build_award_import_card())
         layout.addWidget(self._build_backup_card())
         layout.addWidget(self._build_index_card())
@@ -384,6 +388,31 @@ class SettingsPage(BasePage):
         card_layout.addLayout(row)
         return card
 
+    def _build_cleanup_card(self) -> QWidget:
+        card, card_layout = create_card()
+        card_layout.addWidget(make_section_title("清理工具"))
+
+        hint = BodyLabel("危险操作，执行前请确认已手动备份。")
+        hint.setStyleSheet("color: #d32f2f;")
+        card_layout.addWidget(hint)
+
+        btn_row = QHBoxLayout()
+        clear_log_btn = PushButton("清空日志缓存")
+        clear_log_btn.clicked.connect(self._clear_logs)
+        clear_backup_btn = PushButton("清空备份目录")
+        clear_backup_btn.clicked.connect(self._clear_backups)
+        clear_db_btn = PushButton("清空数据库")
+        clear_db_btn.clicked.connect(self._clear_database)
+        clear_all_btn = PrimaryPushButton("一键清空 (日志+备份+数据库)")
+        clear_all_btn.clicked.connect(self._clear_all)
+        btn_row.addWidget(clear_log_btn)
+        btn_row.addWidget(clear_backup_btn)
+        btn_row.addWidget(clear_db_btn)
+        btn_row.addWidget(clear_all_btn)
+        btn_row.addStretch()
+        card_layout.addLayout(btn_row)
+        return card
+
     def _format_size(self, size: int) -> str:
         size_f = float(size)
         for unit in ("B", "KB", "MB", "GB"):
@@ -476,6 +505,117 @@ class SettingsPage(BasePage):
         except Exception as exc:
             self.logger.exception("Restore backup failed: %s", exc)
             InfoBar.error("恢复失败", str(exc), parent=self.window())
+
+    def _clear_logs(self) -> None:
+        box = MessageBox(
+            "清空日志",
+            "将删除 logs 目录下的所有文件，操作不可恢复。是否继续？",
+            self.window(),
+        )
+        if not box.exec():
+            return
+        self._do_clear_logs()
+
+    def _do_clear_logs(self) -> None:
+        try:
+            logging.shutdown()  # 释放文件句柄
+            if LOG_DIR.exists():
+                for path in sorted(LOG_DIR.rglob("*"), key=lambda p: len(p.parts), reverse=True):
+                    if path.is_file():
+                        try:
+                            path.unlink()
+                        except PermissionError:
+                            with suppress(Exception):
+                                path.write_text("", encoding="utf-8")
+                    elif path.is_dir():
+                        with suppress(Exception):
+                            path.rmdir()
+            LOG_DIR.mkdir(parents=True, exist_ok=True)
+            InfoBar.success("完成", "日志缓存已清空", parent=self.window())
+        except Exception as exc:
+            self.logger.exception("Clear logs failed: %s", exc)
+            InfoBar.error("清理失败", str(exc), parent=self.window())
+
+    def _double_confirm(self, title: str, text: str) -> bool:
+        first = MessageBox(title, text, self.window())
+        if not first.exec():
+            return False
+        second = MessageBox("请再次确认", "此操作不可撤销，确定继续吗？", self.window())
+        return bool(second.exec())
+
+    def _clear_backups(self) -> None:
+        if not self._double_confirm("清空备份", "将删除备份目录下所有文件。"):
+            return
+        self._do_clear_backups()
+
+    def _do_clear_backups(self) -> None:
+        try:
+            root = self.ctx.backup.backup_root
+            if root.exists():
+                for path in sorted(root.iterdir(), key=lambda p: len(p.parts), reverse=True):
+                    if path.is_file():
+                        with suppress(Exception):
+                            path.unlink()
+                    elif path.is_dir():
+                        with suppress(Exception):
+                            shutil.rmtree(path)
+            InfoBar.success("完成", "备份文件已清空", parent=self.window())
+            self._refresh_backup_list()
+        except Exception as exc:
+            self.logger.exception("Clear backups failed: %s", exc)
+            InfoBar.error("清理失败", str(exc), parent=self.window())
+
+    def _clear_database(self) -> None:
+        if not self._double_confirm(
+            "清空数据库",
+            (
+                "将删除 awards.db 并重建空库，数据将全部丢失。<br><br>"
+                "<span style='color:#d32f2f; font-weight:700; font-size: 20px;'>"
+                "本操作会删除：<br>所有荣誉/成员、附件记录、设置项、备份记录、学校与专业及映射、导入记录等。<br><br>请谨慎操作！"
+                "</span>"
+            ),
+        ):
+            return
+        self._do_clear_database()
+
+    def _do_clear_database(self) -> None:
+        try:
+            self.ctx.db.engine.dispose()
+            with suppress(FileNotFoundError):
+                DB_PATH.unlink()
+            self.ctx.db.initialize()
+            InfoBar.success("完成", "数据库已清空并重建", parent=self.window())
+        except Exception as exc:
+            self.logger.exception("Clear database failed: %s", exc)
+            InfoBar.error("清理失败", str(exc), parent=self.window())
+
+    def _clear_all(self) -> None:
+        if not self._double_confirm(
+            "一键清空",
+            (
+                "将依次清空日志、备份目录并重建空数据库，所有数据都会被删除。<br><br>"
+                "<span style='color:#d32f2f; font-weight:700;font-size: 20px'>此操作不可撤销，请确保已另行备份，使用此功能请不要依赖软件备份。</span>"
+            ),
+        ):
+            return
+        errors: list[str] = []
+        try:
+            self._do_clear_logs()
+        except Exception as exc:  # pragma: no cover - UI path
+            errors.append(f"日志：{exc}")
+        try:
+            self._do_clear_backups()
+        except Exception as exc:
+            errors.append(f"备份：{exc}")
+        try:
+            self._do_clear_database()
+        except Exception as exc:
+            errors.append(f"数据库：{exc}")
+
+        if errors:
+            InfoBar.warning("部分失败", "；".join(errors), parent=self.window())
+        else:
+            InfoBar.success("完成", "已清空日志、备份并重建数据库", parent=self.window())
 
     def _rebuild_fts(self) -> None:
         btn = self.rebuild_fts_btn
