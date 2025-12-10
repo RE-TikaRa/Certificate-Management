@@ -6,7 +6,7 @@
   <!-- Typing Effect Title -->
   <h1>荣誉证书管理系统</h1>
   <a href="https://git.io/typing-svg">
-    <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&pause=1000&color=36BCF7&background=00000000&center=true&vCenter=true&width=500&lines=全生命周期荣誉管理;PySide6+%2B+QFluentWidgets+打造;精美界面+极致体验;数据本地化+自动备份" alt="Typing SVG" />
+    <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&pause=1000&color=36BCF7&background=00000000&center=true&vCenter=true&width=500&lines=%E5%85%A8%E7%94%9F%E5%91%BD%E5%91%A8%E6%9C%9F%E8%8D%A3%E8%AA%89%E7%AE%A1%E7%90%86;PySide6+%2B+QFluentWidgets+%E6%89%93%E9%80%A0;%E7%B2%BE%E7%BE%8E%E7%95%8C%E9%9D%A2+%E6%9E%81%E8%87%B4%E4%BD%93%E9%AA%8C;%E6%95%B0%E6%8D%AE%E6%9C%AC%E5%9C%B0%E5%8C%96+%E8%87%AA%E5%8A%A8%E5%A4%87%E4%BB%BD" alt="Typing SVG" />
   </a>
 
   <p>
