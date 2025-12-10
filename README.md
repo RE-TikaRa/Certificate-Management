@@ -51,11 +51,12 @@
 - [🚀 快速开始](#-快速开始)
   - [📥 安装步骤](#-安装步骤)
   - [🛠️ 常用命令](#️-常用命令)
-- [📂 文件目录说明](#-文件目录说明)
-- [🏗️ 项目架构](#️-项目架构)
-- [💾 数据模型](#-数据模型)
+  - [📂 文件目录说明](#-文件目录说明)
+  - [🏗️ 项目架构](#️-项目架构)
+  - [💾 数据模型](#-数据模型)
   - [🏆 荣誉记录 (Awards)](#-荣誉记录-awards)
   - [👤 参与成员 (TeamMembers)](#-参与成员-teammembers)
+  - [🎓 专业与学校 (Majors/Schools)](#-专业与学校-majorsschools)
 - [🔐 数据安全与备份](#-数据安全与备份)
 - [🎨 主题系统](#-主题系统)
 - [🛠️ 开发指南](#️-开发指南)
@@ -317,20 +318,45 @@ flowchart TD
 | :--- | :--- | :--- |
 | `id` | Integer | 主键 |
 | `competition_name` | String | 比赛名称 |
-| `level` | String | 级别 (国家/省/校) |
-| `rank` | String | 等级 (一/二/三/优秀) |
-| `members` | Relation | 关联成员 |
-| `attachments` | Relation | 关联附件 |
+| `award_date` | Date | 获奖日期 |
+| `level` | String | 级别（国家/省/校等） |
+| `rank` | String | 等级（一/二/三/优秀） |
+| `certificate_code` | String | 证书编号 |
+| `remarks` | Text | 备注 |
+| `attachment_folder` | String | 附件目录相对路径 |
+| `deleted` / `deleted_at` | Bool/DateTime | 软删除标记 |
+| `created_at` / `updated_at` | DateTime | 时间戳 |
+| `members` | Relation | 多对多成员 |
+| `attachments` | Relation | 附件（级联删除） |
 
 ### 👤 参与成员 (TeamMembers)
 | 字段 | 类型 | 说明 |
 | :--- | :--- | :--- |
 | `id` | Integer | 主键 |
 | `name` | String | 姓名 |
-| `student_id` | String | 学号 (唯一) |
-| `school` | String | 学校 |
-| `major` | String | 专业 |
-| `awards` | Relation | 关联荣誉 |
+| `gender` | String | 性别 |
+| `id_card` | String | 身份证号（唯一） |
+| `phone` | String | 手机号 |
+| `student_id` | String | 学号（唯一） |
+| `email` | String | 邮箱 |
+| `school` / `school_code` | String | 学校名称/标识码 |
+| `major` / `major_code` | String | 专业名称/代码 |
+| `class_name` | String | 班级 |
+| `college` | String | 学院 |
+| `pinyin` | String | 姓名拼音 |
+| `active` | Bool | 启用状态 |
+| `sort_index` | Integer | 排序权重 |
+| `created_at` / `updated_at` | DateTime | 时间戳 |
+| `awards` | Relation | 多对多荣誉 |
+
+### 🎓 专业与学校 (Majors/Schools)
+| 模型 | 关键字段 | 说明 |
+| :--- | :--- | :--- |
+| `Major` | `name`(唯一), `code`(唯一), `pinyin`, `category`, `discipline_code/name`, `class_code/name`, 时间戳 | 2025 本科专业目录（约 840 条） |
+| `School` | `name`(唯一), `code`(唯一), `pinyin`, `region`, 时间戳 | 全国高校列表 |
+| `SchoolMajorMapping` | `school_name/code`, `major_name/code`, `college_name`, `category`, `discipline_*`, `class_*` | 学校-专业-学院映射，支持代码缺失时按名称回退 |
+| `Attachment` | `award_id`, `stored_name`, `original_name`, `relative_path`(唯一), `file_md5`, `file_size`, `deleted`, 时间戳 | 附件记录 |
+| `BackupRecord` / `ImportJob` | 路径/状态/消息/时间戳 | 备份与导入任务记录 |
 
 *(更多模型细节请查阅源码 `src/data/models.py`)*
 </details>
