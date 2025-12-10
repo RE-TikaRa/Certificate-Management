@@ -386,10 +386,18 @@ class SettingsPage(BasePage):
             f"将从备份 {info.path.name} 覆盖当前数据库和附件/日志。\n此操作不可撤销，建议先备份当前数据。是否继续？",
             self.window(),
         )
+        auto_backup = CheckBox("恢复前自动备份当前数据")
+        auto_backup.setChecked(True)
+        layout = box.layout()
+        if layout is not None:
+            layout.addWidget(auto_backup)
         if not box.exec():
             return
 
         try:
+            if auto_backup.isChecked():
+                new_backup = self.ctx.backup.perform_backup()
+                InfoBar.success("已备份当前数据", str(new_backup), duration=2000, parent=self.window())
             self.ctx.backup.restore_backup(info.path)
             InfoBar.success("已恢复", f"已从 {info.path.name} 恢复数据", parent=self.window())
         except Exception as exc:

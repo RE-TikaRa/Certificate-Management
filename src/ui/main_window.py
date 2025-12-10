@@ -9,7 +9,8 @@ from PySide6.QtCore import (
     QPropertyAnimation,
     QTimer,
 )
-from PySide6.QtWidgets import QApplication, QGraphicsOpacityEffect, QWidget
+from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtWidgets import QApplication, QGraphicsOpacityEffect, QLineEdit, QPlainTextEdit, QTextEdit, QWidget
 from qfluentwidgets import (
     FluentIcon as FIF,
     FluentWindow,
@@ -229,6 +230,29 @@ class MainWindow(FluentWindow):
             ani_info.deltaY = 100
 
         self.navigate_to("home")
+        self._register_shortcuts()
+
+    def _register_shortcuts(self) -> None:
+        """绑定快捷键导航，避免在输入框时误触"""
+
+        def can_navigate() -> bool:
+            focus = QApplication.focusWidget()
+            return not isinstance(focus, (QLineEdit, QTextEdit, QPlainTextEdit))
+
+        shortcuts = [
+            ("Alt+1", "home"),
+            ("Alt+2", "dashboard"),
+            ("Alt+3", "overview"),
+            ("Alt+4", "entry"),
+            ("Alt+5", "management"),
+            ("Alt+6", "recycle"),
+            ("Alt+7", "about"),
+            ("Alt+8", "settings"),
+        ]
+
+        for seq, route in shortcuts:
+            shortcut = QShortcut(QKeySequence(seq), self)
+            shortcut.activated.connect(lambda r=route: self.navigate_to(r) if can_navigate() else None)
 
     def navigate_to(self, route: str) -> None:
         """导航到指定页面"""

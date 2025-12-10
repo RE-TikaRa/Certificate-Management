@@ -1146,7 +1146,7 @@ class EntryPage(BasePage):
                 size_value = resolved.stat().st_size
             except OSError:
                 size_value = None
-            current_award_id = self.editing_award.id if getattr(self, "editing_award", None) else None
+            current_award_id = getattr(getattr(self, "editing_award", None), "id", None)
             if (
                 md5_value
                 and md5_value != "无法计算"

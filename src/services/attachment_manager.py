@@ -66,9 +66,8 @@ class AttachmentManager:
         if award_id is None:
             return False
         with self.db.session_scope() as session:
-            query = (
-                session.query(Attachment.id)
-                .filter(Attachment.award_id == award_id, Attachment.file_md5 == file_md5)
+            query = session.query(Attachment.id).filter(
+                Attachment.award_id == award_id, Attachment.file_md5 == file_md5
             )
             if file_size is not None:
                 query = query.filter(Attachment.file_size == file_size)
