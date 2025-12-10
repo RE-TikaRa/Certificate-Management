@@ -6,7 +6,7 @@
 - 应用：荣誉证书管理桌面端（PySide6 + QFluentWidgets）
 - 语言/平台：Python 3.14+，SQLite + SQLAlchemy 2.x
 - 入口：`uv run python -m src.main`（Windows 可用 `main.bat`）；调试加 `--debug`
-- 数据目录：`data/`（awards.db），`attachments/`，`backups/`，`logs/`，`temp/` 均已 gitignore
+- 数据目录：`data/`（awards.db），`attachments/`，`backups/`，`logs/`，`temp/` 均已被 `.gitignore` 忽略（含 SQLite 辅助文件 *.db-wal / *.db-shm）
 
 ## 常用命令
 - 安装依赖：`uv sync`
