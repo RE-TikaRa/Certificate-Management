@@ -28,6 +28,7 @@ from qfluentwidgets import (
     ComboBox,
     InfoBar,
     LineEdit,
+    MaskDialogBase,
     MessageBox,
     PrimaryPushButton,
     PushButton,
@@ -123,6 +124,7 @@ class SettingsPage(BasePage):
         self.rebuild_fts_btn: PrimaryPushButton | None = None
         self._import_busy = False
         self._progress_dialog: QProgressDialog | None = None
+        self.flag_rows: list[dict] = []
 
         self._build_ui()
         self.refresh()
@@ -181,6 +183,7 @@ class SettingsPage(BasePage):
         settings_layout.addLayout(action_row)
         layout.addWidget(settings_card)
         layout.addWidget(self._build_cleanup_card())
+        layout.addWidget(self._build_flags_card())
         layout.addWidget(self._build_award_import_card())
         layout.addWidget(self._build_backup_card())
         layout.addWidget(self._build_index_card())
@@ -219,6 +222,7 @@ class SettingsPage(BasePage):
         self.email_suffix.setText(email_suffix)
         self._refresh_academic_stats()
         self._refresh_import_log()
+        self._refresh_flags()
 
     def _choose_attach_dir(self) -> None:
         path = QFileDialog.getExistingDirectory(self, "选择附件目录", self.attach_dir.text())
@@ -413,6 +417,51 @@ class SettingsPage(BasePage):
         card_layout.addLayout(btn_row)
         return card
 
+    def _build_flags_card(self) -> QWidget:
+        card, card_layout = create_card()
+        card_layout.addWidget(make_section_title("自定义开关"))
+
+        hint = BodyLabel("用于录入/导出/筛选的布尔开关，支持改名、启用、默认值、排序。")
+        hint.setStyleSheet("color: #7a7a7a;")
+        card_layout.addWidget(hint)
+
+        # 标题行
+        header = QHBoxLayout()
+        add_btn = PrimaryPushButton("新增开关")
+        add_btn.clicked.connect(self._add_flag_dialog)
+        refresh_btn = PushButton("刷新")
+        refresh_btn.clicked.connect(self._refresh_flags)
+        header.addWidget(add_btn)
+        header.addWidget(refresh_btn)
+        header.addStretch()
+        card_layout.addLayout(header)
+
+        # 列头
+        head_row = QHBoxLayout()
+        head_row.setSpacing(8)
+        head_row.addWidget(self._make_header_label("显示名", 180))
+        head_row.addWidget(self._make_header_label("Key", 170))
+        head_row.addWidget(self._make_header_label("默认勾选", 80))
+        head_row.addWidget(self._make_header_label("启用", 60))
+        head_row.addWidget(self._make_header_label("排序", 120))
+        head_row.addWidget(self._make_header_label("操作", 120))
+        card_layout.addLayout(head_row)
+
+        self.flags_container = QWidget()
+        self.flags_layout = QVBoxLayout(self.flags_container)
+        self.flags_layout.setContentsMargins(0, 4, 0, 0)
+        self.flags_layout.setSpacing(6)
+        card_layout.addWidget(self.flags_container)
+
+        return card
+
+    def _make_header_label(self, text: str, width: int | None = None) -> QLabel:
+        label = QLabel(text)
+        if width:
+            label.setMinimumWidth(width)
+        label.setStyleSheet("color: #888; font-weight: 600;")
+        return label
+
     def _format_size(self, size: int) -> str:
         size_f = float(size)
         for unit in ("B", "KB", "MB", "GB"):
@@ -505,6 +554,218 @@ class SettingsPage(BasePage):
         except Exception as exc:
             self.logger.exception("Restore backup failed: %s", exc)
             InfoBar.error("恢复失败", str(exc), parent=self.window())
+
+    # ---- 自定义开关 ----
+    def _refresh_flags(self) -> None:
+        # 清空布局
+        while self.flags_layout.count():
+            item = self.flags_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+        self.flag_rows.clear()
+
+        flags = self.ctx.flags.list_flags(enabled_only=False)
+        for flag in flags:
+            self._add_flag_row(flag)
+
+        self.flags_layout.addStretch()
+
+    def _add_flag_row(self, flag) -> None:
+        row_widget = QWidget()
+        row_layout = QHBoxLayout(row_widget)
+        row_layout.setContentsMargins(0, 0, 0, 0)
+        row_layout.setSpacing(8)
+
+        name_edit = LineEdit(parent=row_widget)
+        name_edit.setText(flag.label)
+        name_edit.setMinimumWidth(180)
+        row_layout.addWidget(name_edit)
+
+        key_label = QLabel(flag.key)
+        key_label.setMinimumWidth(170)
+        row_layout.addWidget(key_label)
+
+        default_cb = CheckBox()
+        default_cb.setChecked(bool(flag.default_value))
+        row_layout.addWidget(default_cb)
+
+        enabled_cb = CheckBox()
+        enabled_cb.setChecked(bool(flag.enabled))
+        row_layout.addWidget(enabled_cb)
+
+        sort_row = QHBoxLayout()
+        up_btn = PushButton("上移")
+        down_btn = PushButton("下移")
+        up_btn.setFixedWidth(50)
+        down_btn.setFixedWidth(50)
+        sort_row.addWidget(up_btn)
+        sort_row.addWidget(down_btn)
+        sort_row.addStretch()
+        sort_wrap = QWidget()
+        sort_wrap.setLayout(sort_row)
+        sort_wrap.setMinimumWidth(120)
+        row_layout.addWidget(sort_wrap)
+
+        ops_row = QHBoxLayout()
+        edit_btn = PushButton("编辑")
+        edit_btn.setFixedWidth(50)
+        del_btn = PushButton("删除")
+        del_btn.setFixedWidth(50)
+        ops_row.addWidget(edit_btn)
+        ops_row.addWidget(del_btn)
+        ops_row.addStretch()
+        ops_wrap = QWidget()
+        ops_wrap.setLayout(ops_row)
+        ops_wrap.setMinimumWidth(120)
+        row_layout.addWidget(ops_wrap)
+
+        self.flags_layout.addWidget(row_widget)
+
+        row_data = {
+            "id": flag.id,
+            "widget": row_widget,
+            "name": name_edit,
+            "default": default_cb,
+            "enabled": enabled_cb,
+            "key": flag.key,
+        }
+        self.flag_rows.append(row_data)
+
+        up_btn.clicked.connect(lambda _=None, w=row_widget: self._move_flag_row(w, -1))
+        down_btn.clicked.connect(lambda _=None, w=row_widget: self._move_flag_row(w, 1))
+        del_btn.clicked.connect(lambda _=None, fid=flag.id, label=flag.label: self._delete_flag(fid, label))
+        edit_btn.clicked.connect(lambda _=None, f=flag: self._edit_flag_dialog(f))
+
+    def _move_flag_row(self, widget: QWidget, delta: int) -> None:
+        idx = next((i for i, r in enumerate(self.flag_rows) if r["widget"] == widget), -1)
+        if idx < 0:
+            return
+        new_idx = idx + delta
+        if not 0 <= new_idx < len(self.flag_rows):
+            return
+        self.flag_rows[idx], self.flag_rows[new_idx] = self.flag_rows[new_idx], self.flag_rows[idx]
+
+        self.flags_layout.removeWidget(widget)
+        self.flags_layout.insertWidget(new_idx, widget)
+
+    def _add_flag_dialog(self) -> None:
+        dialog = FlagDialog(parent=self.window())
+        if not dialog.exec():
+            return
+        try:
+            self.ctx.flags.create_flag(
+                key=dialog.key_value,
+                label=dialog.label_value,
+                default_value=dialog.default_checked,
+                enabled=dialog.enabled_checked,
+            )
+            InfoBar.success("已添加", dialog.label_value, parent=self.window())
+        except Exception as exc:
+            InfoBar.error("添加失败", str(exc), parent=self.window())
+        self._refresh_flags()
+
+    def _edit_flag_dialog(self, flag) -> None:
+        dialog = FlagDialog(
+            parent=self.window(),
+            key_value=flag.key,
+            label_value=flag.label,
+            default_checked=flag.default_value,
+            enabled_checked=flag.enabled,
+            editable_key=False,
+        )
+        if not dialog.exec():
+            return
+        try:
+            self.ctx.flags.update_flag(
+                flag.id,
+                label=dialog.label_value,
+                default_value=dialog.default_checked,
+                enabled=dialog.enabled_checked,
+            )
+            InfoBar.success("已更新", dialog.label_value, parent=self.window())
+        except Exception as exc:
+            InfoBar.error("更新失败", str(exc), parent=self.window())
+        self._refresh_flags()
+
+    def _delete_flag(self, flag_id: int, label: str) -> None:
+        first = MessageBox("确认删除", f"删除开关「{label}」将清理其所有历史值，确定继续？", self.window())
+        if not first.exec():
+            return
+        second = MessageBox("再次确认", "此操作不可撤销，真的要删除吗？", self.window())
+        if not second.exec():
+            return
+        try:
+            self.ctx.flags.delete_flag(flag_id)
+            InfoBar.success("已删除", label, parent=self.window())
+        except Exception as exc:
+            InfoBar.error("删除失败", str(exc), parent=self.window())
+        self._refresh_flags()
+
+    def _save_flags(self) -> None:
+        try:
+            for order, row in enumerate(self.flag_rows):
+                self.ctx.flags.update_flag(
+                    row["id"],
+                    label=row["name"].text().strip() or row["key"],
+                    default_value=row["default"].isChecked(),
+                    enabled=row["enabled"].isChecked(),
+                    sort_order=order,
+                )
+            InfoBar.success("已保存", "自定义开关已更新", parent=self.window())
+        except Exception as exc:
+            InfoBar.error("保存失败", str(exc), parent=self.window())
+        self._refresh_flags()
+
+    def _export_awards(self) -> None:
+        save_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "导出全部荣誉",
+            str(Path("exports/awards.csv").resolve()),
+            "CSV 文件 (*.csv);;Excel 文件 (*.xlsx)",
+        )
+        if not save_path:
+            return
+        path = Path(save_path)
+        try:
+            awards = self.ctx.awards.list_awards()
+            exported = self.ctx.importer.export_awards(path, awards)
+            InfoBar.success("已导出", exported.name, parent=self.window())
+        except Exception as exc:
+            self.logger.exception("Export awards failed: %s", exc)
+            InfoBar.error("导出失败", str(exc), parent=self.window())
+
+    def _create_stat_block(self, title: str, value_label: QLabel) -> QWidget:
+        wrapper = QWidget()
+        layout = QVBoxLayout(wrapper)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+        value_label.setStyleSheet("font-size: 22px; font-weight: 600;")
+        value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        caption = QLabel(title)
+        caption.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        caption.setStyleSheet("color: #6c6c6c; font-size: 12px;")
+        layout.addWidget(value_label)
+        layout.addWidget(caption)
+        return wrapper
+
+    def _rebuild_fts(self) -> None:
+        btn = self.rebuild_fts_btn
+        if btn:
+            btn.setDisabled(True)
+        try:
+            awards, members = self.ctx.db.rebuild_fts()
+            InfoBar.success(
+                "索引已重建",
+                f"荣誉 {awards} 条，成员 {members} 条",
+                parent=self.window(),
+            )
+        except Exception as exc:
+            self.logger.exception("Rebuild FTS failed: %s", exc)
+            InfoBar.error("重建失败", str(exc), parent=self.window())
+        finally:
+            if btn:
+                btn.setDisabled(False)
 
     def _clear_logs(self) -> None:
         box = MessageBox(
@@ -617,24 +878,6 @@ class SettingsPage(BasePage):
         else:
             InfoBar.success("完成", "已清空日志、备份并重建数据库", parent=self.window())
 
-    def _rebuild_fts(self) -> None:
-        btn = self.rebuild_fts_btn
-        if btn:
-            btn.setDisabled(True)
-        try:
-            awards, members = self.ctx.db.rebuild_fts()
-            InfoBar.success(
-                "索引已重建",
-                f"荣誉 {awards} 条，成员 {members} 条",
-                parent=self.window(),
-            )
-        except Exception as exc:
-            self.logger.exception("Rebuild FTS failed: %s", exc)
-            InfoBar.error("重建失败", str(exc), parent=self.window())
-        finally:
-            if btn:
-                btn.setDisabled(False)
-
     def _import_awards(self) -> None:
         start_dir = Path(self.ctx.settings.get("last_import_dir", "data")).resolve()
         file_path, _ = QFileDialog.getOpenFileName(
@@ -727,38 +970,6 @@ class SettingsPage(BasePage):
         progress_timer.timeout.connect(poll_queue)
         progress_timer.start()
         threading.Thread(target=worker, daemon=True).start()
-
-    def _export_awards(self) -> None:
-        save_path, _ = QFileDialog.getSaveFileName(
-            self,
-            "导出全部荣誉",
-            str(Path("exports/awards.csv").resolve()),
-            "CSV 文件 (*.csv);;Excel 文件 (*.xlsx)",
-        )
-        if not save_path:
-            return
-        path = Path(save_path)
-        try:
-            awards = self.ctx.awards.list_awards()
-            exported = self.ctx.importer.export_awards(path, awards)
-            InfoBar.success("已导出", exported.name, parent=self.window())
-        except Exception as exc:
-            self.logger.exception("Export awards failed: %s", exc)
-            InfoBar.error("导出失败", str(exc), parent=self.window())
-
-    def _create_stat_block(self, title: str, value_label: QLabel) -> QWidget:
-        wrapper = QWidget()
-        layout = QVBoxLayout(wrapper)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(4)
-        value_label.setStyleSheet("font-size: 22px; font-weight: 600;")
-        value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        caption = QLabel(title)
-        caption.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        caption.setStyleSheet("color: #6c6c6c; font-size: 12px;")
-        layout.addWidget(value_label)
-        layout.addWidget(caption)
-        return wrapper
 
     def _set_import_busy(self, busy: bool, message: str | None = None) -> None:
         self._import_busy = busy
@@ -1086,3 +1297,105 @@ class SettingsPage(BasePage):
             self.school_major_list.addItem(text)
         if truncated:
             self.school_major_list.addItem(f"…… 仅显示前 {self.MAX_MAJOR_DISPLAY} 条，共 {total_count} 条")
+
+
+class FlagDialog(MaskDialogBase):
+    """新增/编辑自定义开关对话框"""
+
+    def __init__(
+        self,
+        parent=None,
+        *,
+        key_value: str | None = None,
+        label_value: str | None = None,
+        default_checked: bool = False,
+        enabled_checked: bool = True,
+        editable_key: bool = True,
+    ):
+        super().__init__(parent)
+        self.setWindowTitle("开关设置")
+        self.widget.setMinimumWidth(520)
+        self.widget.setMaximumWidth(640)
+        self.key_value = key_value or ""
+        self.label_value = label_value or ""
+        self.default_checked = default_checked
+        self.enabled_checked = enabled_checked
+        self.editable_key = editable_key
+        self._build_ui()
+
+    def _build_ui(self) -> None:
+        from qfluentwidgets import PrimaryPushButton, PushButton
+
+        layout = QVBoxLayout(self.widget)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        header = create_page_header(
+            "新增开关" if self.editable_key else "编辑开关",
+            "自定义布尔开关，可用于表单录入和导出筛选",
+        )
+        layout.addWidget(header)
+
+        card, card_layout = create_card()
+        card_layout.setSpacing(12)
+
+        form_layout = QFormLayout()
+        form_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        form_layout.setFormAlignment(Qt.AlignmentFlag.AlignTop)
+        form_layout.setHorizontalSpacing(12)
+        form_layout.setVerticalSpacing(12)
+
+        key_label = QLabel("Key")
+        key_label.setObjectName("formLabel")
+        self.key_edit = LineEdit(parent=self.widget)
+        self.key_edit.setText(self.key_value)
+        self.key_edit.setPlaceholderText("key（小写英文字母+数字+_，不可更改）")
+        self.key_edit.setDisabled(not self.editable_key)
+        form_layout.addRow(key_label, self.key_edit)
+
+        hint = BodyLabel("只允许小写字母、数字、下划线，创建后不可修改。")
+        hint.setStyleSheet("color: #6b7280;")
+        form_layout.addRow(QLabel(), hint)
+
+        label_label = QLabel("显示名")
+        label_label.setObjectName("formLabel")
+        self.label_edit = LineEdit(parent=self.widget)
+        self.label_edit.setText(self.label_value)
+        self.label_edit.setPlaceholderText("显示名，例如：是否申报综测")
+        form_layout.addRow(label_label, self.label_edit)
+
+        options_row = QHBoxLayout()
+        options_row.setSpacing(16)
+        self.default_cb = CheckBox("默认勾选")
+        self.default_cb.setChecked(self.default_checked)
+        self.enabled_cb = CheckBox("启用")
+        self.enabled_cb.setChecked(self.enabled_checked)
+        options_row.addWidget(self.default_cb)
+        options_row.addWidget(self.enabled_cb)
+        options_row.addStretch()
+        form_layout.addRow(QLabel("选项"), options_row)
+
+        card_layout.addLayout(form_layout)
+        layout.addWidget(card)
+
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(10)
+        btn_row.addStretch()
+        ok_btn = PrimaryPushButton("OK")
+        cancel_btn = PushButton("Cancel")
+        ok_btn.clicked.connect(self._on_ok)
+        cancel_btn.clicked.connect(self.reject)
+        btn_row.addWidget(ok_btn)
+        btn_row.addWidget(cancel_btn)
+        layout.addLayout(btn_row)
+
+    def _on_ok(self) -> None:
+        self.key_value = self.key_edit.text().strip()
+        self.label_value = self.label_edit.text().strip() or self.key_value
+        self.default_checked = self.default_cb.isChecked()
+        self.enabled_checked = self.enabled_cb.isChecked()
+        if not self.key_value:
+            InfoBar.warning("提示", "Key 不能为空", parent=self)
+            return
+        self.accept()

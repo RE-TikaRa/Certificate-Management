@@ -143,10 +143,14 @@ class AttachmentManager:
         if trash_dir.exists() and trash_dir.is_dir():
             shutil.rmtree(trash_dir)
 
-    def mark_deleted(self, attachment_ids: Iterable[int]) -> None:
+    def mark_deleted(self, attachment_ids: Iterable[int], *, session: Session | None = None) -> None:
         root = self.ensure_root()
-        with self.db.session_scope() as session:
-            attachments = session.scalars(select(Attachment).where(Attachment.id.in_(list(attachment_ids)))).all()
+        ids = list(attachment_ids)
+        if not ids:
+            return
+        context = self.db.session_scope() if session is None else contextlib.nullcontext(session)
+        with context as active_session:
+            attachments = active_session.scalars(select(Attachment).where(Attachment.id.in_(ids))).all()
             for attachment in attachments:
                 if attachment.deleted:
                     continue
@@ -155,22 +159,26 @@ class AttachmentManager:
                 src = root / attachment.relative_path
                 trash_dir = root / ".trash" / f"award_{attachment.award_id}"
                 trash_dir.mkdir(parents=True, exist_ok=True)
-                dest = trash_dir / src.name
+                dest = self._ensure_unique_path(trash_dir, src.name)
                 if src.exists():
                     shutil.move(src, dest)
                     attachment.relative_path = str(dest.relative_to(root))
 
-    def restore(self, attachment_ids: Iterable[int]) -> None:
+    def restore(self, attachment_ids: Iterable[int], *, session: Session | None = None) -> None:
         root = self.ensure_root()
-        with self.db.session_scope() as session:
-            attachments = session.scalars(select(Attachment).where(Attachment.id.in_(list(attachment_ids)))).all()
+        ids = list(attachment_ids)
+        if not ids:
+            return
+        context = self.db.session_scope() if session is None else contextlib.nullcontext(session)
+        with context as active_session:
+            attachments = active_session.scalars(select(Attachment).where(Attachment.id.in_(ids))).all()
             for attachment in attachments:
                 if not attachment.deleted:
                     continue
                 trash_path = root / attachment.relative_path
                 original_dir = root / f"award_{attachment.award_id}"
                 original_dir.mkdir(parents=True, exist_ok=True)
-                dest = original_dir / trash_path.name
+                dest = self._ensure_unique_path(original_dir, trash_path.name)
                 if trash_path.exists():
                     shutil.move(trash_path, dest)
                     attachment.relative_path = str(dest.relative_to(root))

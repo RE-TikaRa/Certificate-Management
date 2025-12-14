@@ -166,6 +166,29 @@ class Major(Base):
     class_name: Mapped[str | None] = mapped_column(String(128))
 
 
+class CustomFlag(Base):
+    """自定义布尔开关定义"""
+
+    __tablename__ = "custom_flags"
+    __table_args__ = (UniqueConstraint("key", name="uq_custom_flags_key"),)
+
+    key: Mapped[str] = mapped_column(String(64), unique=True)
+    label: Mapped[str] = mapped_column(String(128), nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    default_value: Mapped[bool] = mapped_column(Boolean, default=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class AwardFlagValue(Base):
+    """荣誉对应的开关值"""
+
+    __tablename__ = "award_flag_values"
+    __table_args__ = (UniqueConstraint("award_id", "flag_key", name="uq_award_flag_values"),)
+
+    award_id: Mapped[int] = mapped_column(ForeignKey("awards.id", ondelete="CASCADE"), nullable=False)
+    flag_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    value: Mapped[bool] = mapped_column(Boolean, default=False)
+
 class School(Base):
     __tablename__ = "schools"
     __table_args__ = (

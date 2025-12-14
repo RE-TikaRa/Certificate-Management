@@ -1,4 +1,5 @@
 import hashlib
+import logging
 from collections.abc import Iterable
 from datetime import date
 from functools import partial
@@ -25,6 +26,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 from qfluentwidgets import (
+    CheckBox,
     ComboBox,
     FluentIcon,
     InfoBar,
@@ -46,6 +48,8 @@ from ..widgets.attachment_table_view import AttachmentTableView
 from ..widgets.major_search import MajorSearchWidget
 from ..widgets.school_search import SchoolSearchWidget
 from .base_page import BasePage
+
+logger = logging.getLogger(__name__)
 
 
 def clean_input_text(line_edit: QLineEdit) -> None:
@@ -72,7 +76,10 @@ class EntryPage(BasePage):
         super().__init__(ctx, theme_manager)
         self.selected_files: list[Path] = []
         self._selected_file_keys: set[str] = set()
+        self._attachments_loaded_for_edit = False
         self.editing_award = None  # 当前正在编辑的荣誉
+        self.flag_checkboxes: dict[str, CheckBox] = {}
+        self.flag_defs: list = []
 
         # 连接主题变化信号
         self.theme_manager.themeChanged.connect(self._on_theme_changed)
@@ -216,6 +223,12 @@ class EntryPage(BasePage):
         remark_col.addWidget(remark_label)
         remark_col.addWidget(self.remarks_input)
         info_layout.addLayout(remark_col)
+
+        # 自定义开关
+        self.flags_container = QVBoxLayout()
+        self.flags_container.setSpacing(8)
+        info_layout.addLayout(self.flags_container)
+        self._refresh_flag_section()
 
         layout.addWidget(info_card)
 
@@ -808,6 +821,9 @@ class EntryPage(BasePage):
                     members.append(member_info)
         return members
 
+    def _get_flag_values(self) -> dict[str, bool]:
+        return {key: cb.isChecked() for key, cb in self.flag_checkboxes.items()}
+
     def _pick_files(self) -> None:
         """选择附件文件并添加到表格"""
         files, _ = QFileDialog.getOpenFileNames(self, "选择附件")
@@ -895,9 +911,11 @@ class EntryPage(BasePage):
 
     def load_award_for_editing(self, award) -> None:
         """加载荣誉信息用于编辑"""
+        self._refresh_flag_section()
         self.editing_award = award
         self.submit_btn.setText("更新荣誉")
         self.clear_btn.setText("取消编辑")
+        self._attachments_loaded_for_edit = False
 
         # 填充基本信息
         self.name_input.setText(award.competition_name)
@@ -949,10 +967,49 @@ class EntryPage(BasePage):
                 else:
                     widget.setText(value)
 
-        self.selected_files = []
+        # 自定义开关
+        if self.flag_defs:
+            try:
+                flag_values = self.ctx.flags.get_award_flags(award.id)
+            except Exception:
+                flag_values = {}
+            for key, cb in self.flag_checkboxes.items():
+                cb.setChecked(bool(flag_values.get(key, cb.isChecked())))
+
+        self._load_existing_attachments(award.id)
 
     def refresh(self) -> None:
-        pass
+        self._refresh_flag_section()
+
+    def _load_existing_attachments(self, award_id: int) -> None:
+        try:
+            from sqlalchemy.orm import joinedload
+
+            from ...data.models import Award
+
+            self.selected_files = []
+            self._selected_file_keys.clear()
+            with self.ctx.db.session_scope() as session:
+                award = session.query(Award).options(joinedload(Award.attachments)).filter(Award.id == award_id).first()
+                if not award:
+                    return
+                root = Path(self.ctx.settings.get("attachment_root", "attachments"))
+                for attachment in award.attachments:
+                    if getattr(attachment, "deleted", False):
+                        continue
+                    file_path = (root / attachment.relative_path).resolve()
+                    if not file_path.exists():
+                        continue
+                    key = self._to_file_key(file_path)
+                    if key in self._selected_file_keys:
+                        continue
+                    self.selected_files.append(file_path)
+                    self._selected_file_keys.add(key)
+            self._attachments_loaded_for_edit = True
+            self._update_attachment_table()
+        except Exception as exc:
+            logger.warning("加载附件失败: %s", exc, exc_info=True)
+            self._attachments_loaded_for_edit = False
 
     def _submit(self) -> None:
         issues = self._validate_form()
@@ -972,26 +1029,18 @@ class EntryPage(BasePage):
         )
 
         if self.editing_award:
-            # 编辑模式：更新现有荣誉
-            award = self.editing_award
-            award.competition_name = self.name_input.text().strip()
-            award.award_date = award_date
-            award.level = self.level_input.currentText()
-            award.rank = self.rank_input.currentText()
-            award.certificate_code = self.certificate_input.text().strip() or None
-            award.remarks = self.remarks_input.text().strip() or None
-
-            # 更新成员关联
-            with self.ctx.db.session_scope() as session:
-                db_award = session.get(type(award), award.id)
-                if db_award:
-                    ordered_members = [
-                        self.ctx.awards._get_or_create_member_with_info(session, member_info)
-                        for member_info in members_data
-                    ]
-                    self.ctx.awards._set_award_members(db_award, ordered_members)
-                    session.commit()
-
+            award = self.ctx.awards.update_award(
+                self.editing_award.id,
+                competition_name=self.name_input.text().strip(),
+                award_date=award_date,
+                level=self.level_input.currentText(),
+                rank=self.rank_input.currentText(),
+                certificate_code=self.certificate_input.text().strip() or None,
+                remarks=self.remarks_input.text().strip() or None,
+                member_names=members_data,
+                attachment_files=self.selected_files if self._attachments_loaded_for_edit else None,
+                flag_values=self._get_flag_values(),
+            )
             InfoBar.success("成功", f"已更新：{award.competition_name}", parent=self.window())
         else:
             # 创建模式：创建新荣誉
@@ -1004,6 +1053,7 @@ class EntryPage(BasePage):
                 remarks=self.remarks_input.text().strip() or None,
                 member_names=members_data,
                 attachment_files=self.selected_files,
+                flag_values=self._get_flag_values(),
             )
             InfoBar.success("成功", f"已保存：{award.competition_name}", parent=self.window())
 
@@ -1102,6 +1152,7 @@ class EntryPage(BasePage):
     def _clear_form(self) -> None:
         """清空表单，重置为新建状态"""
         self.editing_award = None
+        self._attachments_loaded_for_edit = False
         self.name_input.clear()
         today = QDate.currentDate()
         self.year_input.setValue(today.year())
@@ -1111,6 +1162,11 @@ class EntryPage(BasePage):
         self.rank_input.setCurrentIndex(0)
         self.certificate_input.clear()
         self.remarks_input.clear()
+        self._refresh_flag_section()
+        for flag in self.flag_defs:
+            cb = self.flag_checkboxes.get(flag.key)
+            if cb:
+                cb.setChecked(bool(flag.default_value))
         self.selected_files = []
         self._selected_file_keys.clear()
         self._update_attachment_table()
@@ -1211,6 +1267,33 @@ class EntryPage(BasePage):
                 {"#232635": QColor(35, 38, 53), "#f4f6fb": QColor(244, 246, 251)}[scroll_bg],
             )
             scroll_widget.setPalette(palette)
+
+    def _refresh_flag_section(self) -> None:
+        # 清空
+        while self.flags_container.count():
+            item = self.flags_container.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+        self.flag_checkboxes.clear()
+        try:
+            self.flag_defs = self.ctx.flags.list_flags(enabled_only=True)
+        except Exception:
+            self.flag_defs = []
+        if not self.flag_defs:
+            return
+        title = QLabel("自定义开关")
+        title.setObjectName("formLabel")
+        self.flags_container.addWidget(title)
+        flags_row = QHBoxLayout()
+        flags_row.setSpacing(12)
+        for flag in self.flag_defs:
+            cb = CheckBox(flag.label)
+            cb.setChecked(bool(flag.default_value))
+            self.flag_checkboxes[flag.key] = cb
+            flags_row.addWidget(cb)
+        flags_row.addStretch()
+        self.flags_container.addLayout(flags_row)
 
     @Slot()
     def _on_theme_changed(self) -> None:

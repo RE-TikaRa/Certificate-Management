@@ -99,6 +99,11 @@ class OverviewPage(BasePage):
         self.filter_start_date: date | None = None  # 开始日期
         self.filter_end_date: date | None = None  # 结束日期
         self.filter_keyword = ""  # 关键词搜索
+        self.flag_defs: list = []
+        self.flag_defaults: dict[str, bool] = {}
+        self.flag_filters: dict[str, str] = {}
+        self.flag_filter_widgets: dict[str, ComboBox] = {}
+        self.award_flag_values: dict[int, dict[str, bool]] = {}
 
         # 排序条件
         self.sort_by = "日期降序"  # 默认按日期降序
@@ -328,6 +333,13 @@ class OverviewPage(BasePage):
         row2.addStretch()
         parent_layout.addLayout(row2)
 
+        # 动态：自定义开关筛选
+        self.flag_filter_container = QVBoxLayout()
+        self.flag_filter_container.setSpacing(6)
+        parent_layout.addLayout(self.flag_filter_container)
+        self._load_flag_definitions()
+        self._rebuild_flag_filters()
+
     def _on_filter_changed(self) -> None:
         """筛选条件改变时触发"""
         self.filter_level = self.level_combo.currentText()
@@ -367,6 +379,55 @@ class OverviewPage(BasePage):
         self.filter_end_date = cast(date, self.end_date_edit.date().toPython())
         self.filter_keyword = ""
         self.sort_by = "日期降序"
+        for key, combo in self.flag_filter_widgets.items():
+            combo.setCurrentText("全部")
+            self.flag_filters[key] = "全部"
+        self.refresh()
+
+    def _load_flag_definitions(self) -> None:
+        try:
+            self.flag_defs = self.ctx.flags.list_flags(enabled_only=True)
+            self.flag_defaults = {f.key: bool(f.default_value) for f in self.flag_defs}
+        except Exception as exc:
+            logger.warning("加载自定义开关失败: %s", exc)
+            self.flag_defs = []
+            self.flag_defaults = {}
+        # 初始化过滤状态
+        for flag in self.flag_defs:
+            self.flag_filters.setdefault(flag.key, "全部")
+
+    def _rebuild_flag_filters(self) -> None:
+        # 清空容器
+        while self.flag_filter_container.count():
+            item = self.flag_filter_container.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+        self.flag_filter_widgets.clear()
+
+        if not self.flag_defs:
+            return
+
+        title = BodyLabel("自定义开关筛选（是/否）")
+        title.setStyleSheet("color: #666;")
+        self.flag_filter_container.addWidget(title)
+
+        row = QHBoxLayout()
+        row.setSpacing(12)
+        for flag in self.flag_defs:
+            combo = ComboBox()
+            combo.addItems(["全部", "是", "否"])
+            combo.setCurrentText(self.flag_filters.get(flag.key, "全部"))
+            combo.currentTextChanged.connect(lambda text, k=flag.key: self._on_flag_filter_changed(k, text))
+            combo.setFixedWidth(110)
+            row.addWidget(QLabel(flag.label))
+            row.addWidget(combo)
+            self.flag_filter_widgets[flag.key] = combo
+        row.addStretch()
+        self.flag_filter_container.addLayout(row)
+
+    def _on_flag_filter_changed(self, key: str, value: str) -> None:
+        self.flag_filters[key] = value
         self.refresh()
 
     def _apply_filters(self, awards: list) -> list:
@@ -384,6 +445,17 @@ class OverviewPage(BasePage):
         # 日期范围筛选
         if self.filter_start_date and self.filter_end_date:
             filtered = [a for a in filtered if self.filter_start_date <= a.award_date <= self.filter_end_date]
+
+        # 自定义开关筛选
+        for key, choice in self.flag_filters.items():
+            if choice == "全部":
+                continue
+            expect = choice == "是"
+            filtered = [
+                a
+                for a in filtered
+                if self.award_flag_values.get(a.id, {}).get(key, self.flag_defaults.get(key, False)) == expect
+            ]
 
         return filtered
 
@@ -434,6 +506,13 @@ class OverviewPage(BasePage):
     def refresh(self) -> None:
         """刷新荣誉列表"""
         try:
+            # 刷新 flag 定义与过滤器
+            prev_keys = {f.key for f in getattr(self, "flag_defs", [])}
+            self._load_flag_definitions()
+            new_keys = {f.key for f in self.flag_defs}
+            if new_keys != prev_keys:
+                self._rebuild_flag_filters()
+
             self._clear_awards_layout()
 
             level = None if self.filter_level == "全部" else self.filter_level
@@ -446,6 +525,16 @@ class OverviewPage(BasePage):
                 date_to=self.filter_end_date,
                 limit=5000,
             )
+
+            # 预取 flag 值
+            if self.flag_defs:
+                award_ids = [a.id for a in filtered_awards]
+                self.award_flag_values = self.ctx.flags.get_flags_for_awards(award_ids)
+            else:
+                self.award_flag_values = {}
+
+            # 本地筛选（自定义开关等）
+            filtered_awards = self._apply_filters(filtered_awards)
 
             # 应用排序
             self.awards_list = self._apply_sorting(filtered_awards)
@@ -638,6 +727,23 @@ class OverviewPage(BasePage):
             remarks_label.setWordWrap(True)
             remarks_label.setStyleSheet("font-size: 11px;")
             card_layout.addWidget(remarks_label)
+
+        # 自定义开关展示
+        if self.flag_defs:
+            flags_row = QHBoxLayout()
+            flags_row.setSpacing(8)
+            values = self.award_flag_values.get(award.id, {})
+            for flag in self.flag_defs:
+                val = values.get(flag.key, self.flag_defaults.get(flag.key, False))
+                pill = QLabel(f"{flag.label}: {'是' if val else '否'}")
+                pill.setStyleSheet(
+                    "padding:4px 8px; border-radius:6px; font-size:11px;"
+                    f"background-color: {'#e6f4ff' if val else '#f0f0f0'};"
+                    f"color: {'#1890ff' if val else '#666'};"
+                )
+                flags_row.addWidget(pill)
+            flags_row.addStretch()
+            card_layout.addLayout(flags_row)
 
         # 操作按钮
         action_layout = QHBoxLayout()
@@ -859,6 +965,7 @@ class AwardDetailDialog(MaskDialogBase):
         self.ctx = ctx
         self.members_data = []  # 存储成员卡片数据
         self.selected_files: list[Path] = []  # 存储选中的附件文件
+        self._attachments_loaded = False
 
         self.setWindowTitle(f"荣誉详情 - {award.competition_name}")
         self.setMinimumWidth(700)
@@ -1096,6 +1203,8 @@ class AwardDetailDialog(MaskDialogBase):
 
                     # 将附件路径添加到 selected_files
                     for attachment in award.attachments:
+                        if getattr(attachment, "deleted", False):
+                            continue
                         file_path = root / attachment.relative_path
                         if file_path.exists():
                             self.selected_files.append(file_path)
@@ -1106,6 +1215,7 @@ class AwardDetailDialog(MaskDialogBase):
                     self._update_attachment_table()
 
                     logger.info(f"已加载 {len(self.selected_files)} 个附件")
+                self._attachments_loaded = True
         except Exception as e:
             logger.error(f"加载附件失败: {e}", exc_info=True)
 
@@ -1686,7 +1796,7 @@ class AwardDetailDialog(MaskDialogBase):
                 certificate_code=self.cert_input.text() or None,
                 remarks=self.remarks_input.text() or None,
                 member_names=members,
-                attachment_files=self.selected_files,  # 添加附件参数
+                attachment_files=self.selected_files if self._attachments_loaded else None,
             )
 
             # 刷新管理页面，因为成员信息可能已更改

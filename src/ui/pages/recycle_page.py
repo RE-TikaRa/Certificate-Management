@@ -44,7 +44,7 @@ class RecyclePage(BasePage):
         title_layout = QVBoxLayout(title_widget)
         title_layout.setContentsMargins(32, 24, 32, 0)
         title_layout.setSpacing(0)
-        title_layout.addWidget(create_page_header("荣誉回收站", "管理已删除的荣誉记录"))
+        title_layout.addWidget(create_page_header("回收站", "管理已删除的荣誉记录"))
         outer_layout.addWidget(title_widget)
 
         scroll = QScrollArea()

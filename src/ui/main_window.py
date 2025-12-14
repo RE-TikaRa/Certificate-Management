@@ -205,7 +205,7 @@ class MainWindow(FluentWindow):
             ("overview", self.overview_page, FIF.ALIGNMENT, "总览"),
             ("entry", self.entry_page, FIF.ADD, "录入"),
             ("management", self.management_page, FIF.PEOPLE, "成员管理"),
-            ("recycle", self.recycle_page, FIF.DELETE, "附件回收站"),
+            ("recycle", self.recycle_page, FIF.DELETE, "回收站"),
         ]
 
         for route, widget, icon, text in top_pages:

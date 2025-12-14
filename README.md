@@ -98,7 +98,7 @@
       </td>
       <td align="center">
         <h3>🗑️ 后悔药</h3>
-        <p>附件回收站机制<br/>双重删除确认</p>
+        <p>回收站机制<br/>双重删除确认</p>
       </td>
       <td align="center">
         <h3>🎨 炫彩主题</h3>
@@ -233,6 +233,7 @@ Certificate-Management/
 ├── 🔒 uv.lock                      # 依赖锁定
 ├── 🚀 main.bat                     # Windows 启动脚本
 ├── 🚫 .gitignore                   # Git 忽略规则
+├── 🧰 tools/                       # 开发辅助脚本（可选）
 │
 ├── 📦 src/                         # 源代码
 │   ├── 🏁 main.py                  # 入口文件
@@ -379,8 +380,8 @@ flowchart TD
     </tr>
     <tr>
       <td>
-        <h4>🗑️ 附件安全</h4>
-        <p>MD5 校验去重，删除操作进入回收站，支持一键还原。</p>
+        <h4>🗑️ 回收站</h4>
+        <p>删除荣誉进入回收站可恢复；附件删除会移入 <code>attachments/.trash</code>。</p>
       </td>
       <td>
         <h4>🧹 清理策略</h4>

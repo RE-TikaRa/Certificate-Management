@@ -25,10 +25,12 @@ class FormValidator:
 
         card = card.strip()
         if len(card) != 18:
-            return False, "身份证号必须为18位数字"
+            return False, "身份证号必须为18位（末位可为X）"
 
-        if not card.isdigit():
-            return False, "身份证号只能包含数字"
+        first = card[:17]
+        last = card[17]
+        if not first.isdigit() or not (last.isdigit() or last in {"X", "x"}):
+            return False, "身份证号格式不正确（末位可为X）"
 
         # 可选：验证校验位（增强版本）
         # return FormValidator._validate_id_card_checksum(card)

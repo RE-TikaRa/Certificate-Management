@@ -6,6 +6,7 @@ from pathlib import Path
 from sqlalchemy import and_, or_, select
 from sqlalchemy.exc import ArgumentError
 from sqlalchemy.orm import selectinload
+from sqlalchemy.sql.elements import ColumnElement
 
 from ..data.database import Database
 from ..data.models import Award, AwardMember, TeamMember
@@ -15,9 +16,10 @@ logger = logging.getLogger(__name__)
 
 
 class AwardService:
-    def __init__(self, db: Database, attachments: AttachmentManager):
+    def __init__(self, db: Database, attachments: AttachmentManager, flags=None):
         self.db = db
         self.attachments = attachments
+        self.flags = flags
 
     def create_award(
         self,
@@ -30,6 +32,7 @@ class AwardService:
         remarks: str | None,
         member_names: Sequence[str] | Sequence[dict],
         attachment_files: Sequence[Path],
+        flag_values: dict[str, bool] | None = None,
     ) -> Award:
         with self.db.session_scope() as session:
             award = Award(
@@ -53,6 +56,8 @@ class AwardService:
                     attachment_files,
                     session=session,
                 )
+            if flag_values and self.flags:
+                self.flags.set_award_flags(award.id, flag_values)
             self._refresh_award_fts(award, members)
             return award
 
@@ -190,6 +195,7 @@ class AwardService:
         remarks: str | None = None,
         member_names: Sequence[str] | Sequence[dict] | None = None,
         attachment_files: Sequence[Path] | None = None,
+        flag_values: dict[str, bool] | None = None,
     ) -> Award:
         """
         Update an existing award with transaction support.
@@ -204,7 +210,7 @@ class AwardService:
             certificate_code: New certificate code
             remarks: New remarks
             member_names: New member list (replaces existing)
-            attachment_files: New attachment files (replaces existing)
+            attachment_files: When provided, sync attachments to this list (kept + added; missing ones moved to trash)
 
         Returns:
             Updated Award object
@@ -244,12 +250,33 @@ class AwardService:
 
             # Update attachments if provided
             if attachment_files is not None:
-                self.attachments.save_attachments(
-                    award.id,
-                    award.competition_name,
-                    attachment_files,
-                    session=session,
-                )
+                root = self.attachments.ensure_root()
+                existing = [a for a in award.attachments if not a.deleted]
+                existing_by_path: dict[Path, int] = {}
+                for attachment in existing:
+                    existing_by_path[(root / attachment.relative_path).resolve()] = attachment.id
+
+                desired_paths: set[Path] = set()
+                new_files: list[Path] = []
+                for path in attachment_files:
+                    resolved = Path(path).resolve()
+                    if resolved in existing_by_path:
+                        desired_paths.add(resolved)
+                    else:
+                        new_files.append(resolved)
+
+                delete_ids = [attachment_id for p, attachment_id in existing_by_path.items() if p not in desired_paths]
+                if delete_ids:
+                    self.attachments.mark_deleted(delete_ids, session=session)
+                if new_files:
+                    self.attachments.save_attachments(
+                        award.id,
+                        award.competition_name,
+                        new_files,
+                        session=session,
+                    )
+            if flag_values is not None and self.flags:
+                self.flags.set_award_flags(award.id, flag_values)
 
             return award
 
@@ -287,7 +314,7 @@ class AwardService:
                 fts_ids = self.db.search_awards_fts(query, limit)
 
             q = select(Award).options(selectinload(Award.award_members).selectinload(AwardMember.member))
-            conditions = []
+            conditions: list[ColumnElement[bool]] = [Award.deleted.is_(False)]
 
             if query:
                 if fts_ids:
@@ -344,7 +371,9 @@ class AwardService:
                 .filter(Award.id.in_(award_ids))
                 .update({Award.deleted: True, Award.deleted_at: datetime.utcnow()}, synchronize_session=False)
             )
-            return count
+        for award_id in award_ids:
+            self.db.delete_award_fts(award_id)
+        return count
 
     def batch_update_level(self, award_ids: list[int], new_level: str) -> int:
         """
@@ -397,11 +426,16 @@ class AwardService:
     def restore_award(self, award_id: int) -> None:
         """从回收站恢复荣誉记录"""
         with self.db.session_scope() as session:
-            award = session.get(Award, award_id)
+            award = session.scalar(
+                select(Award)
+                .where(Award.id == award_id)
+                .options(selectinload(Award.award_members).selectinload(AwardMember.member))
+            )
             if award and award.deleted:
                 award.deleted = False
                 award.deleted_at = None
                 session.add(award)
+                self._refresh_award_fts(award, award.members)
 
     def permanently_delete_award(self, award_id: int) -> None:
         """彻底删除荣誉记录（不可恢复）"""
@@ -411,6 +445,7 @@ class AwardService:
         except Exception as e:
             logger.error(f"Failed to delete attachment files for award {award_id}: {e}")
 
+        self.db.delete_award_fts(award_id)
         with self.db.session_scope() as session:
             award = session.get(Award, award_id)
             if award:

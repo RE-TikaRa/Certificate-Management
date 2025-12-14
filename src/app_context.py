@@ -5,6 +5,7 @@ from .logger import configure_logging
 from .services.attachment_manager import AttachmentManager
 from .services.award_service import AwardService
 from .services.backup_manager import BackupManager
+from .services.flag_service import FlagService
 from .services.import_export import ImportExportService
 from .services.major_service import MajorService
 from .services.member_service import MemberService
@@ -25,6 +26,7 @@ class AppContext:
     majors: MajorService
     schools: SchoolService
     members: MemberService
+    flags: FlagService
 
 
 def bootstrap(debug: bool = False) -> AppContext:
@@ -35,9 +37,10 @@ def bootstrap(debug: bool = False) -> AppContext:
 
     settings = SettingsService(db)
     attachments = AttachmentManager(db, settings)
-    awards = AwardService(db, attachments)
+    flags = FlagService(db)
+    awards = AwardService(db, attachments, flags)
     backup = BackupManager(db, settings)
-    importer = ImportExportService(db, attachments)
+    importer = ImportExportService(db, attachments, flags)
     statistics = StatisticsService(db)
     majors = MajorService(db)
     schools = SchoolService(db)
@@ -56,4 +59,5 @@ def bootstrap(debug: bool = False) -> AppContext:
         majors=majors,
         schools=schools,
         members=members,
+        flags=flags,
     )

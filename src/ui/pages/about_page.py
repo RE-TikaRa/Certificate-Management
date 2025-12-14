@@ -94,7 +94,7 @@ class AboutPage(BasePage):
             "系统简介",
             "荣誉证书管理系统是一款基于 PySide6 + QFluentWidgets 的桌面端应用，"
             "用于管理竞赛/科研荣誉证书、成员信息与附件材料，完全离线运行。\n\n"
-            "内置证书录入、全文检索（FTS5）、成员管理、附件回收站、自动备份与导入/导出等功能，"
+            "内置证书录入、全文检索（FTS5）、成员管理、回收站、自动备份与导入/导出等功能，"
             "帮助学校/团队高效组织与查询荣誉数据。",
         )
         layout.addWidget(info_card)
@@ -106,19 +106,20 @@ class AboutPage(BasePage):
             "• 数据: SQLAlchemy 2.x + SQLite（本地）\n"
             "• 语言: Python 3.14+\n"
             "• 定时/任务: APScheduler\n"
-            "• 日志: loguru\n"
+            "• 日志: logging（RotatingFileHandler）\n"
             "• 工具: ruff / pyright / uv\n"
-            "• 文档/表格: python-docx, openpyxl",
+            "• 表格: openpyxl（XLSX）\n"
+            "• 文档: Windows Word COM（提取 .doc 文本）",
         )
         layout.addWidget(tech_card)
 
         # ============ 功能特性卡片 ============
         features_card = self._create_info_card(
             "核心功能",
-            "• 荣誉录入：手动/批量导入（CSV、XLSX），字段校验与预检\n"
+            "• 荣誉录入：手动/批量导入（CSV、XLSX），字段校验与预检（dry-run 不写入数据库）\n"
             "• 全文检索：FTS5 + 筛选/排序，500ms 防抖\n"
             "• 成员管理：10 字段监控，学校/专业代码自动补全\n"
-            "• 附件管理：MD5 校验、回收站还原/彻底删除\n"
+            "• 附件管理：MD5 校验去重，删除移入 attachments/.trash\n"
             "• 统计看板：8 张指标卡 + 饼/柱图 + 最近荣誉\n"
             "• 主题与样式：亮/暗主题即时切换\n"
             "• 备份与清理：自动/手动备份，日志与数据库一键清理",
