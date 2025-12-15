@@ -1,5 +1,8 @@
 import logging
+import os
 import shutil
+import subprocess
+import sys
 import threading
 from contextlib import suppress
 from pathlib import Path
@@ -7,8 +10,10 @@ from queue import Empty, SimpleQueue
 from typing import Any, ClassVar
 
 from pypinyin import lazy_pinyin
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, QUrl
+from PySide6.QtGui import QDesktopServices, QIntValidator
 from PySide6.QtWidgets import (
+    QApplication,
     QFileDialog,
     QFormLayout,
     QGridLayout,
@@ -125,9 +130,44 @@ class SettingsPage(BasePage):
         self._import_busy = False
         self._progress_dialog: QProgressDialog | None = None
         self.flag_rows: list[dict] = []
+        self.mcp_allow_write = CheckBox("允许写操作（需重启 MCP 进程，谨慎开启）")
+        self.mcp_max_bytes = LineEdit()
+        self.mcp_max_bytes.setPlaceholderText("默认 1048576（1MB，单位：字节）")
+        self.mcp_max_bytes.setValidator(QIntValidator(1, 50_000_000, self))
+        self.mcp_auto_start = CheckBox("启动软件时自动启动 MCP（仅本地）")
+        self.mcp_port = LineEdit()
+        self.mcp_port.setPlaceholderText("默认 8000")
+        self.mcp_port.setValidator(QIntValidator(1, 65535, self))
+        self.mcp_web_auto_start = CheckBox("启动软件时自动启动 MCP Web 控制台")
+        self.mcp_web_host = LineEdit()
+        self.mcp_web_host.setPlaceholderText("默认 127.0.0.1")
+        self.mcp_web_port = LineEdit()
+        self.mcp_web_port.setPlaceholderText("默认 7860")
+        self.mcp_web_port.setValidator(QIntValidator(1, 65535, self))
+
+        self._mcp_proc: subprocess.Popen | None = None
+        self._mcp_web_proc: subprocess.Popen | None = None
+        self._mcp_status = BodyLabel("MCP：未运行")
+        self._mcp_web_status = BodyLabel("MCP Web：未运行")
+        self._mcp_start_btn = PrimaryPushButton("启动 MCP")
+        self._mcp_stop_btn = PushButton("停止 MCP")
+        self._mcp_restart_btn = PushButton("重启 MCP")
+        self._mcp_open_btn = PushButton("打开 MCP 地址")
+        self._web_start_btn = PrimaryPushButton("启动 Web 控制台")
+        self._web_stop_btn = PushButton("停止 Web 控制台")
+        self._web_open_btn = PushButton("打开 Web 页面")
+        self._web_restart_btn = PushButton("重启 Web 控制台")
+        self._process_timer = QTimer(self)
+        self._process_timer.setInterval(1000)
+        self._process_timer.timeout.connect(self._refresh_process_status)
 
         self._build_ui()
         self.refresh()
+        self._process_timer.start()
+        QTimer.singleShot(0, self._auto_start_mcp_processes)
+        app = QApplication.instance()
+        if app:
+            app.aboutToQuit.connect(self._shutdown_mcp_processes)
 
     def _build_ui(self) -> None:
         outer_layout = QVBoxLayout(self)
@@ -182,6 +222,7 @@ class SettingsPage(BasePage):
         action_row.addStretch()
         settings_layout.addLayout(action_row)
         layout.addWidget(settings_card)
+        layout.addWidget(self._build_mcp_card())
         layout.addWidget(self._build_cleanup_card())
         layout.addWidget(self._build_flags_card())
         layout.addWidget(self._build_award_import_card())
@@ -220,6 +261,16 @@ class SettingsPage(BasePage):
         # Load email suffix
         email_suffix = self.ctx.settings.get("email_suffix", "@st.gsau.edu.cn")
         self.email_suffix.setText(email_suffix)
+        # MCP
+        allow_write = self.ctx.settings.get("mcp_allow_write", "false") == "true"
+        self.mcp_allow_write.setChecked(allow_write)
+        self.mcp_max_bytes.setText(self.ctx.settings.get("mcp_max_bytes", "1048576"))
+        self.mcp_auto_start.setChecked(self.ctx.settings.get("mcp_auto_start", "false") == "true")
+        self.mcp_port.setText(self.ctx.settings.get("mcp_port", "8000"))
+        self.mcp_web_auto_start.setChecked(self.ctx.settings.get("mcp_web_auto_start", "false") == "true")
+        self.mcp_web_host.setText(self.ctx.settings.get("mcp_web_host", "127.0.0.1"))
+        self.mcp_web_port.setText(self.ctx.settings.get("mcp_web_port", "7860"))
+        self._refresh_process_status()
         self._refresh_academic_stats()
         self._refresh_import_log()
         self._refresh_flags()
@@ -261,6 +312,30 @@ class SettingsPage(BasePage):
             theme_value = next((k for k, v in self.THEME_OPTIONS.items() if v == display_text), "light")
             self.ctx.settings.set("theme_mode", theme_value)
 
+            # MCP 设置
+            self.ctx.settings.set("mcp_allow_write", str(self.mcp_allow_write.isChecked()).lower())
+            max_bytes_text = self.mcp_max_bytes.text().strip() or "1048576"
+            try:
+                max_bytes_value = max(1024, int(max_bytes_text))
+            except ValueError:
+                max_bytes_value = 1_048_576
+            self.ctx.settings.set("mcp_max_bytes", str(max_bytes_value))
+            self.ctx.settings.set("mcp_auto_start", str(self.mcp_auto_start.isChecked()).lower())
+            mcp_port_text = self.mcp_port.text().strip() or "8000"
+            try:
+                mcp_port_value = max(1, min(65535, int(mcp_port_text)))
+            except ValueError:
+                mcp_port_value = 8000
+            self.ctx.settings.set("mcp_port", str(mcp_port_value))
+            self.ctx.settings.set("mcp_web_auto_start", str(self.mcp_web_auto_start.isChecked()).lower())
+            self.ctx.settings.set("mcp_web_host", self.mcp_web_host.text().strip() or "127.0.0.1")
+            port_text = self.mcp_web_port.text().strip() or "7860"
+            try:
+                port_value = max(1, min(65535, int(port_text)))
+            except ValueError:
+                port_value = 7860
+            self.ctx.settings.set("mcp_web_port", str(port_value))
+
             # Apply theme changes
             theme_mode = self.theme_manager.get_theme_from_text(theme_value)
             self.theme_manager.set_theme(theme_mode)
@@ -277,6 +352,212 @@ class SettingsPage(BasePage):
     def _backup_now(self) -> None:
         path = self.ctx.backup.perform_backup()
         InfoBar.success("备份完成", str(path), duration=2000, parent=self.window())
+
+    def _build_mcp_card(self) -> QWidget:
+        card, card_layout = create_card()
+        card_layout.addWidget(make_section_title("MCP 服务"))
+
+        hint = BodyLabel(
+            "本软件 MCP 仅供本地使用（localhost）。\n"
+            "MCP 客户端可直接用 `uv run certificate-mcp`（stdio）启动；也可以在此页启动本地 SSE 服务并通过“打开 MCP 地址”访问。\n"
+            "如需写操作或更大附件读取上限，在此勾选并重启 MCP 进程；也可通过环境变量临时覆盖。"
+        )
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: #7a7a7a;")
+        card_layout.addWidget(hint)
+
+        form = QFormLayout()
+        form.setSpacing(12)
+        form.addRow(self.mcp_allow_write)
+        form.addRow("附件读取上限（字节）", self.mcp_max_bytes)
+        form.addRow(self.mcp_auto_start)
+        form.addRow("MCP 端口（本地）", self.mcp_port)
+        form.addRow(self.mcp_web_auto_start)
+        form.addRow("Web Host", self.mcp_web_host)
+        form.addRow("Web Port", self.mcp_web_port)
+        card_layout.addLayout(form)
+
+        status_layout = QVBoxLayout()
+        self._mcp_status.setStyleSheet("color: #7a7a7a;")
+        self._mcp_web_status.setStyleSheet("color: #7a7a7a;")
+        status_layout.addWidget(self._mcp_status)
+        status_layout.addWidget(self._mcp_web_status)
+        card_layout.addLayout(status_layout)
+
+        btn_row = QHBoxLayout()
+        self._mcp_start_btn.clicked.connect(self._start_mcp)
+        self._mcp_stop_btn.clicked.connect(self._stop_mcp)
+        self._mcp_restart_btn.clicked.connect(self._restart_mcp)
+        self._mcp_open_btn.clicked.connect(self._open_mcp)
+        self._web_start_btn.clicked.connect(self._start_web)
+        self._web_stop_btn.clicked.connect(self._stop_web)
+        self._web_restart_btn.clicked.connect(self._restart_web)
+        self._web_open_btn.clicked.connect(self._open_web)
+        btn_row.addWidget(self._mcp_start_btn)
+        btn_row.addWidget(self._mcp_stop_btn)
+        btn_row.addWidget(self._mcp_restart_btn)
+        btn_row.addWidget(self._mcp_open_btn)
+        btn_row.addSpacing(16)
+        btn_row.addWidget(self._web_start_btn)
+        btn_row.addWidget(self._web_stop_btn)
+        btn_row.addWidget(self._web_restart_btn)
+        btn_row.addWidget(self._web_open_btn)
+        btn_row.addStretch()
+        card_layout.addLayout(btn_row)
+
+        self._refresh_process_status()
+        return card
+
+    def _auto_start_mcp_processes(self) -> None:
+        if self.mcp_auto_start.isChecked():
+            self._start_mcp()
+        if self.mcp_web_auto_start.isChecked():
+            self._start_web()
+
+    def _refresh_process_status(self) -> None:
+        if self._mcp_proc and self._mcp_proc.poll() is None:
+            self._mcp_status.setText(f"MCP：运行中（PID {self._mcp_proc.pid}）")
+        else:
+            self._mcp_proc = None
+            self._mcp_status.setText("MCP：未运行")
+
+        if self._mcp_web_proc and self._mcp_web_proc.poll() is None:
+            self._mcp_web_status.setText(f"MCP Web：运行中（PID {self._mcp_web_proc.pid}）")
+        else:
+            self._mcp_web_proc = None
+            self._mcp_web_status.setText("MCP Web：未运行")
+
+        mcp_running = self._mcp_proc is not None
+        web_running = self._mcp_web_proc is not None
+        self._mcp_start_btn.setEnabled(not mcp_running)
+        self._mcp_stop_btn.setEnabled(mcp_running)
+        self._mcp_restart_btn.setEnabled(mcp_running)
+        self._mcp_open_btn.setEnabled(True)
+        self._web_start_btn.setEnabled(not web_running)
+        self._web_stop_btn.setEnabled(web_running)
+        self._web_restart_btn.setEnabled(web_running)
+        self._web_open_btn.setEnabled(True)
+
+    def _start_mcp(self) -> None:
+        if self._mcp_proc and self._mcp_proc.poll() is None:
+            return
+        try:
+            port_text = self.mcp_port.text().strip() or "8000"
+            port_value = max(1, min(65535, int(port_text)))
+            env = os.environ.copy()
+            env["CERT_MCP_TRANSPORT"] = "sse"
+            env["CERT_MCP_HOST"] = "127.0.0.1"
+            env["CERT_MCP_PORT"] = str(port_value)
+            env["CERT_MCP_ALLOW_WRITE"] = "1" if self.mcp_allow_write.isChecked() else "0"
+            env["CERT_MCP_MAX_BYTES"] = self.mcp_max_bytes.text().strip() or "1048576"
+            self._mcp_proc = subprocess.Popen(
+                [sys.executable, "-m", "src.mcp_server"],
+                env=env,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            InfoBar.success("MCP", f"已启动（本地）：{self._mcp_sse_url()}", parent=self.window())
+        except Exception as exc:
+            InfoBar.error("MCP", f"启动失败：{exc}", parent=self.window())
+        finally:
+            self._refresh_process_status()
+
+    def _stop_mcp(self) -> None:
+        if not self._mcp_proc or self._mcp_proc.poll() is not None:
+            self._refresh_process_status()
+            return
+        try:
+            self._mcp_proc.terminate()
+            with suppress(Exception):
+                self._mcp_proc.wait(timeout=3)
+            if self._mcp_proc.poll() is None:
+                self._mcp_proc.kill()
+            InfoBar.success("MCP", "已停止", parent=self.window())
+        except Exception as exc:
+            InfoBar.error("MCP", f"停止失败：{exc}", parent=self.window())
+        finally:
+            self._refresh_process_status()
+
+    def _restart_mcp(self) -> None:
+        self._stop_mcp()
+        self._start_mcp()
+
+    def _mcp_sse_url(self) -> str:
+        port = self.mcp_port.text().strip() or "8000"
+        return f"http://127.0.0.1:{port}/sse"
+
+    def _open_mcp(self) -> None:
+        QDesktopServices.openUrl(QUrl(self._mcp_sse_url()))
+
+    def _start_web(self) -> None:
+        if self._mcp_web_proc and self._mcp_web_proc.poll() is None:
+            return
+        if not shutil.which(sys.executable):
+            InfoBar.error("MCP Web", "Python 不可用", parent=self.window())
+            return
+        try:
+            import importlib.util
+
+            if importlib.util.find_spec("gradio") is None:
+                InfoBar.error("MCP Web", "未安装 gradio，请先执行：uv sync --group mcp-web", parent=self.window())
+                return
+
+            host = self.mcp_web_host.text().strip() or "127.0.0.1"
+            port = self.mcp_web_port.text().strip() or "7860"
+            env = os.environ.copy()
+            env["CERT_MCP_WEB_HOST"] = host
+            env["CERT_MCP_WEB_PORT"] = port
+            env["CERT_MCP_WEB_INBROWSER"] = "0"
+            self._mcp_web_proc = subprocess.Popen(
+                [sys.executable, "-m", "src.mcp_web"],
+                env=env,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            InfoBar.success("MCP Web", "已启动", parent=self.window())
+        except Exception as exc:
+            InfoBar.error("MCP Web", f"启动失败：{exc}", parent=self.window())
+        finally:
+            self._refresh_process_status()
+
+    def _stop_web(self) -> None:
+        if not self._mcp_web_proc or self._mcp_web_proc.poll() is not None:
+            self._refresh_process_status()
+            return
+        try:
+            self._mcp_web_proc.terminate()
+            with suppress(Exception):
+                self._mcp_web_proc.wait(timeout=3)
+            if self._mcp_web_proc.poll() is None:
+                self._mcp_web_proc.kill()
+            InfoBar.success("MCP Web", "已停止", parent=self.window())
+        except Exception as exc:
+            InfoBar.error("MCP Web", f"停止失败：{exc}", parent=self.window())
+        finally:
+            self._refresh_process_status()
+
+    def _restart_web(self) -> None:
+        self._stop_web()
+        self._start_web()
+
+    def _open_web(self) -> None:
+        host = self.mcp_web_host.text().strip() or "127.0.0.1"
+        port = self.mcp_web_port.text().strip() or "7860"
+        QDesktopServices.openUrl(QUrl(f"http://{host}:{port}"))
+
+    def _shutdown_mcp_processes(self) -> None:
+        for proc in (self._mcp_proc, self._mcp_web_proc):
+            if not proc or proc.poll() is not None:
+                continue
+            with suppress(Exception):
+                proc.terminate()
+            with suppress(Exception):
+                proc.wait(timeout=2)
+            if proc.poll() is None:
+                with suppress(Exception):
+                    proc.kill()
+        self._mcp_proc = None
+        self._mcp_web_proc = None
 
     def _build_major_card(self) -> QWidget:
         card, card_layout = create_card()

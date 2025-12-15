@@ -218,8 +218,20 @@
 | **调试** | `uv run python -m src.main --debug` | 开启调试日志 |
 | **检查** | `uv run ruff check .` | 代码 Lint 检查 |
 | **格式化** | `uv run ruff format .` | 代码自动格式化 |
+| **MCP 服务** | `uv run certificate-mcp` | 启动 MCP（默认只读） |
+| **MCP Web** | `uv run certificate-mcp-web` | 启动本地 Web 控制台（需安装可选依赖） |
 
 ---
+
+### 🤖 MCP / AI 接入
+
+- **默认只读**：`uv run certificate-mcp`
+- **可选 Web 控制台**：
+  - 安装：`uv sync --group mcp-web`
+  - 运行：`uv run certificate-mcp-web`（默认 `127.0.0.1:7860`）
+- **配置入口**：设置页 → MCP 服务（修改后需重启对应进程生效）
+- **环境变量覆盖**：`CERT_MCP_ALLOW_WRITE`、`CERT_MCP_MAX_BYTES`、`CERT_MCP_DEBUG`
+- **常用能力**：`health`、`list_awards`、`search_awards`、`get_award`、`read_attachment`，以及资源 `schema://models`、`templates://awards_csv`
 
 ## 📂 文件目录说明
 
@@ -240,6 +252,8 @@ Certificate-Management/
 │   ├── 🌍 app_context.py           # DI 容器
 │   ├── ⚙️ config.py                # 配置加载
 │   ├── 📝 logger.py                # 日志配置
+│   ├── 🤖 mcp_server.py            # MCP 服务端（默认只读）
+│   ├── 🌐 mcp_web.py               # MCP 本地 Web 控制台（可选）
 │   │
 │   ├── 💾 data/                    # 数据层
 │   │   ├── models.py               # SQLAlchemy 模型

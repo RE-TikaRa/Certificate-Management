@@ -12,6 +12,8 @@
 - 安装依赖：`uv sync`
 - 运行：`uv run python -m src.main`
 - 调试：`uv run python -m src.main --debug`
+- MCP（默认只读）：`uv run certificate-mcp`
+- MCP Web（可选）：`uv sync --group mcp-web` 后 `uv run certificate-mcp-web`
 - 语法检查：`python -m py_compile src/`
 - Lint：`uv run ruff check .`
 - 格式化：`uv run ruff format .`
@@ -20,6 +22,7 @@
 
 ## 目录速览
 - `src/main.py` 应用入口；`app_context.py` 构建 DI 容器与服务；`logger.py` 日志配置；`config.py` 配置加载。
+- MCP：`src/mcp_server.py`（MCP 服务端）、`src/mcp_web.py`（本地 Web 控制台，可选）。
 - 数据层 `src/data/`: `models.py`（Base + Award/TeamMember/Attachment/Setting/BackupRecord/ImportJob/Major/School/SchoolMajorMapping/AwardMember）；`database.py` 提供 `session_scope`。
 - 服务层 `src/services/`: award_service、statistics_service、import_export、backup_manager、attachment_manager、settings_service、major_service 等。
 - 表现层 `src/ui/`: `main_window.py`（窗口与导航，懒加载页面，窗口居中），`styled_theme.py`（ThemeManager），`theme.py`（通用 UI 工具），`widgets/major_search.py`，`pages/`（home、dashboard、overview、entry、management、recycle、settings、about、base_page）。
