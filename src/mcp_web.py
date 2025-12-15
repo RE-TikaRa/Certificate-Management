@@ -22,6 +22,8 @@ def _client_config_snippet() -> str:
     env = {
         "CERT_MCP_ALLOW_WRITE": "0",
         "CERT_MCP_MAX_BYTES": str(mcp_server.MAX_BYTES),
+        "CERT_MCP_WEB_USERNAME": "your-username",
+        "CERT_MCP_WEB_PASSWORD": "your-password",
     }
     payload = {
         "mcpServers": {
@@ -44,6 +46,8 @@ def main() -> None:
     host = os.getenv("CERT_MCP_WEB_HOST", "127.0.0.1")
     port = int(os.getenv("CERT_MCP_WEB_PORT", "7860"))
     inbrowser = os.getenv("CERT_MCP_WEB_INBROWSER", "1") == "1"
+    username = os.getenv("CERT_MCP_WEB_USERNAME", "").strip()
+    password = os.getenv("CERT_MCP_WEB_PASSWORD", "").strip()
 
     def health_json() -> str:
         return _pretty(mcp_server.health())
@@ -196,7 +200,10 @@ def main() -> None:
             outa = gr.Code(language="json", label="read_attachment")
             btna.click(read_attachment_json, inputs=[rel, off, length], outputs=outa)
 
-    demo.launch(server_name=host, server_port=port, inbrowser=inbrowser)
+    if username and password:
+        demo.launch(server_name=host, server_port=port, inbrowser=inbrowser, auth=(username, password))
+    else:
+        demo.launch(server_name=host, server_port=port, inbrowser=inbrowser)
 
 
 if __name__ == "__main__":

@@ -8,11 +8,12 @@ from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QApplication
 
 from .app_context import bootstrap
+from .mcp_helpers import safe_int
+from .mcp_runtime import get_mcp_runtime
 from .ui.main_window import MainWindow
 from .ui.styled_theme import ThemeManager
 
 logger = logging.getLogger(__name__)
-
 
 def main(debug: bool = False) -> None:
     # 启动时间统计
@@ -53,6 +54,18 @@ def main(debug: bool = False) -> None:
     window_start = time.time()
     window = MainWindow(ctx, theme_manager)
     logger.info(f"MainWindow initialized in {time.time() - window_start:.2f}s")
+
+    runtime = get_mcp_runtime(ctx)
+    app.aboutToQuit.connect(runtime.shutdown)
+    if ctx.settings.get("mcp_auto_start", "false") == "true":
+        max_bytes = safe_int(ctx.settings.get("mcp_max_bytes", "1048576"), 1_048_576, min_value=1024)
+        port = safe_int(ctx.settings.get("mcp_port", "8000"), 8000, min_value=1, max_value=65535)
+        allow_write = ctx.settings.get("mcp_allow_write", "false") == "true"
+        runtime.start_mcp_sse(port=port, allow_write=allow_write, max_bytes=max_bytes)
+    if ctx.settings.get("mcp_web_auto_start", "false") == "true":
+        host = ctx.settings.get("mcp_web_host", "127.0.0.1")
+        port = safe_int(ctx.settings.get("mcp_web_port", "7860"), 7860, min_value=1, max_value=65535)
+        runtime.start_web(host=host, port=port)
 
     window.show()
     logger.info(f"Total startup time: {time.time() - start_time:.2f}s")

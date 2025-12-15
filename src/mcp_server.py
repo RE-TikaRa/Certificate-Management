@@ -12,7 +12,7 @@ import os
 import sys
 from datetime import date
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 from sqlalchemy import select, text
@@ -21,22 +21,19 @@ from sqlalchemy.orm import selectinload
 from .app_context import AppContext, bootstrap
 from .config import ATTACHMENTS_DIR, BASE_DIR, DB_PATH, TEMPLATES_DIR
 from .data.models import Attachment, Award, AwardMember, Base, Major, School, TeamMember
+from .mcp_helpers import Transport, parse_transport, safe_int, to_bool
 
-
-def _to_bool(value: str | bool | None, default: bool = False) -> bool:
-    if value is None:
-        return default
-    if isinstance(value, bool):
-        return value
-    return value.lower() in {"1", "true", "yes", "on"}
-
-
-DEBUG = _to_bool(os.getenv("CERT_MCP_DEBUG"), False)
+DEBUG = to_bool(os.getenv("CERT_MCP_DEBUG"), False)
 app: AppContext = bootstrap(debug=DEBUG)
 
-ALLOW_WRITE = _to_bool(
+ALLOW_WRITE = to_bool(
     os.getenv("CERT_MCP_ALLOW_WRITE"),
-    _to_bool(app.settings.get("mcp_allow_write", "false")),
+    to_bool(app.settings.get("mcp_allow_write", "false")),
+)
+
+REDACT_PII = to_bool(
+    os.getenv("CERT_MCP_REDACT_PII"),
+    to_bool(app.settings.get("mcp_redact_pii", "true"), True),
 )
 
 def _parse_max_bytes(raw: str | None, fallback: int) -> int:
@@ -53,16 +50,14 @@ MAX_BYTES = _parse_max_bytes(
     _parse_max_bytes(app.settings.get("mcp_max_bytes", "1048576"), 1_048_576),
 )
 
-Transport = Literal["stdio", "sse", "streamable-http"]
-_transport_raw = os.getenv("CERT_MCP_TRANSPORT", "stdio")
-if _transport_raw not in ("stdio", "sse", "streamable-http"):
-    _transport_raw = "stdio"
-TRANSPORT: Transport = cast(Transport, _transport_raw)
-MCP_HOST = os.getenv("CERT_MCP_HOST") or app.settings.get("mcp_host", "127.0.0.1")
-try:
-    MCP_PORT = int(os.getenv("CERT_MCP_PORT") or app.settings.get("mcp_port", "8000"))
-except Exception:
-    MCP_PORT = 8000
+TRANSPORT: Transport = parse_transport(os.getenv("CERT_MCP_TRANSPORT"))
+MCP_HOST = (os.getenv("CERT_MCP_HOST") or app.settings.get("mcp_host", "127.0.0.1")).strip()
+MCP_PORT = safe_int(
+    os.getenv("CERT_MCP_PORT") or app.settings.get("mcp_port", "8000"),
+    8000,
+    min_value=1,
+    max_value=65535,
+)
 
 if TRANSPORT != "stdio" and MCP_HOST not in {"127.0.0.1", "localhost", "::1"}:
     raise ValueError("MCP is local-only; host must be 127.0.0.1/localhost/::1")
@@ -95,15 +90,48 @@ def _handle_tool_error(exc: Exception) -> dict[str, Any]:
     return _error("internal_error", "internal error", detail=str(exc) if DEBUG else None)
 
 
+def _mask_keep(value: str | None, start: int, end: int) -> str | None:
+    if not value:
+        return value
+    if len(value) <= start + end:
+        return "*" * len(value)
+    return f"{value[:start]}{'*' * 6}{value[-end:]}"
+
+
+def _mask_phone(value: str | None) -> str | None:
+    return _mask_keep(value, 3, 4)
+
+
+def _mask_id_card(value: str | None) -> str | None:
+    return _mask_keep(value, 6, 4)
+
+
+def _mask_email(value: str | None) -> str | None:
+    if not value:
+        return value
+    if "@" not in value:
+        return _mask_keep(value, 1, 1)
+    local, domain = value.split("@", 1)
+    masked_local = _mask_keep(local, 1, 1) or local
+    return f"{masked_local}@{domain}"
+
+
 def _serialize_member(member: TeamMember) -> dict[str, Any]:
+    id_card = member.id_card
+    phone = member.phone
+    email = member.email
+    if REDACT_PII:
+        id_card = _mask_id_card(id_card)
+        phone = _mask_phone(phone)
+        email = _mask_email(email)
     return {
         "id": member.id,
         "name": member.name,
         "gender": member.gender,
-        "id_card": member.id_card,
-        "phone": member.phone,
+        "id_card": id_card,
+        "phone": phone,
         "student_id": member.student_id,
-        "email": member.email,
+        "email": email,
         "school": member.school,
         "school_code": member.school_code,
         "major": member.major,
@@ -491,6 +519,7 @@ def health() -> dict[str, Any]:
             "read_only": not ALLOW_WRITE,
             "max_bytes": MAX_BYTES,
             "debug": DEBUG,
+            "redact_pii": REDACT_PII,
             "python": sys.version.split()[0],
             "fts": {"available": fts_available, "error": fts_error},
         }
