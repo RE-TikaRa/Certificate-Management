@@ -333,6 +333,8 @@ class SettingsPage(BasePage):
         self.mcp_web_token.setReadOnly(True)
         self._mcp_web_regen_user_btn = PushButton("随机用户名")
         self._mcp_web_regen_token_btn = PushButton("重新生成密码")
+        self._mcp_web_copy_user_btn = PushButton("复制用户名")
+        self._mcp_web_copy_token_btn = PushButton("复制密码")
         self._mcp_web_install_btn = PushButton("安装/更新 Web 依赖（uv）")
         self._mcp_web_install_dialog: UvSyncDialog | None = None
 
@@ -617,6 +619,7 @@ class SettingsPage(BasePage):
         user_layout = QHBoxLayout(user_row)
         user_layout.setContentsMargins(0, 0, 0, 0)
         user_layout.addWidget(self.mcp_web_username, 1)
+        user_layout.addWidget(self._mcp_web_copy_user_btn)
         user_layout.addWidget(self._mcp_web_regen_user_btn)
         form.addRow("Web 用户名", user_row)
 
@@ -624,6 +627,7 @@ class SettingsPage(BasePage):
         token_layout = QHBoxLayout(token_row)
         token_layout.setContentsMargins(0, 0, 0, 0)
         token_layout.addWidget(self.mcp_web_token, 1)
+        token_layout.addWidget(self._mcp_web_copy_token_btn)
         token_layout.addWidget(self._mcp_web_regen_token_btn)
         form.addRow("Web 密码", token_row)
         form.addRow(self._mcp_web_install_btn)
@@ -646,6 +650,8 @@ class SettingsPage(BasePage):
         self._web_log_btn.clicked.connect(self._open_web_log)
         self._mcp_web_regen_user_btn.clicked.connect(self._regen_web_username)
         self._mcp_web_regen_token_btn.clicked.connect(self._regen_web_token)
+        self._mcp_web_copy_user_btn.clicked.connect(self._copy_web_username)
+        self._mcp_web_copy_token_btn.clicked.connect(self._copy_web_password)
         self._mcp_web_install_btn.clicked.connect(self._install_mcp_web_deps)
         btn_row.addWidget(self._mcp_start_btn)
         btn_row.addWidget(self._mcp_stop_btn)
@@ -748,6 +754,26 @@ class SettingsPage(BasePage):
         username = self._mcp_runtime.regenerate_web_username()
         self.mcp_web_username.setText(username)
         InfoBar.success("MCP Web", "用户名已更新，重启 Web 控制台后生效", parent=self.window())
+
+    def _copy_web_username(self) -> None:
+        from PySide6.QtGui import QGuiApplication
+
+        text = self.mcp_web_username.text().strip()
+        if not text:
+            InfoBar.warning("MCP Web", "用户名为空，无法复制", parent=self.window())
+            return
+        QGuiApplication.clipboard().setText(text)
+        InfoBar.success("MCP Web", "用户名已复制", duration=1500, parent=self.window())
+
+    def _copy_web_password(self) -> None:
+        from PySide6.QtGui import QGuiApplication
+
+        text = self.mcp_web_token.text().strip()
+        if not text:
+            InfoBar.warning("MCP Web", "密码为空，无法复制", parent=self.window())
+            return
+        QGuiApplication.clipboard().setText(text)
+        InfoBar.success("MCP Web", "密码已复制", duration=1500, parent=self.window())
 
     def _install_mcp_web_deps(self) -> None:
         if shutil.which("uv") is None:

@@ -229,7 +229,7 @@
 - **可选 Web 控制台**：
   - 安装：`uv sync --group mcp-web`
   - 运行：`uv run certificate-mcp-web`（默认 `127.0.0.1:7860`）
-- **配置入口**：设置页 → MCP 服务（修改后需重启对应进程生效）
+- **配置入口**：设置页 → MCP 服务（可改用户名/密码、端口、写开关、脱敏开关，修改后需重启对应进程）
 - **环境变量覆盖**：`CERT_MCP_ALLOW_WRITE`、`CERT_MCP_MAX_BYTES`、`CERT_MCP_DEBUG`
 - **常用能力**：`health`、`list_awards`、`search_awards`、`get_award`、`read_attachment`，以及资源 `schema://models`、`templates://awards_csv`
 
@@ -254,6 +254,8 @@ Certificate-Management/
 │   ├── 📝 logger.py                # 日志配置
 │   ├── 🤖 mcp_server.py            # MCP 服务端（默认只读）
 │   ├── 🌐 mcp_web.py               # MCP 本地 Web 控制台（可选）
+│   ├── 🧩 mcp_helpers.py           # MCP 配置/解析辅助
+│   ├── ⚙️ mcp_runtime.py           # MCP 进程/自启动管理（本地）
 │   │
 │   ├── 💾 data/                    # 数据层
 │   │   ├── models.py               # SQLAlchemy 模型
