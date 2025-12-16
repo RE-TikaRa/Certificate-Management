@@ -1,11 +1,8 @@
-from typing import TYPE_CHECKING
-
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget
 
-if TYPE_CHECKING:
-    from ...app_context import AppContext
-    from ..styled_theme import ThemeManager
+from ...app_context import AppContext
+from ..styled_theme import ThemeManager
 
 
 class BasePage(QWidget):

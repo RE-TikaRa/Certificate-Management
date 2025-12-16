@@ -60,9 +60,10 @@ def main(debug: bool = False) -> None:
     app.aboutToQuit.connect(runtime.shutdown)
     if ctx.settings.get("mcp_auto_start", "false") == "true":
         max_bytes = safe_int(ctx.settings.get("mcp_max_bytes", "1048576"), 1_048_576, min_value=1024)
+        host = ctx.settings.get("mcp_host", "127.0.0.1")
         port = safe_int(ctx.settings.get("mcp_port", "8000"), 8000, min_value=1, max_value=65535)
         allow_write = ctx.settings.get("mcp_allow_write", "false") == "true"
-        runtime.start_mcp_sse(port=port, allow_write=allow_write, max_bytes=max_bytes)
+        runtime.start_mcp_sse(host=host, port=port, allow_write=allow_write, max_bytes=max_bytes)
     if ctx.settings.get("mcp_web_auto_start", "false") == "true":
         host = ctx.settings.get("mcp_web_host", "127.0.0.1")
         port = safe_int(ctx.settings.get("mcp_web_port", "7860"), 7860, min_value=1, max_value=65535)

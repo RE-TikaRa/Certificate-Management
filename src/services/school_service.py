@@ -9,9 +9,9 @@ from collections.abc import Callable, Iterable
 from pypinyin import lazy_pinyin
 from sqlalchemy import func, or_, select, text
 
-from src.data.database import Database
-from src.data.models import School
-from src.services.academic_types import SchoolInput
+from ..data.database import Database
+from ..data.models import School
+from .academic_types import SchoolInput
 
 
 class SchoolService:
@@ -50,10 +50,18 @@ class SchoolService:
             if progress_callback:
                 progress_callback(count)
 
-        self._set_sqlite_pragma("journal_mode", "'WAL'")
-        self._set_sqlite_pragma("synchronous", "OFF")
-        try:
-            with self.db.session_scope() as session:
+        with self.db.session_scope() as session:
+            old_journal = None
+            old_sync = None
+            try:
+                old_journal = session.execute(text("PRAGMA journal_mode")).scalar()
+                old_sync = session.execute(text("PRAGMA synchronous")).scalar()
+                session.execute(text("PRAGMA journal_mode = WAL"))
+                session.execute(text("PRAGMA synchronous = OFF"))
+            except Exception:
+                pass
+
+            try:
                 session.query(School).delete()
                 for school in deduped.values():
                     chunk.append(
@@ -67,9 +75,14 @@ class SchoolService:
                     if len(chunk) >= batch_size:
                         flush(session)
                 flush(session)
-        finally:
-            self._set_sqlite_pragma("synchronous", "NORMAL")
-            self._set_sqlite_pragma("journal_mode", "'DELETE'")
+            finally:
+                try:
+                    if old_sync is not None:
+                        session.execute(text(f"PRAGMA synchronous = {int(old_sync)}"))
+                    if old_journal:
+                        session.execute(text(f"PRAGMA journal_mode = {str(old_journal).upper()}"))
+                except Exception:
+                    pass
         return count
 
     def upsert(self, schools: Iterable[SchoolInput]) -> int:
@@ -174,10 +187,3 @@ class SchoolService:
             code=(value.code or "").strip() or None,
             region=(value.region or "").strip() or None,
         )
-
-    def _set_sqlite_pragma(self, key: str, value: str) -> None:
-        try:
-            with self.db.engine.begin() as connection:
-                connection.execute(text(f"PRAGMA {key} = {value}"))
-        except Exception:
-            pass

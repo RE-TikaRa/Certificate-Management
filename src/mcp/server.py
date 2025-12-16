@@ -24,7 +24,9 @@ from ..data.models import Attachment, Award, AwardMember, Base, Major, School, T
 from .helpers import Transport, parse_transport, safe_int, to_bool
 
 DEBUG = to_bool(os.getenv("CERT_MCP_DEBUG"), False)
-app: AppContext = bootstrap(debug=DEBUG)
+app: AppContext = bootstrap(debug=DEBUG, start_scheduler=False)
+
+ATTACHMENTS_ROOT = Path(app.settings.get("attachment_root", str(ATTACHMENTS_DIR))).expanduser().resolve()
 
 ALLOW_WRITE = to_bool(
     os.getenv("CERT_MCP_ALLOW_WRITE"),
@@ -194,7 +196,7 @@ def _serialize_award(award: Award, *, with_members: bool = True, with_attachment
 
 
 def _safe_attachment_path(relative_path: str) -> Path:
-    base = ATTACHMENTS_DIR.resolve()
+    base = ATTACHMENTS_ROOT
     target = (base / relative_path).resolve()
     if base not in target.parents and target != base:
         raise ValueError("attachment path is outside attachments directory")
@@ -491,12 +493,12 @@ def read_attachment(relative_path: str, offset: int = 0, length: int = MAX_BYTES
             slice_ = f.read(length)
         mime_type, _encoding = mimetypes.guess_type(path.name)
         return {
-            "path": str(path.relative_to(BASE_DIR)),
+            "path": str(path.relative_to(ATTACHMENTS_ROOT)),
             "file_size": file_size,
             "mime_type": mime_type,
             "offset": offset,
             "length": len(slice_),
-            "truncated": offset + length < file_size,
+            "truncated": offset + len(slice_) < file_size,
             "content_base64": base64.b64encode(slice_).decode(),
         }
     except Exception as exc:
@@ -533,7 +535,7 @@ def health() -> dict[str, Any]:
             "name": "certificate-management",
             "base_dir": str(BASE_DIR),
             "db_path": str(DB_PATH),
-            "attachments_dir": str(ATTACHMENTS_DIR),
+            "attachments_dir": str(ATTACHMENTS_ROOT),
             "read_only": not ALLOW_WRITE,
             "max_bytes": MAX_BYTES,
             "debug": DEBUG,

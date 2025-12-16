@@ -119,7 +119,7 @@ class AttachmentManager:
 
                 attachment = Attachment(
                     award_id=award_id,
-                    stored_name=safe_name,
+                    stored_name=dest.name,
                     original_name=src.name,
                     relative_path=str(rel_path),
                     file_md5=file_md5,

@@ -223,6 +223,9 @@ class DashboardPage(BasePage):
         run_in_thread(load_all, self._on_data_loaded)
 
     def _on_data_loaded(self, payload) -> None:
+        if isinstance(payload, Exception):
+            InfoBar.error("加载失败", str(payload), parent=self.window())
+            return
         stats, level_stats, rank_stats = payload
         self._latest_awards = stats["latest_awards"]
         self.metric_labels["总荣誉数"].setText(str(stats["total"]))

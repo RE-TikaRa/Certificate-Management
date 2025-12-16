@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import cast
+from typing import Self, cast
 
 from PySide6.QtCore import QCoreApplication, QObject, Signal
 from PySide6.QtGui import QGuiApplication, QPalette
@@ -53,7 +53,7 @@ class ThemeManager(QObject):
         self._is_dark = False
 
     @classmethod
-    def instance(cls) -> ThemeManager:
+    def instance(cls) -> Self:
         """Get singleton instance"""
         if cls._instance is None:
             from PySide6.QtWidgets import QApplication
@@ -62,7 +62,7 @@ class ThemeManager(QObject):
         return cls._instance
 
     @classmethod
-    def set_instance(cls, instance: ThemeManager) -> None:
+    def set_instance(cls, instance: Self) -> None:
         """Set singleton instance"""
         cls._instance = instance
 

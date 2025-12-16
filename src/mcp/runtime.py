@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import secrets
+import shutil
 import subprocess
 import sys
 from contextlib import suppress
@@ -44,6 +45,7 @@ class McpRuntime:
             self._ctx.settings.set("mcp_web_token", password)
         self._web_password = password
 
+        self._last_mcp_host: str = self._ctx.settings.get("mcp_host", "127.0.0.1")
         try:
             self._last_mcp_port = int(self._ctx.settings.get("mcp_port", "8000"))
         except Exception:
@@ -60,7 +62,7 @@ class McpRuntime:
         return ProcInfo(
             pid=pid,
             running=running,
-            url=f"http://127.0.0.1:{self._last_mcp_port}/sse" if running else None,
+            url=f"http://{self._last_mcp_host}:{self._last_mcp_port}/sse" if running else None,
             log_path=str(self._mcp_log),
         )
 
@@ -99,9 +101,10 @@ class McpRuntime:
         self._web_username = username
         return username
 
-    def start_mcp_sse(self, *, port: int, allow_write: bool, max_bytes: int) -> None:
+    def start_mcp_sse(self, *, host: str, port: int, allow_write: bool, max_bytes: int) -> None:
         if self._mcp_proc and self._mcp_proc.poll() is None:
             return
+        self._last_mcp_host = host
         self._last_mcp_port = port
 
         LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -109,12 +112,22 @@ class McpRuntime:
         self._mcp_log_fp = self._mcp_log.open("ab")
         env = os.environ.copy()
         env["CERT_MCP_TRANSPORT"] = "sse"
-        env["CERT_MCP_HOST"] = "127.0.0.1"
+        env["CERT_MCP_HOST"] = host
         env["CERT_MCP_PORT"] = str(port)
         env["CERT_MCP_ALLOW_WRITE"] = "1" if allow_write else "0"
         env["CERT_MCP_MAX_BYTES"] = str(max_bytes)
+        cmd = [sys.executable, "-m", "src.mcp.server"]
+        check = subprocess.run(
+            [sys.executable, "-c", "import mcp"],
+            cwd=str(BASE_DIR),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        if check.returncode != 0 and shutil.which("uv") is not None:
+            cmd = ["uv", "run", "python", "-m", "src.mcp.server"]
         self._mcp_proc = subprocess.Popen(
-            [sys.executable, "-m", "src.mcp.server"],
+            cmd,
             cwd=str(BASE_DIR),
             env=env,
             stdout=self._mcp_log_fp,
@@ -136,10 +149,27 @@ class McpRuntime:
         LOG_DIR.mkdir(parents=True, exist_ok=True)
         self._close_log(self._web_log_fp)
         self._web_log_fp = self._web_log.open("ab")
-        import importlib.util
-
-        if importlib.util.find_spec("gradio") is None:
-            raise RuntimeError("gradio is not installed; run: uv sync --group mcp-web")
+        cmd = [sys.executable, "-m", "src.mcp.web"]
+        check = subprocess.run(
+            [sys.executable, "-c", "import gradio"],
+            cwd=str(BASE_DIR),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        if check.returncode != 0:
+            if shutil.which("uv") is None:
+                raise RuntimeError("gradio is not installed; run: uv sync --group mcp-web")
+            check_uv = subprocess.run(
+                ["uv", "run", "python", "-c", "import gradio"],
+                cwd=str(BASE_DIR),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+            )
+            if check_uv.returncode != 0:
+                raise RuntimeError("gradio is not installed; run: uv sync --group mcp-web")
+            cmd = ["uv", "run", "python", "-m", "src.mcp.web"]
         env = os.environ.copy()
         env["CERT_MCP_WEB_HOST"] = host
         env["CERT_MCP_WEB_PORT"] = str(self._last_web_port)
@@ -147,7 +177,7 @@ class McpRuntime:
         env["CERT_MCP_WEB_USERNAME"] = self._web_username
         env["CERT_MCP_WEB_PASSWORD"] = self._web_password
         self._web_proc = subprocess.Popen(
-            [sys.executable, "-m", "src.mcp.web"],
+            cmd,
             cwd=str(BASE_DIR),
             env=env,
             stdout=self._web_log_fp,

@@ -4,13 +4,10 @@ from typing import Any, cast
 
 from PySide6.QtCore import (
     QEasingCurve,
-    QParallelAnimationGroup,
-    QPoint,
-    QPropertyAnimation,
     QTimer,
 )
 from PySide6.QtGui import QKeySequence, QShortcut
-from PySide6.QtWidgets import QApplication, QGraphicsOpacityEffect, QLineEdit, QPlainTextEdit, QTextEdit, QWidget
+from PySide6.QtWidgets import QApplication, QLineEdit, QPlainTextEdit, QTextEdit, QWidget
 from qfluentwidgets import (
     FluentIcon as FIF,
     FluentWindow,
@@ -21,10 +18,10 @@ from qfluentwidgets import (
 
 from ..app_context import AppContext
 from .pages.about_page import AboutPage
-from .pages.base_page import BasePage
 from .pages.dashboard_page import DashboardPage
 from .pages.entry_page import EntryPage
 from .pages.home_page import HomePage
+from .pages.lazy_page import LazyPage
 from .pages.management_page import ManagementPage
 from .pages.overview_page import OverviewPage
 from .pages.recycle_page import RecyclePage
@@ -99,46 +96,15 @@ class MainWindow(FluentWindow):
         if current_index == next_index:
             return
 
-        content_widget = getattr(interface, "content_widget", None)
-
-        if content_widget:
-            view.setAnimationEnabled(False)
-            view.setCurrentIndex(next_index)
-            view.setAnimationEnabled(True)
-
-            opacity_effect = content_widget.graphicsEffect()
-            if not isinstance(opacity_effect, QGraphicsOpacityEffect):
-                opacity_effect = QGraphicsOpacityEffect(content_widget)
-                content_widget.setGraphicsEffect(opacity_effect)
-
-            end_pos = content_widget.pos()
-            start_pos = end_pos + QPoint(0, 60)
-
-            opacity_ani = QPropertyAnimation(opacity_effect, b"opacity", self)
-            opacity_ani.setStartValue(0.0)
-            opacity_ani.setEndValue(1.0)
-            opacity_ani.setDuration(400)
-            opacity_ani.setEasingCurve(QEasingCurve.Type.OutQuint)
-
-            pos_ani = QPropertyAnimation(content_widget, b"pos", self)
-            pos_ani.setStartValue(start_pos)
-            pos_ani.setEndValue(end_pos)
-            pos_ani.setDuration(400)
-            pos_ani.setEasingCurve(QEasingCurve.Type.OutQuint)
-
-            ani_group = QParallelAnimationGroup(self)
-            ani_group.addAnimation(opacity_ani)
-            ani_group.addAnimation(pos_ani)
-            ani_group.finished.connect(self._on_page_animation_finished)
-            ani_group.start()
-        else:
-            view.setCurrentWidget(
-                interface,
-                needPopOut=False,
-                showNextWidgetDirectly=True,
-                duration=400,
-                easingCurve=QEasingCurve.Type.OutQuint,
-            )
+        view.setCurrentWidget(
+            interface,
+            needPopOut=False,
+            showNextWidgetDirectly=True,
+            duration=400,
+            easingCurve=QEasingCurve.Type.OutQuint,
+        )
+        if not (hasattr(self.stackedWidget, "view") and hasattr(self.stackedWidget.view, "aniFinished")):
+            QTimer.singleShot(0, self._on_page_animation_finished)
 
     def _on_page_changed(self, index: int) -> None:
         """记录即将显示的页索引，等待动画结束后再刷新"""
@@ -153,7 +119,13 @@ class MainWindow(FluentWindow):
             current_widget: Any = self.stackedWidget.widget(index)
             if current_widget and hasattr(current_widget, "refresh"):
                 # 动画结束立即刷新，可按需再加微小延迟
-                QTimer.singleShot(0, current_widget.refresh)
+                def _safe_refresh() -> None:
+                    try:
+                        current_widget.refresh()
+                    except Exception as exc:
+                        logger.warning("Failed to refresh page at index %s: %s", index, exc, exc_info=True)
+
+                QTimer.singleShot(0, _safe_refresh)
                 logger.debug(f"Page at index {index} refreshed after animation")
         except Exception as e:
             logger.warning(f"Failed to refresh page at index {index}: {e}")
@@ -162,38 +134,18 @@ class MainWindow(FluentWindow):
 
     def _init_navigation_fast(self) -> None:
         """初始化导航栏"""
-        # 创建所有页面
+        # 创建首页，其余页面延迟构建，减少启动卡顿
         page_start = time.time()
         self.home_page = HomePage(self.ctx, self.theme_manager)
         logger.debug(f"HomePage initialized in {time.time() - page_start:.2f}s")
 
-        page_start = time.time()
-        self.overview_page = OverviewPage(self.ctx, self.theme_manager)
-        logger.debug(f"OverviewPage initialized in {time.time() - page_start:.2f}s")
-
-        page_start = time.time()
-        self.entry_page = EntryPage(self.ctx, self.theme_manager)
-        logger.debug(f"EntryPage initialized in {time.time() - page_start:.2f}s")
-
-        page_start = time.time()
-        self.management_page = ManagementPage(self.ctx, self.theme_manager)
-        logger.debug(f"ManagementPage initialized in {time.time() - page_start:.2f}s")
-
-        page_start = time.time()
-        self.dashboard_page = DashboardPage(self.ctx, self.theme_manager)
-        logger.debug(f"DashboardPage initialized in {time.time() - page_start:.2f}s")
-
-        page_start = time.time()
-        self.recycle_page = RecyclePage(self.ctx, self.theme_manager)
-        logger.debug(f"RecyclePage initialized in {time.time() - page_start:.2f}s")
-
-        page_start = time.time()
-        self.about_page = AboutPage(self.ctx, self.theme_manager)
-        logger.debug(f"AboutPage initialized in {time.time() - page_start:.2f}s")
-
-        page_start = time.time()
-        self.settings_page = SettingsPage(self.ctx, self.theme_manager)
-        logger.debug(f"SettingsPage initialized in {time.time() - page_start:.2f}s")
+        self.overview_page = LazyPage(lambda: OverviewPage(self.ctx, self.theme_manager))
+        self.entry_page = LazyPage(lambda: EntryPage(self.ctx, self.theme_manager))
+        self.management_page = LazyPage(lambda: ManagementPage(self.ctx, self.theme_manager))
+        self.dashboard_page = LazyPage(lambda: DashboardPage(self.ctx, self.theme_manager))
+        self.recycle_page = LazyPage(lambda: RecyclePage(self.ctx, self.theme_manager))
+        self.about_page = LazyPage(lambda: AboutPage(self.ctx, self.theme_manager))
+        self.settings_page = LazyPage(lambda: SettingsPage(self.ctx, self.theme_manager))
 
         # 注册所有导航项
         self.route_keys: dict[str, Any] = {}
@@ -258,22 +210,3 @@ class MainWindow(FluentWindow):
         """导航到指定页面"""
         if route in self.route_keys:
             self.navigationInterface.setCurrentItem(cast(Any, self.route_keys[route]))
-
-            # 自动刷新该页面 - 获取对应的页面对象并调用 refresh()
-            page_map: dict[str, BasePage | None] = {
-                "home": self.home_page,
-                "overview": self.overview_page,
-                "entry": self.entry_page,
-                "dashboard": self.dashboard_page,
-                "management": self.management_page,
-                "recycle": self.recycle_page,
-                "settings": self.settings_page,
-            }
-
-            page = page_map.get(route)
-            if page and hasattr(page, "refresh"):
-                try:
-                    page.refresh()
-                    logger.debug(f"Page '{route}' refreshed")
-                except Exception as e:
-                    logger.warning(f"Failed to refresh page '{route}': {e}")

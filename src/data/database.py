@@ -2,7 +2,7 @@ from contextlib import contextmanager
 from typing import Iterator
 
 import logging
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from ..config import DB_PATH
@@ -12,7 +12,17 @@ from .models import Base
 class Database:
     def __init__(self) -> None:
         self.engine = create_engine(f"sqlite:///{DB_PATH}", echo=False, future=True)
+        event.listen(self.engine, "connect", self._on_connect)
         self._session_factory = sessionmaker(bind=self.engine, expire_on_commit=False)
+
+    @staticmethod
+    def _on_connect(dbapi_connection, _connection_record) -> None:
+        try:
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
+        except Exception:
+            logging.getLogger(__name__).warning("Failed to enable SQLite foreign_keys", exc_info=True)
 
     def initialize(self) -> None:
         Base.metadata.create_all(self.engine)
@@ -58,45 +68,48 @@ class Database:
 
         logging.getLogger(__name__).info("Migrating award_members to snapshot schema")
         connection.execute(text("PRAGMA foreign_keys=OFF"))
-        connection.execute(
-            text(
-                """
-                CREATE TABLE IF NOT EXISTS award_members_new (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    award_id INTEGER NOT NULL,
-                    member_id INTEGER,
-                    member_name TEXT NOT NULL,
-                    sort_order INTEGER NOT NULL DEFAULT 0,
-                    FOREIGN KEY(award_id) REFERENCES awards(id) ON DELETE CASCADE,
-                    FOREIGN KEY(member_id) REFERENCES team_members(id) ON DELETE SET NULL
+        try:
+            connection.execute(text("DROP TABLE IF EXISTS award_members_new"))
+            connection.execute(
+                text(
+                    """
+                    CREATE TABLE award_members_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        award_id INTEGER NOT NULL,
+                        member_id INTEGER,
+                        member_name TEXT NOT NULL,
+                        sort_order INTEGER NOT NULL DEFAULT 0,
+                        FOREIGN KEY(award_id) REFERENCES awards(id) ON DELETE CASCADE,
+                        FOREIGN KEY(member_id) REFERENCES team_members(id) ON DELETE SET NULL
+                    )
+                    """
                 )
-                """
             )
-        )
-        connection.execute(
-            text(
-                """
-                INSERT INTO award_members_new (award_id, member_id, member_name, sort_order)
-                SELECT am.award_id,
-                       am.member_id,
-                       COALESCE(tm.name, '') AS member_name,
-                       COALESCE(am.sort_order, 0) AS sort_order
-                FROM award_members am
-                LEFT JOIN team_members tm ON tm.id = am.member_id
-                """
+            connection.execute(
+                text(
+                    """
+                    INSERT INTO award_members_new (award_id, member_id, member_name, sort_order)
+                    SELECT am.award_id,
+                           am.member_id,
+                           COALESCE(tm.name, '') AS member_name,
+                           COALESCE(am.sort_order, 0) AS sort_order
+                    FROM award_members am
+                    LEFT JOIN team_members tm ON tm.id = am.member_id
+                    """
+                )
             )
-        )
-        connection.execute(text("DROP TABLE award_members"))
-        connection.execute(text("ALTER TABLE award_members_new RENAME TO award_members"))
-        connection.execute(text("CREATE INDEX IF NOT EXISTS ix_award_members_award_id ON award_members (award_id)"))
-        connection.execute(text("CREATE INDEX IF NOT EXISTS ix_award_members_member_id ON award_members (member_id)"))
-        connection.execute(
-            text(
-                "CREATE UNIQUE INDEX IF NOT EXISTS uq_award_members_award_sort "
-                "ON award_members (award_id, sort_order)"
+            connection.execute(text("DROP TABLE award_members"))
+            connection.execute(text("ALTER TABLE award_members_new RENAME TO award_members"))
+            connection.execute(text("CREATE INDEX IF NOT EXISTS ix_award_members_award_id ON award_members (award_id)"))
+            connection.execute(text("CREATE INDEX IF NOT EXISTS ix_award_members_member_id ON award_members (member_id)"))
+            connection.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS uq_award_members_award_sort "
+                    "ON award_members (award_id, sort_order)"
+                )
             )
-        )
-        connection.execute(text("PRAGMA foreign_keys=ON"))
+        finally:
+            connection.execute(text("PRAGMA foreign_keys=ON"))
 
     def _ensure_fts(self) -> None:
         """创建 FTS5 虚表（如果可用）"""
@@ -225,6 +238,14 @@ class Database:
             return
 
         if awards_count == 0 or members_count == 0:
+            try:
+                with self.engine.begin() as connection:
+                    base_awards = connection.execute(text("SELECT count(1) FROM awards")).scalar() or 0
+                    base_members = connection.execute(text("SELECT count(1) FROM team_members")).scalar() or 0
+                if base_awards == 0 and base_members == 0:
+                    return
+            except Exception:
+                logging.getLogger(__name__).warning("Check base table size failed", exc_info=True)
             logging.getLogger(__name__).info("Rebuilding FTS indexes (awards=%s, members=%s)", awards_count, members_count)
             try:
                 with self.engine.begin() as connection:

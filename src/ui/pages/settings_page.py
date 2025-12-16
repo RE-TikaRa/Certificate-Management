@@ -696,7 +696,9 @@ class SettingsPage(BasePage):
             port_value = max(1, min(65535, int(port_text)))
             max_bytes_text = self.mcp_max_bytes.text().strip() or "1048576"
             max_bytes_value = max(1024, int(max_bytes_text))
+            host = self.ctx.settings.get("mcp_host", "127.0.0.1")
             self._mcp_runtime.start_mcp_sse(
+                host=host,
                 port=port_value,
                 allow_write=self.mcp_allow_write.isChecked(),
                 max_bytes=max_bytes_value,
@@ -718,16 +720,11 @@ class SettingsPage(BasePage):
 
     def _mcp_sse_url(self) -> str:
         port = self.mcp_port.text().strip() or "8000"
-        return f"http://127.0.0.1:{port}/sse"
+        host = self.ctx.settings.get("mcp_host", "127.0.0.1")
+        return f"http://{host}:{port}/sse"
 
     def _start_web(self) -> None:
         try:
-            import importlib.util
-
-            if importlib.util.find_spec("gradio") is None:
-                InfoBar.error("MCP Web", "未安装 gradio，请先执行：uv sync --group mcp-web", parent=self.window())
-                return
-
             host = self.mcp_web_host.text().strip() or "127.0.0.1"
             port = self.mcp_web_port.text().strip() or "7860"
             self._mcp_runtime.start_web(host=host, port=int(port))
@@ -749,11 +746,13 @@ class SettingsPage(BasePage):
     def _regen_web_token(self) -> None:
         token = self._mcp_runtime.regenerate_web_token()
         self.mcp_web_token.setText(token)
+        self._save_mcp_settings(silent=True)
         InfoBar.success("MCP Web", "密码已更新，重启 Web 控制台后生效", parent=self.window())
 
     def _regen_web_username(self) -> None:
         username = self._mcp_runtime.regenerate_web_username()
         self.mcp_web_username.setText(username)
+        self._save_mcp_settings(silent=True)
         InfoBar.success("MCP Web", "用户名已更新，重启 Web 控制台后生效", parent=self.window())
 
     def _copy_web_username(self) -> None:

@@ -135,21 +135,31 @@ class ImportExportService:
             else:
                 flag_col_map[flag.key] = ""  # 缺失列，用默认值
 
+        def clean_cell(value) -> str:
+            if value is None:
+                return ""
+            if isinstance(value, float) and pd.isna(value):
+                return ""
+            if pd.isna(value):
+                return ""
+            text = str(value).strip()
+            return "" if text.lower() == "nan" else text
+
         def handle_row(session: Session, row_index: int, row) -> None:
             nonlocal success
-            timestamp = cast(pd.Timestamp, pd.to_datetime(row["获奖日期"]))
+            timestamp = cast(pd.Timestamp, pd.to_datetime(clean_cell(row["获奖日期"])))
             award = Award(
-                competition_name=str(row["比赛名称"]).strip(),
+                competition_name=clean_cell(row["比赛名称"]),
                 award_date=timestamp.date(),
-                level=str(row["赛事级别"]).strip(),
-                rank=str(row["奖项等级"]).strip(),
-                certificate_code=str(row.get("证书编号", "") or "").strip() or None,
-                remarks=str(row.get("备注", "") or "").strip() or None,
+                level=clean_cell(row["赛事级别"]),
+                rank=clean_cell(row["奖项等级"]),
+                certificate_code=clean_cell(row.get("证书编号", "")) or None,
+                remarks=clean_cell(row.get("备注", "")) or None,
             )
             session.add(award)
             session.flush()
 
-            members = self._parse_items(str(row.get("成员", "")))
+            members = self._parse_items(clean_cell(row.get("成员", "")))
             award.award_members = [AwardMember(member_name=name, sort_order=index) for index, name in enumerate(members)]
             session.flush()
 
@@ -162,7 +172,7 @@ class ImportExportService:
                     values.append(AwardFlagValue(award_id=award.id, flag_key=flag.key, value=value))
                 session.add_all(values)
 
-            attachment_paths = self._parse_items(str(row.get("附件路径", "")), sep=";")
+            attachment_paths = self._parse_items(clean_cell(row.get("附件路径", "")), sep=";")
             files = [Path(path) for path in attachment_paths if path]
             if files and not dry_run:
                 self.attachments.save_attachments(award.id, award.competition_name, files, session=session)

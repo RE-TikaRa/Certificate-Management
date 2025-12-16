@@ -21,6 +21,7 @@ class DocInfoExtractor:
         """使用PowerShell和Word COM对象提取.doc文件文本"""
         # 转换路径为绝对路径并规范化
         abs_path = str(self.doc_path.resolve())
+        safe_path = abs_path.replace("'", "''")
 
         # 使用 -EncodedCommand 避免路径中的特殊字符问题
         ps_script = f"""
@@ -28,7 +29,7 @@ class DocInfoExtractor:
             $word = New-Object -ComObject Word.Application
             $word.Visible = $false
             $word.DisplayAlerts = 0
-            $doc = $word.Documents.Open('{abs_path}', $false, $true)
+            $doc = $word.Documents.Open('{safe_path}', $false, $true)
             $text = $doc.Content.Text
             $doc.Close($false)
             $word.Quit()

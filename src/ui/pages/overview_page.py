@@ -1761,6 +1761,10 @@ class AwardDetailDialog(MaskDialogBase):
         run_in_thread(build_rows, self._on_attachments_ready)
 
     def _on_attachments_ready(self, rows: list[dict]) -> None:
+        if isinstance(rows, Exception):
+            logger.exception("附件分析失败: %s", rows)
+            InfoBar.error("附件加载失败", str(rows), parent=self.window())
+            return
         self.attach_model.set_objects(rows)
         for row_idx, _ in enumerate(rows):
             delete_btn = TransparentToolButton(FluentIcon.DELETE)

@@ -29,7 +29,7 @@ class AppContext:
     flags: FlagService
 
 
-def bootstrap(debug: bool = False) -> AppContext:
+def bootstrap(debug: bool = False, *, start_scheduler: bool = True) -> AppContext:
     configure_logging(debug_enabled=debug)
 
     db = Database()
@@ -39,14 +39,15 @@ def bootstrap(debug: bool = False) -> AppContext:
     attachments = AttachmentManager(db, settings)
     flags = FlagService(db)
     awards = AwardService(db, attachments, flags)
-    backup = BackupManager(db, settings)
+    backup = BackupManager(db, settings, start_scheduler=False)
     importer = ImportExportService(db, attachments, flags)
     statistics = StatisticsService(db)
     majors = MajorService(db)
     schools = SchoolService(db)
     members = MemberService(db)
 
-    backup.schedule_jobs()
+    if start_scheduler:
+        backup.schedule_jobs()
 
     return AppContext(
         db=db,

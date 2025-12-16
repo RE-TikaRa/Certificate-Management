@@ -69,19 +69,6 @@ class AwardService:
             ).all()
             return list(members)
 
-    def add_member(self, name: str) -> TeamMember:
-        with self.db.session_scope() as session:
-            member = TeamMember(name=name, pinyin=name)
-            session.add(member)
-            session.flush()
-            return member
-
-    def remove_member(self, name: str) -> None:
-        with self.db.session_scope() as session:
-            member = session.scalar(select(TeamMember).where(TeamMember.name == name))
-            if member:
-                session.delete(member)
-
     def _get_or_create_member(self, session, name: str) -> TeamMember:
         member = session.scalar(select(TeamMember).where(TeamMember.name == name))
         if member:

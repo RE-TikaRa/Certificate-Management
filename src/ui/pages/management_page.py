@@ -163,9 +163,15 @@ class ManagementPage(BasePage):
     def refresh(self) -> None:
         """异步刷新成员表格"""
         run_in_thread(self.ctx.awards.list_members, self._on_members_loaded)
+        self.search_input.blockSignals(True)
         self.search_input.setText("")
+        self.search_input.blockSignals(False)
 
     def _on_members_loaded(self, members) -> None:
+        if isinstance(members, Exception):
+            logger.exception("加载成员失败: %s", members)
+            InfoBar.error("加载失败", str(members), parent=self.window())
+            return
         self._cached_member_ids = {m.id for m in members}
         self.members_model.set_objects(members)
         self.members_table.resizeColumnsToContents()

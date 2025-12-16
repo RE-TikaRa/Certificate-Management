@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Sequence
-from contextlib import contextmanager
 from dataclasses import dataclass
 
 from pypinyin import lazy_pinyin
@@ -245,18 +244,37 @@ class MajorService:
                 progress_callback(processed)
             chunk.clear()
 
-        with self._sqlite_speedup(), self.db.session_scope() as session:
-            session.query(Major).delete()
-            for value in majors:
-                record = self._normalize_catalog_input(self._to_catalog_input(value))
-                key = record.major_code or record.major_name
-                if key in seen_keys:
-                    continue
-                seen_keys.add(key)
-                chunk.append(record)
-                if len(chunk) >= batch_size:
-                    flush(session)
-            flush(session)
+        with self.db.session_scope() as session:
+            old_journal = None
+            old_sync = None
+            try:
+                old_journal = session.execute(text("PRAGMA journal_mode")).scalar()
+                old_sync = session.execute(text("PRAGMA synchronous")).scalar()
+                session.execute(text("PRAGMA journal_mode = WAL"))
+                session.execute(text("PRAGMA synchronous = OFF"))
+            except Exception:
+                pass
+
+            try:
+                session.query(Major).delete()
+                for value in majors:
+                    record = self._normalize_catalog_input(self._to_catalog_input(value))
+                    key = record.major_code or record.major_name
+                    if key in seen_keys:
+                        continue
+                    seen_keys.add(key)
+                    chunk.append(record)
+                    if len(chunk) >= batch_size:
+                        flush(session)
+                flush(session)
+            finally:
+                try:
+                    if old_sync is not None:
+                        session.execute(text(f"PRAGMA synchronous = {int(old_sync)}"))
+                    if old_journal:
+                        session.execute(text(f"PRAGMA journal_mode = {str(old_journal).upper()}"))
+                except Exception:
+                    pass
         return processed
 
     def batch_add_majors(self, major_names: list[str]) -> int:
@@ -479,25 +497,6 @@ class MajorService:
             "school_count": school_count,
             "college_count": college_count,
         }
-
-    @contextmanager
-    def _sqlite_speedup(self):
-        try:
-            with self.db.engine.begin() as connection:
-                connection.execute(text("PRAGMA journal_mode = WAL"))
-                connection.execute(text("PRAGMA synchronous = OFF"))
-        except Exception:
-            yield
-            return
-        try:
-            yield
-        finally:
-            try:
-                with self.db.engine.begin() as connection:
-                    connection.execute(text("PRAGMA synchronous = NORMAL"))
-                    connection.execute(text("PRAGMA journal_mode = DELETE"))
-            except Exception:
-                pass
 
     def _clone_major(self, major: Major) -> Major:
         return Major(

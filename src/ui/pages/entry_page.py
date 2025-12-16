@@ -219,7 +219,6 @@ class EntryPage(BasePage):
         remark_label = QLabel("备注")
         remark_label.setObjectName("formLabel")
         self.remarks_input = LineEdit()
-        clean_input_text(self.remarks_input)
         remark_col.addWidget(remark_label)
         remark_col.addWidget(self.remarks_input)
         info_layout.addLayout(remark_col)
@@ -896,6 +895,10 @@ class EntryPage(BasePage):
         run_in_thread(build_rows, self._on_attachments_ready)
 
     def _on_attachments_ready(self, rows: list[dict]) -> None:
+        if isinstance(rows, Exception):
+            logger.exception("附件分析失败: %s", rows)
+            InfoBar.error("附件加载失败", str(rows), parent=self.window())
+            return
         self.attach_model.set_objects(rows)
         self._resize_attachment_table(len(rows))
         # 设置操作按钮

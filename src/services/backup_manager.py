@@ -34,11 +34,14 @@ class BackupInfo:
 
 
 class BackupManager:
-    def __init__(self, db: Database, settings: SettingsService):
+    def __init__(self, db: Database, settings: SettingsService, *, start_scheduler: bool = True):
         self.db = db
         self.settings = settings
         self.scheduler = BackgroundScheduler()
-        self.scheduler.start()
+        self._scheduler_started = False
+        if start_scheduler:
+            self.scheduler.start()
+            self._scheduler_started = True
 
     @property
     def backup_root(self) -> Path:
@@ -169,6 +172,9 @@ class BackupManager:
         frequency = self.settings.get("backup_frequency", "manual")
         if frequency == "manual":
             return
+        if not self._scheduler_started:
+            self.scheduler.start()
+            self._scheduler_started = True
         if frequency == "startup":
             self._schedule_startup_backup()
         elif frequency == "daily":
@@ -181,7 +187,11 @@ class BackupManager:
         if not last_time:
             self.perform_backup()
             return
-        last_dt = datetime.fromisoformat(last_time)
+        try:
+            last_dt = datetime.fromisoformat(last_time)
+        except Exception:
+            self.perform_backup()
+            return
         if datetime.utcnow() - last_dt > timedelta(hours=24):
             self.perform_backup()
 

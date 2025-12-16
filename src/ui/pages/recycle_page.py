@@ -101,7 +101,14 @@ class RecyclePage(BasePage):
 
     def refresh(self) -> None:
         """刷新已删除的荣誉列表"""
-        run_in_thread(self.ctx.awards.list_deleted_awards, self.model.set_objects)
+        def on_loaded(payload) -> None:
+            if isinstance(payload, Exception):
+                logger.exception("加载回收站失败: %s", payload)
+                InfoBar.error("加载失败", str(payload), parent=self.window())
+                return
+            self.model.set_objects(payload)
+
+        run_in_thread(self.ctx.awards.list_deleted_awards, on_loaded)
 
     def _selected_ids(self) -> list[int]:
         ids = []
