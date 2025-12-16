@@ -9,11 +9,11 @@
     <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&pause=1000&color=36BCF7&background=00000000&center=true&vCenter=true&width=500&lines=%E5%85%A8%E7%94%9F%E5%91%BD%E5%91%A8%E6%9C%9F%E8%8D%A3%E8%AA%89%E7%AE%A1%E7%90%86;PySide6+%2B+QFluentWidgets+%E6%89%93%E9%80%A0;%E7%B2%BE%E7%BE%8E%E7%95%8C%E9%9D%A2+%E6%9E%81%E8%87%B4%E4%BD%93%E9%AA%8C;%E6%95%B0%E6%8D%AE%E6%9C%AC%E5%9C%B0%E5%8C%96+%E8%87%AA%E5%8A%A8%E5%A4%87%E4%BB%BD" alt="Typing SVG" />
   </a>
 
-	  <p>
-	    一款功能完整、界面精美的荣誉证书管理桌面应用。<br/>
-	    支持荣誉证书的全生命周期管理：从录入、统计分析、成员管理到附件管理，一应俱全。<br/>
-	    <b>当前版本：</b> v1.3.1（2025-12-17）
-	  </p>
+  <p>
+    一款功能完整、界面精美的荣誉证书管理桌面应用。<br/>
+    支持荣誉证书的全生命周期管理：从录入、统计分析、成员管理到附件管理，一应俱全。<br/>
+    <b>当前版本：</b> v1.3.1（2025-12-17）
+  </p>
 
   <!-- Badges -->
   <p>
@@ -573,9 +573,6 @@ flowchart TD
 <summary><strong>提交记录（v1.3.1，共 4 条）</strong></summary>
 
 - `1bb7c41` 2025-12-17 feat: 荣誉成员支持快照与可选入库
-- `1ae5479` 2025-12-17 feat: 优化页面加载与错误处理，提升性能
-- `ac8cc5c` 2025-12-17 feat: 优化日志输出与懒加载页面体验
-- `25041a0` 2025-12-17 chore: 规范化版本号管理 (v1.3.1)
 - `1ae5479` 2025-12-17 feat: 优化页面加载与错误处理，提升性能
 - `ac8cc5c` 2025-12-17 feat: 优化日志输出与懒加载页面体验
 - `25041a0` 2025-12-17 chore: 规范化版本号管理 (v1.3.1)
