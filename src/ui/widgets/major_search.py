@@ -3,6 +3,8 @@
 提供模糊搜索和一键填充功能
 """
 
+from __future__ import annotations
+
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QListWidget,
@@ -11,9 +13,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 from qfluentwidgets import LineEdit
+from shiboken6 import isValid
 
 from src.services.major_service import MajorService
 from src.ui.styled_theme import ThemeManager
+from src.ui.utils.async_utils import run_in_thread
 
 
 class MajorSearchWidget(QWidget):
@@ -33,6 +37,7 @@ class MajorSearchWidget(QWidget):
         self._selected_code: str | None = None
         self._selected_college: str | None = None
         self._pending_text = ""
+        self._search_seq = 0
         self._debounce_timer = QTimer(self)
         self._debounce_timer.setSingleShot(True)
         self._debounce_timer.setInterval(200)
@@ -131,32 +136,52 @@ class MajorSearchWidget(QWidget):
         if len(text) < self.MIN_QUERY_LENGTH and not text.isdigit():
             self.results_list.setVisible(False)
             return
-        majors = self.major_service.search_majors(
-            text,
-            limit=8,
-            school_code=self._school_code,
-            school_name=self._school_name,
-        )
+        self._search_seq += 1
+        seq = self._search_seq
+        query = text
+        school_code = self._school_code
+        school_name = self._school_name
 
-        if not majors:
-            self.results_list.setVisible(False)
-            return
+        def task():
+            return self.major_service.search_majors(
+                query,
+                limit=8,
+                school_code=school_code,
+                school_name=school_name,
+            )
 
-        # 显示搜索结果
-        self.results_list.clear()
-        for major in majors:
-            display = major.name
-            if major.code:
-                display = f"{major.name}（{major.code}）"
-            if major.college:
-                display = f"{display} - {major.college}"
-            item = QListWidgetItem(display)
-            item.setData(Qt.ItemDataRole.UserRole, major.name)
-            item.setData(Qt.ItemDataRole.UserRole + 1, major.code or "")
-            item.setData(Qt.ItemDataRole.UserRole + 2, major.college or "")
-            self.results_list.addItem(item)
+        def on_done(result) -> None:
+            if seq != self._search_seq:
+                return
+            if not isValid(self):
+                return
+            if query != self._pending_text:
+                return
+            if isinstance(result, Exception):
+                self.results_list.setVisible(False)
+                return
+            majors = result
+            if not majors:
+                self.results_list.setVisible(False)
+                return
 
-        self.results_list.setVisible(True)
+            # 显示搜索结果
+            self.results_list.clear()
+            for major in majors:
+                display = major.name
+                if major.code:
+                    display = f"{major.name}（{major.code}）"
+                if major.college:
+                    display = f"{display} - {major.college}"
+                item = QListWidgetItem(display)
+                item.setData(Qt.ItemDataRole.UserRole, major.name)
+                item.setData(Qt.ItemDataRole.UserRole + 1, major.code or "")
+                item.setData(Qt.ItemDataRole.UserRole + 2, major.college or "")
+                self.results_list.addItem(item)
+
+            self.results_list.setVisible(True)
+
+        run_in_thread(task, on_done)
 
     def _on_item_clicked(self, item: QListWidgetItem):
         """点击搜索结果项"""

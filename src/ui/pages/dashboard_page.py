@@ -433,3 +433,7 @@ class DashboardPage(BasePage):
         """页面关闭时停止定时器"""
         self.refresh_timer.stop()
         super().closeEvent(event)
+
+    def hideEvent(self, event) -> None:
+        super().hideEvent(event)
+        self.refresh_timer.stop()

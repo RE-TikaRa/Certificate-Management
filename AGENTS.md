@@ -32,7 +32,7 @@
 - **主要设置键（settings 表）**：`mcp_auto_start`、`mcp_port`、`mcp_allow_write`、`mcp_redact_pii`、`mcp_max_bytes`、`mcp_web_auto_start`、`mcp_web_host`、`mcp_web_port`、`mcp_web_username`、`mcp_web_token`（密码）
 
 ## 目录速览
-- `src/main.py` 应用入口；`app_context.py` 构建 DI 容器与服务；`logger.py` 日志配置；`config.py` 配置加载。
+- `src/main.py` 应用入口；`app_context.py` 构建 DI 容器与服务；`logger.py` 日志配置；`config.py` 配置加载；`version.py` 版本号管理。
 - MCP：`src/mcp/server.py`（MCP 服务端，stdio/SSE）、`src/mcp/web.py`（本地 Web 控制台，可选）、`src/mcp/runtime.py`（MCP 进程管理与自启动）、`src/mcp/helpers.py`（配置解析辅助）。
 - 数据层 `src/data/`: `models.py`（Base + Award/TeamMember/Attachment/Setting/BackupRecord/ImportJob/Major/School/SchoolMajorMapping/AwardMember）；`database.py` 提供 `session_scope`。
 - 服务层 `src/services/`: award_service、statistics_service、import_export、backup_manager、attachment_manager、settings_service、major_service 等。
@@ -42,8 +42,9 @@
 
 ## 模型与数据
 - Base：统一主键、自增、时间戳。
-- Award：competition_name、award_date、level、rank、certificate_code、remarks、attachment_folder、deleted/deleted_at；关系 members（m2m）与 attachments（级联删除）。
-- TeamMember：姓名、性别、身份证（唯一）、手机号、学号（唯一）、邮箱、学校/学校代码、专业/专业代码、班级、学院、pinyin、active、sort_index；关系 awards（m2m）。
+- Award：competition_name、award_date、level、rank、certificate_code、remarks、attachment_folder、deleted/deleted_at；关系 award_members（`AwardMember` 快照，级联删除）与 attachments（级联删除）。
+- AwardMember：荣誉成员快照（award_id、member_id 可空、member_name 必填、sort_order），成员库变更不影响历史荣誉显示。
+- TeamMember：姓名、性别、身份证（唯一）、手机号、学号（唯一）、邮箱、学校/学校代码、专业/专业代码、班级、学院、pinyin、active、sort_index；关系 award_associations（通过 `AwardMember` 关联荣誉）。
 - Attachment：award_id、stored_name、original_name、relative_path（唯一）、file_md5、file_size、deleted 标记。
 - Setting/BackupRecord/ImportJob：应用设置、备份记录、导入任务。
 - Major：name/code 唯一，含学科/专业类信息与 pinyin；School、SchoolMajorMapping 存储学校与学校-专业-学院映射。

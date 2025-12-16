@@ -101,6 +101,7 @@ class RecyclePage(BasePage):
 
     def refresh(self) -> None:
         """刷新已删除的荣誉列表"""
+
         def on_loaded(payload) -> None:
             if isinstance(payload, Exception):
                 logger.exception("加载回收站失败: %s", payload)

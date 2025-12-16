@@ -74,7 +74,7 @@ class BackupManager:
         try:
             db_copy = tmp_dir / "data"
             db_copy.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(DB_PATH, db_copy / DB_PATH.name)
+            self._backup_sqlite_db(db_copy / DB_PATH.name)
 
             if include_attachments:
                 attachments_root = Path(self.settings.get("attachment_root", str(ATTACHMENTS_DIR)))
@@ -114,6 +114,23 @@ class BackupManager:
             raise
         finally:
             shutil.rmtree(tmp_dir, ignore_errors=True)
+
+    def _backup_sqlite_db(self, dest_path: Path) -> None:
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+        if not DB_PATH.exists():
+            raise FileNotFoundError(f"数据库文件不存在：{DB_PATH}")
+
+        src_conn = sqlite3.connect(DB_PATH)
+        dest_conn = sqlite3.connect(dest_path)
+        try:
+            src_conn.execute("PRAGMA busy_timeout = 3000")
+            dest_conn.execute("PRAGMA busy_timeout = 3000")
+            src_conn.backup(dest_conn)
+        finally:
+            try:
+                dest_conn.close()
+            finally:
+                src_conn.close()
 
     def restore_backup(self, backup_path: Path, *, restore_attachments: bool = True, restore_logs: bool = True) -> None:
         """

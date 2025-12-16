@@ -160,7 +160,9 @@ class ImportExportService:
             session.flush()
 
             members = self._parse_items(clean_cell(row.get("成员", "")))
-            award.award_members = [AwardMember(member_name=name, sort_order=index) for index, name in enumerate(members)]
+            award.award_members = [
+                AwardMember(member_name=name, sort_order=index) for index, name in enumerate(members)
+            ]
             session.flush()
 
             if flag_defs and not dry_run:

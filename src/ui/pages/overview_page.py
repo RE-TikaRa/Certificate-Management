@@ -205,9 +205,9 @@ class OverviewPage(BasePage):
         self._cached_award_ids = set()
 
         # 自动刷新定时器（每5秒检查一次数据）
-        self.refresh_timer = QTimer()
+        self.refresh_timer = QTimer(self)
         self.refresh_timer.timeout.connect(self._auto_refresh)
-        self.refresh_timer.start(5000)  # 5秒更新一次
+        self.refresh_timer.setInterval(5000)
 
         self._apply_theme()
 
@@ -360,7 +360,7 @@ class OverviewPage(BasePage):
         if hasattr(self, "_search_timer"):
             self._search_timer.stop()
         else:
-            self._search_timer = QTimer()
+            self._search_timer = QTimer(self)
             self._search_timer.setSingleShot(True)
             self._search_timer.timeout.connect(self.refresh)
         self._search_timer.start(500)
@@ -918,6 +918,11 @@ class OverviewPage(BasePage):
         if self.refresh_timer:
             self.refresh_timer.start()
 
+    def hideEvent(self, event) -> None:
+        super().hideEvent(event)
+        if self.refresh_timer:
+            self.refresh_timer.stop()
+
     def _apply_theme(self) -> None:
         """应用主题到滚动区域"""
         is_dark = self.theme_manager.is_dark
@@ -1381,7 +1386,12 @@ class AwardDetailDialog(MaskDialogBase):
         up_btn.clicked.connect(lambda: self._move_member_up(member_card))
         down_btn.clicked.connect(lambda: self._move_member_down(member_card))
 
-        member_data = {"card": member_card, "fields": member_fields, "label": member_label, "join_checkbox": join_checkbox}
+        member_data = {
+            "card": member_card,
+            "fields": member_fields,
+            "label": member_label,
+            "join_checkbox": join_checkbox,
+        }
         self.members_data.append(member_data)
         self.members_list_layout.addWidget(member_card)
         self._update_member_indices()

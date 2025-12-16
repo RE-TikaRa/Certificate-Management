@@ -29,9 +29,21 @@ class _Worker(QRunnable):
         self.invoker.finished.emit(result)
 
 
+_ACTIVE_WORKERS: set[_Worker] = set()
+
+
 def run_in_thread(func: Callable[[], Any], on_done: Callable[[Any], None]) -> None:
     """
     Run func in Qt thread pool, then invoke on_done in the GUI thread with the result.
     """
-    worker = _Worker(func, on_done)
+
+    def _wrapped(result: Any) -> None:
+        try:
+            on_done(result)
+        finally:
+            _ACTIVE_WORKERS.discard(worker)
+
+    worker = _Worker(func, _wrapped)
+    worker.setAutoDelete(False)
+    _ACTIVE_WORKERS.add(worker)
     QThreadPool.globalInstance().start(worker)

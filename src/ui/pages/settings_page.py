@@ -356,9 +356,17 @@ class SettingsPage(BasePage):
 
         self._build_ui()
         self.refresh()
-        self._process_timer.start()
         self._refresh_process_status()
         self._connect_mcp_signals()
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        self._refresh_process_status()
+        self._process_timer.start()
+
+    def hideEvent(self, event) -> None:
+        super().hideEvent(event)
+        self._process_timer.stop()
 
     def _build_ui(self) -> None:
         outer_layout = QVBoxLayout(self)

@@ -7,9 +7,11 @@ from __future__ import annotations
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import QListWidget, QListWidgetItem, QVBoxLayout, QWidget
 from qfluentwidgets import LineEdit
+from shiboken6 import isValid
 
 from src.services.school_service import SchoolService
 from src.ui.styled_theme import ThemeManager
+from src.ui.utils.async_utils import run_in_thread
 
 
 class SchoolSearchWidget(QWidget):
@@ -22,6 +24,7 @@ class SchoolSearchWidget(QWidget):
         self._selected_code: str | None = None
         self._region: str | None = None
         self._pending_text = ""
+        self._search_seq = 0
         self._debounce_timer = QTimer(self)
         self._debounce_timer.setSingleShot(True)
         self._debounce_timer.setInterval(200)
@@ -80,21 +83,41 @@ class SchoolSearchWidget(QWidget):
             self.results.setVisible(False)
             return
 
-        schools = self.school_service.search(text, limit=8, region=self._region)
-        if not schools:
-            self.results.setVisible(False)
-            return
+        self._search_seq += 1
+        seq = self._search_seq
+        query = text
+        region = self._region
 
-        self.results.clear()
-        for school in schools:
-            display = school.name
-            if school.code:
-                display = f"{school.name}（{school.code}）"
-            item = QListWidgetItem(display)
-            item.setData(Qt.ItemDataRole.UserRole, school.name)
-            item.setData(Qt.ItemDataRole.UserRole + 1, school.code or "")
-            self.results.addItem(item)
-        self.results.setVisible(True)
+        def task():
+            return self.school_service.search(query, limit=8, region=region)
+
+        def on_done(result) -> None:
+            if seq != self._search_seq:
+                return
+            if not isValid(self):
+                return
+            if query != self._pending_text:
+                return
+            if isinstance(result, Exception):
+                self.results.setVisible(False)
+                return
+            schools = result
+            if not schools:
+                self.results.setVisible(False)
+                return
+
+            self.results.clear()
+            for school in schools:
+                display = school.name
+                if school.code:
+                    display = f"{school.name}（{school.code}）"
+                item = QListWidgetItem(display)
+                item.setData(Qt.ItemDataRole.UserRole, school.name)
+                item.setData(Qt.ItemDataRole.UserRole + 1, school.code or "")
+                self.results.addItem(item)
+            self.results.setVisible(True)
+
+        run_in_thread(task, on_done)
 
     def _on_item_clicked(self, item: QListWidgetItem) -> None:
         name = item.data(Qt.ItemDataRole.UserRole)

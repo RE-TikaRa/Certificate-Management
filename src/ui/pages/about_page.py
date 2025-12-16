@@ -8,6 +8,7 @@ from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QHBoxLayout, QScrollArea, QVBoxLayout, QWidget
 from qfluentwidgets import BodyLabel, FluentIcon, HyperlinkButton, TitleLabel
 
+from ...version import get_app_version
 from ..styled_theme import ThemeManager
 from .base_page import BasePage
 
@@ -65,7 +66,7 @@ class AboutPage(BasePage):
         header_layout.addWidget(subtitle)
 
         # 版本信息
-        version = BodyLabel("Version 1.3.0")
+        version = BodyLabel(f"Version {get_app_version()}")
         version.setAlignment(Qt.AlignmentFlag.AlignCenter)
         version_font = QFont()
         version_font.setPointSize(12)
@@ -94,7 +95,7 @@ class AboutPage(BasePage):
             "系统简介",
             "荣誉证书管理系统是一款基于 PySide6 + QFluentWidgets 的桌面端应用，"
             "用于管理竞赛/科研荣誉证书、成员信息与附件材料，完全离线运行。\n\n"
-            "内置证书录入、全文检索（FTS5）、成员管理、回收站、自动备份与导入/导出等功能，"
+            "内置证书录入、全文检索（FTS5）、成员管理（支持快照）、回收站、自动备份与导入/导出等功能，"
             "并提供本地 MCP（stdio/SSE）服务与可选 Gradio Web 控制台，方便外部智能体安全接入，"
             "支持用户名/密码/令牌、写入开关与 PII 过滤，帮助学校/团队高效组织与查询荣誉数据。",
         )

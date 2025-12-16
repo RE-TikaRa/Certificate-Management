@@ -1002,7 +1002,9 @@ class EntryPage(BasePage):
                 if widget is None:
                     continue
                 if field_name == "school" and isinstance(widget, SchoolSearchWidget):
-                    widget.set_school(value or "", member.school_code if member is not None and member_id is not None else None)
+                    widget.set_school(
+                        value or "", member.school_code if member is not None and member_id is not None else None
+                    )
                 elif isinstance(widget, MajorSearchWidget):
                     widget.set_text(value)
                 else:
