@@ -53,6 +53,10 @@
   - [📥 安装步骤](#-安装步骤)
   - [🛠️ 常用命令](#️-常用命令)
   - [🤖 MCP / AI 接入](#-mcp--ai-接入)
+    - [🔌 连接方式](#-连接方式)
+    - [🛡️ 权限与安全](#️-权限与安全)
+    - [🛠️ 能力概览](#️-能力概览)
+    - [⚙️ 常用环境变量](#️-常用环境变量)
 - [📂 文件目录说明](#-文件目录说明)
 - [🏗️ 项目架构](#️-项目架构)
 - [💾 数据模型](#-数据模型)
@@ -241,45 +245,72 @@
 
 ### 🤖 MCP / AI 接入
 
-- **推荐方式：stdio（由客户端拉起进程）**
-  - 启动：`uv run certificate-mcp`
-  - 适用：支持“本地命令型 MCP”的客户端（无需开端口）
-- **可选方式：SSE（本地 URL）**
-  - URL：`http://127.0.0.1:8000/sse`
-  - 启动（推荐）：设置页 → MCP 服务 → 开启“随软件启动 MCP”
-  - 启动（手动）：`CERT_MCP_TRANSPORT=sse CERT_MCP_PORT=8000 uv run certificate-mcp`
-  - 日志：`logs/mcp_sse.log`
+本项目内置了 MCP (Model Context Protocol) 服务，允许 AI Agent（如 Claude Desktop、Cursor 等）安全地读取本地荣誉数据与附件。
+
+#### 🔌 连接方式
+
+1. **stdio 模式（推荐）**
+   - **适用场景**：本地客户端直接拉起进程（无需占用端口）。
+   - **启动命令**：`uv run certificate-mcp`
+   - **配置示例**：见下文“客户端配置示例”。
+
+2. **SSE 模式（HTTP 服务）**
+   - **适用场景**：需要远程连接或调试。
+   - **地址**：`http://127.0.0.1:8000/sse`
+   - **启动方式**：
+     - **自动（推荐）**：在“设置页 → MCP 服务”中开启“随软件启动 MCP”。
+     - **手动**：`CERT_MCP_TRANSPORT=sse uv run certificate-mcp`
+   - **日志**：`logs/mcp_sse.log`
+
+   <details>
+   <summary><strong>Windows PowerShell 手动启动命令</strong></summary>
+
+   ```powershell
+   $env:CERT_MCP_TRANSPORT = "sse"
+   $env:CERT_MCP_HOST = "127.0.0.1"
+   $env:CERT_MCP_PORT = "8000"
+   uv run certificate-mcp
+   ```
+   </details>
+
+3. **Web 控制台（调试用）**
+   - **功能**：提供一个 Web 界面来测试 MCP 工具调用。
+   - **安装**：`uv sync --group mcp-web`（或在设置页点击安装）。
+   - **启动**：`uv run certificate-mcp-web`（默认访问 `http://127.0.0.1:7860`）。
+   - **认证**：用户名/密码在设置页配置。
+
+#### 🛡️ 权限与安全
+
+- **默认只读**：默认不允许写入数据库或修改文件。如需开启写入（仅限本地），请在设置页勾选或设置环境变量 `CERT_MCP_ALLOW_WRITE=1`。
+- **隐私保护**：默认开启 PII 脱敏（`CERT_MCP_REDACT_PII=1`），自动隐藏身份证号与手机号中间位。
+- **附件限额**：单次读取附件最大 1MB（可配置 `CERT_MCP_MAX_BYTES`）。
+- **网络安全**：服务默认绑定 `127.0.0.1`，请勿暴露到公网。
+
+#### 🛠️ 能力概览
+
+- **Tools (工具)**：
+  - `list_awards` / `get_award` / `search_awards`：查询荣誉记录。
+  - `list_members` / `get_member`：查询成员信息。
+  - `read_attachment`：读取附件内容（支持文本提取）。
+  - `health`：健康检查。
+- **Resources (资源)**：
+  - `schema://models`：查看数据库模型定义。
+  - `templates://awards_csv`：获取导入模板。
+
+#### ⚙️ 常用环境变量
+
+| 变量名 | 说明 | 默认值 |
+| :--- | :--- | :--- |
+| `CERT_MCP_TRANSPORT` | 传输模式 (`stdio`/`sse`) | `stdio` |
+| `CERT_MCP_PORT` | SSE 端口 | `8000` |
+| `CERT_MCP_ALLOW_WRITE` | 允许写入 (`0`/`1`) | `0` |
+| `CERT_MCP_REDACT_PII` | 敏感信息脱敏 (`0`/`1`) | `1` |
+| `CERT_MCP_WEB_PORT` | Web 控制台端口 | `7860` |
 
 <details>
-<summary><strong>Windows PowerShell 启动 SSE（手动）</strong></summary>
+<summary><strong>📎 客户端配置示例 (Claude Desktop / Cursor)</strong></summary>
 
-```powershell
-$env:CERT_MCP_TRANSPORT = "sse"
-$env:CERT_MCP_HOST = "127.0.0.1"
-$env:CERT_MCP_PORT = "8000"
-uv run certificate-mcp
-```
-
-</details>
-- **可选：Web 控制台（便于调试/验收 MCP 输出）**
-  - 安装依赖：`uv sync --group mcp-web`（也可在设置页一键安装/更新）
-  - 运行：`uv run certificate-mcp-web`（默认 `127.0.0.1:7860`）
-  - 认证：使用设置页配置的用户名/密码（修改后需重启 MCP Web 进程生效）
-  - 日志：`logs/mcp_web.log`（安装/更新日志见 `logs/mcp_web_install.log`）
-- **权限与安全**
-  - 默认只读：不允许写入数据库/文件；可在设置页或 `CERT_MCP_ALLOW_WRITE=1` 开启（仅本地自用）
-  - 附件读取限额：`CERT_MCP_MAX_BYTES`（默认 1MB），避免一次读取超大文件
-  - PII 脱敏：`CERT_MCP_REDACT_PII`（默认开启），对身份证/手机号等做掩码处理
-  - 本项目 MCP 仅供本地使用：请保持绑定 `127.0.0.1`，不要对公网/局域网暴露端口
-- **环境变量（常用）**
-  - MCP：`CERT_MCP_TRANSPORT`（stdio/sse/streamable-http）、`CERT_MCP_HOST`、`CERT_MCP_PORT`、`CERT_MCP_ALLOW_WRITE`、`CERT_MCP_REDACT_PII`、`CERT_MCP_MAX_BYTES`、`CERT_MCP_DEBUG`
-  - MCP Web：`CERT_MCP_WEB_HOST`、`CERT_MCP_WEB_PORT`、`CERT_MCP_WEB_USERNAME`、`CERT_MCP_WEB_PASSWORD`、`CERT_MCP_WEB_INBROWSER`
-- **能力概览**
-  - Tools：`health`、`list_awards`、`search_awards`、`get_award`、`list_members`、`get_member`、`read_attachment`
-  - Resources：`schema://models`、`templates://awards_csv`
-
-<details>
-<summary><strong>📎 客户端配置示例（stdio）</strong></summary>
+**stdio 模式 (推荐)**：
 
 ```json
 {
@@ -296,10 +327,7 @@ uv run certificate-mcp
 }
 ```
 
-</details>
-
-<details>
-<summary><strong>📎 客户端配置示例（SSE）</strong></summary>
+**SSE 模式**：
 
 ```json
 {
