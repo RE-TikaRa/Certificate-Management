@@ -29,4 +29,3 @@ def parse_transport(raw: str | None, default: Transport = "stdio") -> Transport:
     if raw not in ("stdio", "sse", "streamable-http"):
         return default
     return cast(Transport, raw)
-

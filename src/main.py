@@ -8,12 +8,13 @@ from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QApplication
 
 from .app_context import bootstrap
-from .mcp_helpers import safe_int
-from .mcp_runtime import get_mcp_runtime
+from .mcp.helpers import safe_int
+from .mcp.runtime import get_mcp_runtime
 from .ui.main_window import MainWindow
 from .ui.styled_theme import ThemeManager
 
 logger = logging.getLogger(__name__)
+
 
 def main(debug: bool = False) -> None:
     # 启动时间统计

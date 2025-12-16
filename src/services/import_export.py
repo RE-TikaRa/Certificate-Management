@@ -45,6 +45,13 @@ class ImportExportService:
         self._ensure_template()
         self._member_cache: dict[str, TeamMember] = {}
 
+    def get_awards_template_path(self, fmt: str = "xlsx") -> Path:
+        """返回荣誉导入模板路径（csv/xlsx）。"""
+        self._ensure_template()
+        suffix = fmt.lower().lstrip(".")
+        filename = "awards_template.xlsx" if suffix == "xlsx" else "awards_template.csv"
+        return TEMPLATES_DIR / filename
+
     def _ensure_template(self) -> None:
         csv_path = TEMPLATES_DIR / "awards_template.csv"
         if not csv_path.exists():

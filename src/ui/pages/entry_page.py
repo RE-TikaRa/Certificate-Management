@@ -1269,12 +1269,19 @@ class EntryPage(BasePage):
             scroll_widget.setPalette(palette)
 
     def _refresh_flag_section(self) -> None:
-        # 清空
-        while self.flags_container.count():
-            item = self.flags_container.takeAt(0)
-            widget = item.widget()
-            if widget is not None:
-                widget.deleteLater()
+        def _clear_layout(layout: QLayout) -> None:
+            while layout.count():
+                item = layout.takeAt(0)
+                widget = item.widget()
+                if widget is not None:
+                    widget.deleteLater()
+                    continue
+                child_layout = item.layout()
+                if child_layout is not None:
+                    _clear_layout(child_layout)
+                    child_layout.deleteLater()
+
+        _clear_layout(self.flags_container)
         self.flag_checkboxes.clear()
         try:
             self.flag_defs = self.ctx.flags.list_flags(enabled_only=True)

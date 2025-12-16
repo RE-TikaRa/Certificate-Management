@@ -12,18 +12,28 @@
 - 安装依赖：`uv sync`
 - 运行：`uv run python -m src.main`
 - 调试：`uv run python -m src.main --debug`
-- MCP（默认只读）：`uv run certificate-mcp`（stdio，可切 SSE，本地）
+- MCP（默认只读）：`uv run certificate-mcp`（默认 stdio；可切 SSE，本地）
 - MCP Web（可选）：`uv sync --group mcp-web` 后 `uv run certificate-mcp-web`
 - MCP 账号：设置页 → MCP 服务，可修改/随机用户名、重置/复制密码，改后重启 MCP Web 生效
 - 语法检查：`python -m py_compile src/`
 - Lint：`uv run ruff check .`
 - 格式化：`uv run ruff format .`
 - 类型检查：`uv run pyright`
-- 入口脚本：`certificate-management = src.main:main`
+- 入口脚本：`certificate-management = src.main:main` / `certificate-mcp = src.mcp.server:main` / `certificate-mcp-web = src.mcp.web:main`
+
+## MCP / AI 接入（本地）
+- **stdio（推荐）**：由 MCP 客户端拉起本地进程：`uv run certificate-mcp`
+- **SSE（本地 URL）**：`http://127.0.0.1:8000/sse`
+  - 推荐启动方式：应用设置页 → MCP 服务 → 开启“随软件启动 MCP”
+  - 手动启动：设置 `CERT_MCP_TRANSPORT=sse` 后运行 `uv run certificate-mcp`
+- **Web 控制台（可选）**：安装 `mcp-web` 依赖后 `uv run certificate-mcp-web`（默认 `127.0.0.1:7860`，用户名/密码来自设置页）
+- **默认只读 + 脱敏**：写入开关与 PII 脱敏开关均可在设置页配置（仅本地使用，避免对外暴露端口）
+- **日志位置**：`logs/mcp_sse.log`、`logs/mcp_web.log`、`logs/mcp_web_install.log`
+- **主要设置键（settings 表）**：`mcp_auto_start`、`mcp_port`、`mcp_allow_write`、`mcp_redact_pii`、`mcp_max_bytes`、`mcp_web_auto_start`、`mcp_web_host`、`mcp_web_port`、`mcp_web_username`、`mcp_web_token`（密码）
 
 ## 目录速览
 - `src/main.py` 应用入口；`app_context.py` 构建 DI 容器与服务；`logger.py` 日志配置；`config.py` 配置加载。
-- MCP：`src/mcp_server.py`（MCP 服务端，stdio/SSE）、`src/mcp_web.py`（本地 Web 控制台，可选）、`src/mcp_runtime.py`（MCP 进程管理与自启动）、`src/mcp_helpers.py`（配置解析辅助）。
+- MCP：`src/mcp/server.py`（MCP 服务端，stdio/SSE）、`src/mcp/web.py`（本地 Web 控制台，可选）、`src/mcp/runtime.py`（MCP 进程管理与自启动）、`src/mcp/helpers.py`（配置解析辅助）。
 - 数据层 `src/data/`: `models.py`（Base + Award/TeamMember/Attachment/Setting/BackupRecord/ImportJob/Major/School/SchoolMajorMapping/AwardMember）；`database.py` 提供 `session_scope`。
 - 服务层 `src/services/`: award_service、statistics_service、import_export、backup_manager、attachment_manager、settings_service、major_service 等。
 - 表现层 `src/ui/`: `main_window.py`（窗口与导航，懒加载页面，窗口居中），`styled_theme.py`（ThemeManager），`theme.py`（通用 UI 工具），`widgets/major_search.py`，`pages/`（home、dashboard、overview、entry、management、recycle、settings、about、base_page）。
@@ -56,8 +66,8 @@
 
 ## 代码风格
 - Ruff 配置：行宽 120、缩进 4、目标 py314、双引号；已豁免 Qt 命名/复杂度规则。运行 `uv run ruff check .` / `uv run ruff format .`。
-- Pyright 配置：basic 模式类型检查；与 ruff 分工——ruff 负责代码风格和 unused import/variable，pyright 负责类型检查。运行 `uv run pyright`。
-- 采用现代类型标注（`list[str]`, `| None`），无需 `__future__`；尽量添加 docstring。
+- Pyright 配置：standard 模式类型检查；与 ruff 分工——ruff 负责代码风格和 unused import/variable，pyright 负责类型检查。运行 `uv run pyright`。
+- 采用现代类型标注（`list[str]`, `| None`），无需强制 `__future__`；尽量添加 docstring。
 - 使用 loguru 日志，避免 `print`。
 - 保持导入有序、移除未用依赖；少量必要注释，遵循现有风格。
 
@@ -66,7 +76,7 @@
 - 添加页面：继承 `BasePage`，实现 `_init_ui`；在 `main_window.py` 注册（导航项、_load_* 分组、route_keys），按需处理主题信号。
 - 添加数据字段：同步更新模型、对应 service、UI 表单/列表、统计或刷新逻辑（管理页的 10 字段监控需保持一致）。
 - 成员字段在 UI 约定为 10 项（含学校）；管理页刷新依赖该集合。
-- 导入/导出：CSV 模板 `resources/templates/awards_template.csv`；专业与学校/学院映射导入来自 `docs/china_bachelor_majors_2025.csv`、`china_universities_2025.csv`、`GSAU_majors.xlsx`。
+- 导入/导出：模板位于 `src/resources/templates/`（CSV 版本在仓库内；XLSX 模板会在运行时自动生成并可从设置页下载）；专业与学校/学院映射导入来自 `docs/china_bachelor_majors_2025.csv`、`china_universities_2025.csv`、`GSAU_majors.xlsx`。
 - 导入荣誉：支持 CSV/XLSX，带预检（dry-run，不写入数据库/不落盘附件）、进度 ETA；正式导入会写入 imports 表并可导出错误行。
 - 附件删除：编辑时删除附件会移入 `attachments/.trash` 并在数据库标记 deleted（当前无 UI 入口恢复单个附件）。
 - 学院自动填充依赖 `SchoolMajorMapping`，如导入数据缺少学校代码会自动用学校名称回退匹配；若要禁用回退需同步保证 school_code 完整。

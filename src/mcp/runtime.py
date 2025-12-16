@@ -9,9 +9,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import IO
 
-from .app_context import AppContext
-from .config import BASE_DIR, LOG_DIR
-from .mcp_helpers import safe_int
+from ..app_context import AppContext
+from ..config import BASE_DIR, LOG_DIR
+from .helpers import safe_int
 
 
 @dataclass
@@ -114,7 +114,7 @@ class McpRuntime:
         env["CERT_MCP_ALLOW_WRITE"] = "1" if allow_write else "0"
         env["CERT_MCP_MAX_BYTES"] = str(max_bytes)
         self._mcp_proc = subprocess.Popen(
-            [sys.executable, "-m", "src.mcp_server"],
+            [sys.executable, "-m", "src.mcp.server"],
             cwd=str(BASE_DIR),
             env=env,
             stdout=self._mcp_log_fp,
@@ -147,7 +147,7 @@ class McpRuntime:
         env["CERT_MCP_WEB_USERNAME"] = self._web_username
         env["CERT_MCP_WEB_PASSWORD"] = self._web_password
         self._web_proc = subprocess.Popen(
-            [sys.executable, "-m", "src.mcp_web"],
+            [sys.executable, "-m", "src.mcp.web"],
             cwd=str(BASE_DIR),
             env=env,
             stdout=self._web_log_fp,

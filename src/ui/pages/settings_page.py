@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QProgressDialog,
     QScrollArea,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -38,7 +39,7 @@ from qfluentwidgets import (
 )
 
 from src.config import BASE_DIR, DB_PATH, LOG_DIR
-from src.mcp_runtime import get_mcp_runtime
+from src.mcp.runtime import get_mcp_runtime
 from src.services.import_export import ImportResult
 from src.services.major_importer import read_major_catalog_from_csv, read_majors_from_excel
 from src.services.school_importer import read_school_list
@@ -885,8 +886,11 @@ class SettingsPage(BasePage):
         self.award_import_btn.clicked.connect(self._import_awards)
         self.award_export_btn = PushButton("导出全部荣誉 (CSV)")
         self.award_export_btn.clicked.connect(self._export_awards)
+        self.award_template_btn = PushButton("下载导入模板 (XLSX)")
+        self.award_template_btn.clicked.connect(self._download_awards_template_xlsx)
         btn_row.addWidget(self.award_import_btn)
         btn_row.addWidget(self.award_export_btn)
+        btn_row.addWidget(self.award_template_btn)
 
         self.award_dry_run = CheckBox("仅预检（不写入数据库）")
         self.award_dry_run.setChecked(False)
@@ -966,22 +970,55 @@ class SettingsPage(BasePage):
         header.addStretch()
         card_layout.addLayout(header)
 
-        # 列头
-        head_row = QHBoxLayout()
-        head_row.setSpacing(8)
-        head_row.addWidget(self._make_header_label("显示名", 180))
-        head_row.addWidget(self._make_header_label("Key", 170))
-        head_row.addWidget(self._make_header_label("默认勾选", 80))
-        head_row.addWidget(self._make_header_label("启用", 60))
-        head_row.addWidget(self._make_header_label("排序", 120))
-        head_row.addWidget(self._make_header_label("操作", 120))
-        card_layout.addLayout(head_row)
-
         self.flags_container = QWidget()
-        self.flags_layout = QVBoxLayout(self.flags_container)
-        self.flags_layout.setContentsMargins(0, 4, 0, 0)
-        self.flags_layout.setSpacing(6)
-        card_layout.addWidget(self.flags_container)
+        # 表格区域过宽会导致列间空隙过大，这里限制最大宽度并居中展示
+        self.flags_container.setMaximumWidth(1140)
+        self.flags_layout = QGridLayout(self.flags_container)
+        self.flags_layout.setContentsMargins(0, 8, 0, 0)
+        self.flags_layout.setHorizontalSpacing(12)
+        self.flags_layout.setVerticalSpacing(10)
+
+        name_h = self._make_header_label("显示名")
+        name_h.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        key_h = self._make_header_label("Key")
+        key_h.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        default_h = self._make_header_label("默认勾选")
+        default_h.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        enabled_h = self._make_header_label("启用")
+        enabled_h.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        sort_h = self._make_header_label("排序")
+        sort_h.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        ops_h = self._make_header_label("操作")
+        ops_h.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.flags_layout.addWidget(name_h, 0, 0)
+        self.flags_layout.addWidget(key_h, 0, 1)
+        self.flags_layout.addWidget(default_h, 0, 2)
+        self.flags_layout.addWidget(enabled_h, 0, 3)
+        self.flags_layout.addWidget(sort_h, 0, 4)
+        self.flags_layout.addWidget(ops_h, 0, 5)
+
+        self.flags_layout.setColumnMinimumWidth(0, 220)
+        self.flags_layout.setColumnMinimumWidth(1, 180)
+        self.flags_layout.setColumnMinimumWidth(2, 90)
+        self.flags_layout.setColumnMinimumWidth(3, 70)
+        self.flags_layout.setColumnMinimumWidth(4, 140)
+        self.flags_layout.setColumnMinimumWidth(5, 140)
+
+        # 让“显示名/Key”随容器宽度扩展，其他列保持紧凑，整体随窗口自适应
+        self.flags_layout.setColumnStretch(0, 5)
+        self.flags_layout.setColumnStretch(1, 3)
+        self.flags_layout.setColumnStretch(2, 0)
+        self.flags_layout.setColumnStretch(3, 0)
+        self.flags_layout.setColumnStretch(4, 0)
+        self.flags_layout.setColumnStretch(5, 0)
+        table_wrap = QWidget()
+        table_row = QHBoxLayout(table_wrap)
+        table_row.setContentsMargins(0, 0, 0, 0)
+        table_row.addStretch()
+        table_row.addWidget(self.flags_container)
+        table_row.addStretch()
+        card_layout.addWidget(table_wrap)
 
         return card
 
@@ -1087,11 +1124,9 @@ class SettingsPage(BasePage):
 
     # ---- 自定义开关 ----
     def _refresh_flags(self) -> None:
-        # 清空布局
-        while self.flags_layout.count():
-            item = self.flags_layout.takeAt(0)
-            widget = item.widget()
-            if widget:
+        for row in self.flag_rows:
+            for widget in row.get("cells", []):
+                self.flags_layout.removeWidget(widget)
                 widget.deleteLater()
         self.flag_rows.clear()
 
@@ -1099,85 +1134,98 @@ class SettingsPage(BasePage):
         for flag in flags:
             self._add_flag_row(flag)
 
-        self.flags_layout.addStretch()
+        self._render_flag_rows()
 
     def _add_flag_row(self, flag) -> None:
-        row_widget = QWidget()
-        row_layout = QHBoxLayout(row_widget)
-        row_layout.setContentsMargins(0, 0, 0, 0)
-        row_layout.setSpacing(8)
-
-        name_edit = LineEdit(parent=row_widget)
+        name_edit = LineEdit(parent=self.flags_container)
         name_edit.setText(flag.label)
         name_edit.setMinimumWidth(180)
-        row_layout.addWidget(name_edit)
+        name_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
-        key_label = QLabel(flag.key)
+        key_label = QLabel(flag.key, parent=self.flags_container)
         key_label.setMinimumWidth(170)
-        row_layout.addWidget(key_label)
+        key_label.setStyleSheet("color: #bdbdbd;" if self.theme_manager.is_dark else "color: #666;")
+        key_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
-        default_cb = CheckBox()
+        default_cb = CheckBox(parent=self.flags_container)
         default_cb.setChecked(bool(flag.default_value))
-        row_layout.addWidget(default_cb)
+        default_cb.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
 
-        enabled_cb = CheckBox()
+        enabled_cb = CheckBox(parent=self.flags_container)
         enabled_cb.setChecked(bool(flag.enabled))
-        row_layout.addWidget(enabled_cb)
+        enabled_cb.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
 
-        sort_row = QHBoxLayout()
-        up_btn = PushButton("上移")
-        down_btn = PushButton("下移")
-        up_btn.setFixedWidth(50)
-        down_btn.setFixedWidth(50)
+        sort_wrap = QWidget(parent=self.flags_container)
+        sort_row = QHBoxLayout(sort_wrap)
+        sort_row.setContentsMargins(0, 0, 0, 0)
+        sort_row.setSpacing(8)
+        up_btn = PushButton("上移", parent=sort_wrap)
+        down_btn = PushButton("下移", parent=sort_wrap)
+        up_btn.setFixedWidth(56)
+        down_btn.setFixedWidth(56)
         sort_row.addWidget(up_btn)
         sort_row.addWidget(down_btn)
-        sort_row.addStretch()
-        sort_wrap = QWidget()
-        sort_wrap.setLayout(sort_row)
-        sort_wrap.setMinimumWidth(120)
-        row_layout.addWidget(sort_wrap)
+        sort_wrap.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
 
-        ops_row = QHBoxLayout()
-        edit_btn = PushButton("编辑")
-        edit_btn.setFixedWidth(50)
-        del_btn = PushButton("删除")
-        del_btn.setFixedWidth(50)
+        ops_wrap = QWidget(parent=self.flags_container)
+        ops_row = QHBoxLayout(ops_wrap)
+        ops_row.setContentsMargins(0, 0, 0, 0)
+        ops_row.setSpacing(8)
+        edit_btn = PushButton("编辑", parent=ops_wrap)
+        del_btn = PushButton("删除", parent=ops_wrap)
+        edit_btn.setFixedWidth(56)
+        del_btn.setFixedWidth(56)
         ops_row.addWidget(edit_btn)
         ops_row.addWidget(del_btn)
-        ops_row.addStretch()
-        ops_wrap = QWidget()
-        ops_wrap.setLayout(ops_row)
-        ops_wrap.setMinimumWidth(120)
-        row_layout.addWidget(ops_wrap)
-
-        self.flags_layout.addWidget(row_widget)
+        ops_wrap.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
 
         row_data = {
             "id": flag.id,
-            "widget": row_widget,
             "name": name_edit,
             "default": default_cb,
             "enabled": enabled_cb,
             "key": flag.key,
+            "cells": [name_edit, key_label, default_cb, enabled_cb, sort_wrap, ops_wrap],
+            "key_label": key_label,
+            "sort_wrap": sort_wrap,
+            "ops_wrap": ops_wrap,
         }
         self.flag_rows.append(row_data)
 
-        up_btn.clicked.connect(lambda _=None, w=row_widget: self._move_flag_row(w, -1))
-        down_btn.clicked.connect(lambda _=None, w=row_widget: self._move_flag_row(w, 1))
+        up_btn.clicked.connect(lambda _=None, fid=flag.id: self._move_flag_row(fid, -1))
+        down_btn.clicked.connect(lambda _=None, fid=flag.id: self._move_flag_row(fid, 1))
         del_btn.clicked.connect(lambda _=None, fid=flag.id, label=flag.label: self._delete_flag(fid, label))
         edit_btn.clicked.connect(lambda _=None, f=flag: self._edit_flag_dialog(f))
 
-    def _move_flag_row(self, widget: QWidget, delta: int) -> None:
-        idx = next((i for i, r in enumerate(self.flag_rows) if r["widget"] == widget), -1)
+    def _render_flag_rows(self) -> None:
+        self.flags_container.setUpdatesEnabled(False)
+        try:
+            for row in self.flag_rows:
+                for widget in row.get("cells", []):
+                    self.flags_layout.removeWidget(widget)
+
+            for i, row in enumerate(self.flag_rows, start=1):
+                self.flags_layout.addWidget(row["name"], i, 0)
+                self.flags_layout.addWidget(row["key_label"], i, 1)
+                self.flags_layout.addWidget(row["default"], i, 2, alignment=Qt.AlignmentFlag.AlignCenter)
+                self.flags_layout.addWidget(row["enabled"], i, 3, alignment=Qt.AlignmentFlag.AlignCenter)
+                self.flags_layout.addWidget(row["sort_wrap"], i, 4, alignment=Qt.AlignmentFlag.AlignCenter)
+                self.flags_layout.addWidget(
+                    row["ops_wrap"], i, 5, alignment=Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                )
+            self.flags_layout.setRowStretch(len(self.flag_rows) + 1, 1)
+        finally:
+            self.flags_container.setUpdatesEnabled(True)
+
+    def _move_flag_row(self, flag_id: int, delta: int) -> None:
+        idx = next((i for i, r in enumerate(self.flag_rows) if r["id"] == flag_id), -1)
         if idx < 0:
             return
         new_idx = idx + delta
         if not 0 <= new_idx < len(self.flag_rows):
             return
         self.flag_rows[idx], self.flag_rows[new_idx] = self.flag_rows[new_idx], self.flag_rows[idx]
-
-        self.flags_layout.removeWidget(widget)
-        self.flags_layout.insertWidget(new_idx, widget)
+        self._render_flag_rows()
 
     def _add_flag_dialog(self) -> None:
         dialog = FlagDialog(parent=self.window())
@@ -1264,6 +1312,27 @@ class SettingsPage(BasePage):
         except Exception as exc:
             self.logger.exception("Export awards failed: %s", exc)
             InfoBar.error("导出失败", str(exc), parent=self.window())
+
+    def _download_awards_template_xlsx(self) -> None:
+        save_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "保存导入模板 (XLSX)",
+            str(Path("exports/awards_template.xlsx").resolve()),
+            "Excel 文件 (*.xlsx)",
+        )
+        if not save_path:
+            return
+        path = Path(save_path)
+        if path.suffix.lower() != ".xlsx":
+            path = path.with_suffix(".xlsx")
+        try:
+            template = self.ctx.importer.get_awards_template_path("xlsx")
+            path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(template, path)
+            InfoBar.success("已保存", path.name, parent=self.window())
+        except Exception as exc:
+            self.logger.exception("Save awards template failed: %s", exc)
+            InfoBar.error("保存失败", str(exc), parent=self.window())
 
     def _create_stat_block(self, title: str, value_label: QLabel) -> QWidget:
         wrapper = QWidget()

@@ -18,10 +18,10 @@ from mcp.server.fastmcp import FastMCP
 from sqlalchemy import select, text
 from sqlalchemy.orm import selectinload
 
-from .app_context import AppContext, bootstrap
-from .config import ATTACHMENTS_DIR, BASE_DIR, DB_PATH, TEMPLATES_DIR
-from .data.models import Attachment, Award, AwardMember, Base, Major, School, TeamMember
-from .mcp_helpers import Transport, parse_transport, safe_int, to_bool
+from ..app_context import AppContext, bootstrap
+from ..config import ATTACHMENTS_DIR, BASE_DIR, DB_PATH, TEMPLATES_DIR
+from ..data.models import Attachment, Award, AwardMember, Base, Major, School, TeamMember
+from .helpers import Transport, parse_transport, safe_int, to_bool
 
 DEBUG = to_bool(os.getenv("CERT_MCP_DEBUG"), False)
 app: AppContext = bootstrap(debug=DEBUG)
@@ -35,6 +35,7 @@ REDACT_PII = to_bool(
     os.getenv("CERT_MCP_REDACT_PII"),
     to_bool(app.settings.get("mcp_redact_pii", "true"), True),
 )
+
 
 def _parse_max_bytes(raw: str | None, fallback: int) -> int:
     if raw is None:
@@ -203,6 +204,7 @@ def read_agents() -> str:
     path = BASE_DIR / "AGENTS.md"
     return path.read_text(encoding="utf-8")
 
+
 @mcp.resource("schema://models")
 def schema_models() -> str:
     """返回 SQLAlchemy 模型字段摘要（JSON）。"""
@@ -275,9 +277,13 @@ def list_awards(
             else:
                 raise ValueError("invalid order_by")
 
-            stmt = stmt.options(
-                selectinload(Award.award_members).selectinload(AwardMember.member),
-            ).offset(offset).limit(limit)
+            stmt = (
+                stmt.options(
+                    selectinload(Award.award_members).selectinload(AwardMember.member),
+                )
+                .offset(offset)
+                .limit(limit)
+            )
             items = session.scalars(stmt).all()
             return {"items": [_serialize_award(a) for a in items], "count": len(items)}
     except Exception as exc:
@@ -326,8 +332,12 @@ def search_awards(
             return {"items": [], "count": 0}
         id_rank = {award_id: idx for idx, award_id in enumerate(ids)}
         with app.db.session_scope() as session:
-            stmt = select(Award).where(Award.id.in_(ids)).options(
-                selectinload(Award.award_members).selectinload(AwardMember.member),
+            stmt = (
+                select(Award)
+                .where(Award.id.in_(ids))
+                .options(
+                    selectinload(Award.award_members).selectinload(AwardMember.member),
+                )
             )
             if not include_deleted:
                 stmt = stmt.where(Award.deleted.is_(False))

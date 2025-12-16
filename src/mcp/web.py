@@ -11,7 +11,7 @@ import json
 import os
 from typing import Any
 
-from . import mcp_server
+from . import server as mcp_server
 
 
 def _pretty(value: Any) -> str:

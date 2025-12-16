@@ -51,6 +51,7 @@
 - [🚀 快速开始](#-快速开始)
   - [📥 安装步骤](#-安装步骤)
   - [🛠️ 常用命令](#️-常用命令)
+  - [🤖 MCP / AI 接入](#-mcp--ai-接入)
   - [📂 文件目录说明](#-文件目录说明)
   - [🏗️ 项目架构](#️-项目架构)
   - [💾 数据模型](#-数据模型)
@@ -118,7 +119,8 @@
 - **荣誉管理**: 完整字段录入 (比赛/日期/级别/等级/证书号)，多成员动态卡片管理。
 - **智能搜索**: 基于 2025 教育部目录，支持中文/拼音/代码模糊搜索，自动回退匹配。
 - **高级筛选**: 多维度排序 (8种)，组合筛选 (等级/奖项/日期)，CSV/XLSX 导入导出。
-- **系统设置**: 自动备份频率，数据目录迁移，日志级别控制，一键重置。
+- **系统设置**: 自动备份频率，数据目录迁移，日志级别控制，一键重置；提供 MCP 服务开关、Web 依赖安装入口与导入模板下载。
+- **AI 接入**: 内置本地 MCP（stdio/SSE）与可选 Web 控制台，默认只读，支持 PII 脱敏与写入开关。
 
 ---
 
@@ -132,6 +134,10 @@
 | ![QFluentWidgets](https://img.shields.io/badge/QFluentWidgets-Fluent_UI-0078D4?style=for-the-badge&logo=microsoft&logoColor=white) | ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-ORM-D71F00?style=for-the-badge&logo=sqlalchemy&logoColor=white) | ![Ruff](https://img.shields.io/badge/Ruff-Linter-FCC21B?style=for-the-badge&logo=python&logoColor=black) |
 
 </div>
+
+- **AI/MCP**：`mcp`（FastMCP），支持 stdio/SSE；可选 `gradio` Web 控制台
+- **日志**：`loguru`（应用日志与 MCP 进程日志输出到 `logs/`）
+- **类型检查**：`pyright`（标准模式）+ `ruff`（风格/未使用项）
 
 ---
 
@@ -218,20 +224,86 @@
 | **调试** | `uv run python -m src.main --debug` | 开启调试日志 |
 | **检查** | `uv run ruff check .` | 代码 Lint 检查 |
 | **格式化** | `uv run ruff format .` | 代码自动格式化 |
-| **MCP 服务** | `uv run certificate-mcp` | 启动 MCP（默认只读） |
+| **MCP 服务** | `uv run certificate-mcp` | 启动 MCP（默认 stdio，只读） |
+| **MCP SSE** | `CERT_MCP_TRANSPORT=sse uv run certificate-mcp` | 启动 SSE（默认 `http://127.0.0.1:8000/sse`；推荐用设置页随软件启动） |
 | **MCP Web** | `uv run certificate-mcp-web` | 启动本地 Web 控制台（需安装可选依赖） |
 
 ---
 
 ### 🤖 MCP / AI 接入
 
-- **默认只读**：`uv run certificate-mcp`
-- **可选 Web 控制台**：
-  - 安装：`uv sync --group mcp-web`
+- **推荐方式：stdio（由客户端拉起进程）**
+  - 启动：`uv run certificate-mcp`
+  - 适用：支持“本地命令型 MCP”的客户端（无需开端口）
+- **可选方式：SSE（本地 URL）**
+  - URL：`http://127.0.0.1:8000/sse`
+  - 启动（推荐）：设置页 → MCP 服务 → 开启“随软件启动 MCP”
+  - 启动（手动）：`CERT_MCP_TRANSPORT=sse CERT_MCP_PORT=8000 uv run certificate-mcp`
+  - 日志：`logs/mcp_sse.log`
+
+<details>
+<summary><strong>Windows PowerShell 启动 SSE（手动）</strong></summary>
+
+```powershell
+$env:CERT_MCP_TRANSPORT = "sse"
+$env:CERT_MCP_HOST = "127.0.0.1"
+$env:CERT_MCP_PORT = "8000"
+uv run certificate-mcp
+```
+
+</details>
+- **可选：Web 控制台（便于调试/验收 MCP 输出）**
+  - 安装依赖：`uv sync --group mcp-web`（也可在设置页一键安装/更新）
   - 运行：`uv run certificate-mcp-web`（默认 `127.0.0.1:7860`）
-- **配置入口**：设置页 → MCP 服务（可改用户名/密码、端口、写开关、脱敏开关，修改后需重启对应进程）
-- **环境变量覆盖**：`CERT_MCP_ALLOW_WRITE`、`CERT_MCP_MAX_BYTES`、`CERT_MCP_DEBUG`
-- **常用能力**：`health`、`list_awards`、`search_awards`、`get_award`、`read_attachment`，以及资源 `schema://models`、`templates://awards_csv`
+  - 认证：使用设置页配置的用户名/密码（修改后需重启 MCP Web 进程生效）
+  - 日志：`logs/mcp_web.log`（安装/更新日志见 `logs/mcp_web_install.log`）
+- **权限与安全**
+  - 默认只读：不允许写入数据库/文件；可在设置页或 `CERT_MCP_ALLOW_WRITE=1` 开启（仅本地自用）
+  - 附件读取限额：`CERT_MCP_MAX_BYTES`（默认 1MB），避免一次读取超大文件
+  - PII 脱敏：`CERT_MCP_REDACT_PII`（默认开启），对身份证/手机号等做掩码处理
+  - 本项目 MCP 仅供本地使用：请保持绑定 `127.0.0.1`，不要对公网/局域网暴露端口
+- **环境变量（常用）**
+  - MCP：`CERT_MCP_TRANSPORT`（stdio/sse/streamable-http）、`CERT_MCP_HOST`、`CERT_MCP_PORT`、`CERT_MCP_ALLOW_WRITE`、`CERT_MCP_REDACT_PII`、`CERT_MCP_MAX_BYTES`、`CERT_MCP_DEBUG`
+  - MCP Web：`CERT_MCP_WEB_HOST`、`CERT_MCP_WEB_PORT`、`CERT_MCP_WEB_USERNAME`、`CERT_MCP_WEB_PASSWORD`、`CERT_MCP_WEB_INBROWSER`
+- **能力概览**
+  - Tools：`health`、`list_awards`、`search_awards`、`get_award`、`list_members`、`get_member`、`read_attachment`
+  - Resources：`schema://models`、`templates://awards_csv`
+
+<details>
+<summary><strong>📎 客户端配置示例（stdio）</strong></summary>
+
+```json
+{
+  "mcpServers": {
+    "certificate": {
+      "command": "uv",
+      "args": ["run", "certificate-mcp"],
+      "env": {
+        "CERT_MCP_ALLOW_WRITE": "0",
+        "CERT_MCP_REDACT_PII": "1"
+      }
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><strong>📎 客户端配置示例（SSE）</strong></summary>
+
+```json
+{
+  "mcpServers": {
+    "certificate": {
+      "type": "sse",
+      "url": "http://127.0.0.1:8000/sse"
+    }
+  }
+}
+```
+
+</details>
 
 ## 📂 文件目录说明
 
@@ -252,10 +324,11 @@ Certificate-Management/
 │   ├── 🌍 app_context.py           # DI 容器
 │   ├── ⚙️ config.py                # 配置加载
 │   ├── 📝 logger.py                # 日志配置
-│   ├── 🤖 mcp_server.py            # MCP 服务端（默认只读）
-│   ├── 🌐 mcp_web.py               # MCP 本地 Web 控制台（可选）
-│   ├── 🧩 mcp_helpers.py           # MCP 配置/解析辅助
-│   ├── ⚙️ mcp_runtime.py           # MCP 进程/自启动管理（本地）
+│   ├── 🤖 mcp/                     # MCP 模块（本地）
+│   │   ├── server.py               # MCP 服务端（默认只读）
+│   │   ├── web.py                  # MCP 本地 Web 控制台（可选）
+│   │   ├── helpers.py              # MCP 配置/解析辅助
+│   │   └── runtime.py              # MCP 进程/自启动管理（本地）
 │   │
 │   ├── 💾 data/                    # 数据层
 │   │   ├── models.py               # SQLAlchemy 模型
@@ -446,6 +519,7 @@ flowchart TD
 | **界面文字乱码** | 字体缺失或编码问题 | 检查系统字体，确认未强制覆盖 `QFontDatabase` |
 | **数据库被锁** | 异常退出导致锁文件残留 | 关闭应用，删除 `data/awards.db-shm` 和 `.db-wal` |
 | **导入无响应** | 模板格式错误 | 确认 CSV/XLSX 表头与模板一致，查看设置页日志 |
+| **MCP 连接失败** | 端口未启动/URL 错误/依赖缺失 | SSE：确认 `http://127.0.0.1:8000/sse` 且设置页已启动；Web：先 `uv sync --group mcp-web`，再用设置页用户名/密码登录 |
 | **主题不更新** | 信号未连接 | 检查 `__init__` 是否连接 `themeChanged` 信号 |
 | **附件校验失败** | 文件被占用或修改 | 检查文件权限，清空回收站后重试 |
 
