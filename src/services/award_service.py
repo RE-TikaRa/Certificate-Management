@@ -43,9 +43,7 @@ class AwardService:
                 certificate_code=certificate_code,
                 remarks=remarks,
             )
-            # 处理成员信息（可能是字符串或字典）
-            members = [self._get_or_create_member_with_info(session, item) for item in member_names]
-            self._set_award_members(award, members)
+            snapshot_names = self._set_award_members(session, award, member_names)
             session.add(award)
             session.flush()
 
@@ -58,7 +56,7 @@ class AwardService:
                 )
             if flag_values and self.flags:
                 self.flags.set_award_flags(award.id, flag_values)
-            self._refresh_award_fts(award, members)
+            self._refresh_award_fts(award, snapshot_names)
             return award
 
     def list_members(self) -> list[TeamMember]:
@@ -149,11 +147,34 @@ class AwardService:
         )
         return member
 
-    def _set_award_members(self, award: Award, members: Sequence[TeamMember]) -> None:
-        """重建 award_members 关联并写入排序索引"""
+    def _set_award_members(self, session, award: Award, members: Sequence[str] | Sequence[dict]) -> list[str]:
+        """重建 award_members（支持“可选入库”的成员快照）"""
         award.award_members.clear()
-        for index, member in enumerate(members):
-            award.award_members.append(AwardMember(member=member, sort_order=index))
+        snapshot_names: list[str] = []
+        for index, item in enumerate(members):
+            if isinstance(item, str):
+                name = item.strip()
+                if not name:
+                    continue
+                award.award_members.append(AwardMember(member_name=name, sort_order=index))
+                snapshot_names.append(name)
+                continue
+
+            name = str(item.get("name", "")).strip()
+            if not name:
+                continue
+
+            join_library = bool(item.get("join_member_library", False))
+            if join_library:
+                member_info = {k: v for k, v in item.items() if k not in {"join_member_library"} and v}
+                member_info["name"] = name
+                member = self._get_or_create_member_with_info(session, member_info)
+                award.award_members.append(AwardMember(member=member, member_name=name, sort_order=index))
+                snapshot_names.append(name)
+            else:
+                award.award_members.append(AwardMember(member_name=name, sort_order=index))
+                snapshot_names.append(name)
+        return snapshot_names
 
     def list_awards(self) -> list[Award]:
         """获取所有未删除的荣誉记录（按日期降序排列）"""
@@ -239,11 +260,10 @@ class AwardService:
 
             # Update member associations
             if member_names is not None:
-                members = [self._get_or_create_member_with_info(session, item) for item in member_names]
-                self._set_award_members(award, members)
-                self._refresh_award_fts(award, members)
+                snapshot_names = self._set_award_members(session, award, member_names)
+                self._refresh_award_fts(award, snapshot_names)
             else:
-                self._refresh_award_fts(award, award.members)
+                self._refresh_award_fts(award, award.member_names)
 
             session.add(award)
             session.flush()  # Validate before commit
@@ -346,8 +366,8 @@ class AwardService:
                 results = sorted(results, key=lambda a: order.get(a.id, len(order)))
             return results
 
-    def _refresh_award_fts(self, award: Award, members: Sequence[TeamMember]) -> None:
-        member_names = " ".join(member.name for member in members)
+    def _refresh_award_fts(self, award: Award, members: Sequence[str]) -> None:
+        member_names = " ".join(members)
         self.db.upsert_award_fts(
             award.id,
             award.competition_name,
@@ -435,7 +455,7 @@ class AwardService:
                 award.deleted = False
                 award.deleted_at = None
                 session.add(award)
-                self._refresh_award_fts(award, award.members)
+                self._refresh_award_fts(award, award.member_names)
 
     def permanently_delete_award(self, award_id: int) -> None:
         """彻底删除荣誉记录（不可恢复）"""

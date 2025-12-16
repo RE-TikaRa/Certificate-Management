@@ -48,6 +48,55 @@ class Database:
                 self._ensure_column(connection, "majors", "class_name", "TEXT")
             if "schools" in tables:
                 self._ensure_column(connection, "schools", "region", "TEXT")
+            if "award_members" in tables:
+                self._migrate_award_members_to_snapshot(connection, inspector)
+
+    def _migrate_award_members_to_snapshot(self, connection, inspector) -> None:
+        cols = {c["name"] for c in inspector.get_columns("award_members")}
+        if "member_name" in cols and "id" in cols:
+            return
+
+        logging.getLogger(__name__).info("Migrating award_members to snapshot schema")
+        connection.execute(text("PRAGMA foreign_keys=OFF"))
+        connection.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS award_members_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    award_id INTEGER NOT NULL,
+                    member_id INTEGER,
+                    member_name TEXT NOT NULL,
+                    sort_order INTEGER NOT NULL DEFAULT 0,
+                    FOREIGN KEY(award_id) REFERENCES awards(id) ON DELETE CASCADE,
+                    FOREIGN KEY(member_id) REFERENCES team_members(id) ON DELETE SET NULL
+                )
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                INSERT INTO award_members_new (award_id, member_id, member_name, sort_order)
+                SELECT am.award_id,
+                       am.member_id,
+                       COALESCE(tm.name, '') AS member_name,
+                       COALESCE(am.sort_order, 0) AS sort_order
+                FROM award_members am
+                LEFT JOIN team_members tm ON tm.id = am.member_id
+                """
+            )
+        )
+        connection.execute(text("DROP TABLE award_members"))
+        connection.execute(text("ALTER TABLE award_members_new RENAME TO award_members"))
+        connection.execute(text("CREATE INDEX IF NOT EXISTS ix_award_members_award_id ON award_members (award_id)"))
+        connection.execute(text("CREATE INDEX IF NOT EXISTS ix_award_members_member_id ON award_members (member_id)"))
+        connection.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_award_members_award_sort "
+                "ON award_members (award_id, sort_order)"
+            )
+        )
+        connection.execute(text("PRAGMA foreign_keys=ON"))
 
     def _ensure_fts(self) -> None:
         """创建 FTS5 虚表（如果可用）"""
@@ -178,18 +227,14 @@ class Database:
         if awards_count == 0 or members_count == 0:
             logging.getLogger(__name__).info("Rebuilding FTS indexes (awards=%s, members=%s)", awards_count, members_count)
             try:
-                from .models import Award, AwardMember, TeamMember
-                from sqlalchemy import select
-
                 with self.engine.begin() as connection:
                     if awards_count == 0:
                         rows = connection.execute(
                             text(
                                 "SELECT a.id, a.competition_name, a.certificate_code, "
-                                "GROUP_CONCAT(tm.name, ' ') AS member_names "
+                                "GROUP_CONCAT(am.member_name, ' ') AS member_names "
                                 "FROM awards a "
                                 "LEFT JOIN award_members am ON am.award_id = a.id "
-                                "LEFT JOIN team_members tm ON tm.id = am.member_id "
                                 "GROUP BY a.id"
                             )
                         ).fetchall()

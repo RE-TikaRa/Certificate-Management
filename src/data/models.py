@@ -39,15 +39,19 @@ class AwardMember(Base):
     __tablename__ = "award_members"
 
     # Exclude Base columns that don't exist in the legacy table
-    id = cast("Mapped[int]", None)
     created_at = cast("Mapped[datetime]", None)
     updated_at = cast("Mapped[datetime]", None)
 
-    award_id: Mapped[int] = mapped_column(ForeignKey("awards.id", ondelete="CASCADE"), primary_key=True)
-    member_id: Mapped[int] = mapped_column(ForeignKey("team_members.id", ondelete="CASCADE"), primary_key=True)
+    award_id: Mapped[int] = mapped_column(ForeignKey("awards.id", ondelete="CASCADE"), index=True)
+    member_id: Mapped[int | None] = mapped_column(
+        ForeignKey("team_members.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    member_name: Mapped[str] = mapped_column(String(128), nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
 
-    member: Mapped["TeamMember"] = relationship(back_populates="award_associations")
+    member: Mapped["TeamMember | None"] = relationship(back_populates="award_associations")
     award: Mapped["Award"] = relationship(back_populates="award_members")
 
 
@@ -69,12 +73,11 @@ class Award(Base):
         order_by="AwardMember.sort_order",
         cascade="all, delete-orphan",
     )
-    members: AssociationProxy[list["TeamMember"]] = association_proxy(
-        "award_members",
-        "member",
-        creator=lambda m: AwardMember(member=m),
-    )
     attachments: Mapped[list["Attachment"]] = relationship(back_populates="award", cascade="all, delete-orphan")
+
+    @property
+    def member_names(self) -> list[str]:
+        return [assoc.member_name for assoc in self.award_members]
 
 
 class TeamMember(Base):
@@ -96,14 +99,7 @@ class TeamMember(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     sort_index: Mapped[int] = mapped_column(Integer, default=0)
 
-    award_associations: Mapped[list["AwardMember"]] = relationship(
-        back_populates="member", cascade="all, delete-orphan"
-    )
-    awards: AssociationProxy[list["Award"]] = association_proxy(
-        "award_associations",
-        "award",
-        creator=lambda a: AwardMember(award=a),
-    )
+    award_associations: Mapped[list["AwardMember"]] = relationship(back_populates="member")
 
 
 class Attachment(Base):

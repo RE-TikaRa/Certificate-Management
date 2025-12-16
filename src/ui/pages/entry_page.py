@@ -328,6 +328,10 @@ class EntryPage(BasePage):
         member_label = QLabel(f"成员 #{member_index}")
         member_label.setStyleSheet("font-weight: bold; font-size: 13px;")
         header_layout.addWidget(member_label)
+
+        join_checkbox = CheckBox("加入成员库")
+        join_checkbox.setChecked(False)
+        header_layout.addWidget(join_checkbox)
         header_layout.addStretch()
 
         # 上移按钮
@@ -400,6 +404,7 @@ class EntryPage(BasePage):
 
         # 存储该成员的所有字段输入框
         member_fields = {}
+        label_widgets: dict[str, QLabel] = {}
 
         # 首先创建所有输入框
         for field_name, label in zip(field_names, field_labels, strict=False):
@@ -426,6 +431,21 @@ class EntryPage(BasePage):
 
             form_grid.addWidget(label_widget, row, col, alignment=Qt.AlignmentFlag.AlignCenter)
             form_grid.addWidget(member_fields[field_name], row, col + 1)
+            label_widgets[field_name] = label_widget
+
+        def _apply_join_state(checked: bool) -> None:
+            for field_name in field_names:
+                if field_name == "name":
+                    continue
+                widget = member_fields.get(field_name)
+                label_widget = label_widgets.get(field_name)
+                if widget is not None:
+                    widget.setVisible(checked)
+                if label_widget is not None:
+                    label_widget.setVisible(checked)
+
+        join_checkbox.toggled.connect(_apply_join_state)
+        _apply_join_state(join_checkbox.isChecked())
 
         member_layout.addLayout(form_grid)
         self._connect_member_field_signals(member_fields)
@@ -434,7 +454,7 @@ class EntryPage(BasePage):
         import_btn.clicked.connect(lambda: self._import_from_doc(member_fields))
 
         # 从历史成员选择按钮连接
-        history_btn.clicked.connect(lambda: self._select_from_history(member_fields))
+        history_btn.clicked.connect(lambda: self._select_from_history(member_fields, join_checkbox))
 
         # 移动按钮连接
         up_btn.clicked.connect(lambda: self._move_member_up(member_card))
@@ -444,7 +464,12 @@ class EntryPage(BasePage):
         delete_btn.clicked.connect(lambda: self._remove_member_card(member_card, member_fields))
 
         # 保存成员数据
-        member_data = {"card": member_card, "fields": member_fields, "label": member_label}
+        member_data = {
+            "card": member_card,
+            "fields": member_fields,
+            "label": member_label,
+            "join_checkbox": join_checkbox,
+        }
         self.members_data.append(member_data)
 
         # 添加到列表
@@ -565,7 +590,7 @@ class EntryPage(BasePage):
         if isinstance(college_widget, QLineEdit) and college:
             college_widget.setText(college)
 
-    def _select_from_history(self, member_fields: dict) -> None:
+    def _select_from_history(self, member_fields: dict, join_checkbox: CheckBox) -> None:
         """从历史成员中选择"""
         # 获取所有历史成员
         from ...services.member_service import MemberService
@@ -584,12 +609,13 @@ class EntryPage(BasePage):
             selected_member = dialog.selected_member
             if selected_member:
                 # 填充成员信息到表单
+                join_checkbox.setChecked(True)
                 member_fields["name"].setText(selected_member.name)
-                member_fields["gender"].setText(selected_member.gender)
-                member_fields["id_card"].setText(selected_member.id_card)
-                member_fields["phone"].setText(selected_member.phone)
-                member_fields["student_id"].setText(selected_member.student_id)
-                member_fields["email"].setText(selected_member.email)
+                member_fields["gender"].setText(selected_member.gender or "")
+                member_fields["id_card"].setText(selected_member.id_card or "")
+                member_fields["phone"].setText(selected_member.phone or "")
+                member_fields["student_id"].setText(selected_member.student_id or "")
+                member_fields["email"].setText(selected_member.email or "")
                 # 学校及专业字段特殊处理
                 school_widget = member_fields.get("school")
                 if isinstance(school_widget, SchoolSearchWidget):
@@ -614,7 +640,7 @@ class EntryPage(BasePage):
                     major_code_widget.setText(selected_member.major_code or "")
 
                 member_fields["class_name"].setText(selected_member.class_name)
-                member_fields["college"].setText(selected_member.college)
+                member_fields["college"].setText(selected_member.college or "")
                 InfoBar.success("成功", f"已选择成员: {selected_member.name}", parent=self.window())
 
     def _import_from_doc(self, member_fields: dict) -> None:
@@ -799,24 +825,27 @@ class EntryPage(BasePage):
 
         for member_data in self.members_data:
             member_fields = member_data["fields"]
+            join_checkbox = member_data.get("join_checkbox")
+            join_member_library = bool(join_checkbox.isChecked()) if isinstance(join_checkbox, CheckBox) else True
 
             # 获取姓名，如果有则表示成员有效
             name_widget = member_fields.get("name")
             if isinstance(name_widget, QLineEdit):
                 name = name_widget.text().strip()
                 if name:  # 只记录有姓名的成员
-                    member_info = {"name": name}
+                    member_info = {"name": name, "join_member_library": join_member_library}
 
-                    # 收集其他字段
-                    for field_name in field_names[1:]:
-                        widget = member_fields.get(field_name)
-                        if isinstance(widget, (MajorSearchWidget, SchoolSearchWidget, QLineEdit)):
-                            value = widget.text().strip()
-                        else:
-                            value = ""
+                    if join_member_library:
+                        # 收集其他字段
+                        for field_name in field_names[1:]:
+                            widget = member_fields.get(field_name)
+                            if isinstance(widget, (MajorSearchWidget, SchoolSearchWidget, QLineEdit)):
+                                value = widget.text().strip()
+                            else:
+                                value = ""
 
-                        if value:
-                            member_info[field_name] = value
+                            if value:
+                                member_info[field_name] = value
 
                     members.append(member_info)
         return members
@@ -932,36 +961,45 @@ class EntryPage(BasePage):
             member_data["card"].deleteLater()
         self.members_data.clear()
 
-        for member in award.members:
+        for assoc in award.award_members:
             # 添加新的成员卡片
             self._add_member_row()
 
             # 填充最后添加的成员卡片的数据
             member_data = self.members_data[-1]
             member_fields = member_data["fields"]
+            join_checkbox = member_data.get("join_checkbox")
 
-            # 映射成员数据到表单字段
-            field_mapping = {
-                "name": member.name or "",
-                "gender": member.gender or "",
-                "id_card": member.id_card or "",
-                "phone": member.phone or "",
-                "student_id": member.student_id or "",
-                "email": member.email or "",
-                "school": member.school or "",
-                "school_code": member.school_code or "",
-                "major": member.major or "",
-                "major_code": member.major_code or "",
-                "class_name": member.class_name or "",
-                "college": member.college or "",
-            }
+            member = getattr(assoc, "member", None)
+            member_id = getattr(assoc, "member_id", None)
+            linked = member is not None and member_id is not None
+            if isinstance(join_checkbox, CheckBox):
+                join_checkbox.setChecked(bool(linked))
+
+            field_mapping = {"name": assoc.member_name or ""}
+            if member is not None and member_id is not None:
+                field_mapping.update(
+                    {
+                        "gender": member.gender or "",
+                        "id_card": member.id_card or "",
+                        "phone": member.phone or "",
+                        "student_id": member.student_id or "",
+                        "email": member.email or "",
+                        "school": member.school or "",
+                        "school_code": member.school_code or "",
+                        "major": member.major or "",
+                        "major_code": member.major_code or "",
+                        "class_name": member.class_name or "",
+                        "college": member.college or "",
+                    }
+                )
 
             for field_name, value in field_mapping.items():
                 widget = member_fields.get(field_name)
                 if widget is None:
                     continue
                 if field_name == "school" and isinstance(widget, SchoolSearchWidget):
-                    widget.set_school(member.school or "", member.school_code)
+                    widget.set_school(value or "", member.school_code if member is not None and member_id is not None else None)
                 elif isinstance(widget, MajorSearchWidget):
                     widget.set_text(value)
                 else:

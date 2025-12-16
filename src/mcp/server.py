@@ -163,6 +163,14 @@ def _serialize_attachment(att: Attachment) -> dict[str, Any]:
     }
 
 
+def _serialize_award_member(assoc: AwardMember) -> dict[str, Any]:
+    if assoc.member is None:
+        return {"id": None, "name": assoc.member_name}
+    payload = _serialize_member(assoc.member)
+    payload["name"] = assoc.member_name or payload.get("name")
+    return payload
+
+
 def _serialize_award(award: Award, *, with_members: bool = True, with_attachments: bool = False) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "id": award.id,
@@ -179,7 +187,7 @@ def _serialize_award(award: Award, *, with_members: bool = True, with_attachment
         "updated_at": _iso(award.updated_at),
     }
     if with_members:
-        payload["members"] = [_serialize_member(am.member) for am in award.award_members]
+        payload["members"] = [_serialize_award_member(am) for am in award.award_members]
     if with_attachments:
         payload["attachments"] = [_serialize_attachment(att) for att in award.attachments]
     return payload

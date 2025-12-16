@@ -201,7 +201,7 @@ class DashboardPage(BasePage):
             lambda a: a.level,
             lambda a: a.rank,
             lambda a: str(a.award_date),
-            lambda a: ", ".join(member.name for member in a.members),
+            lambda a: ", ".join(a.member_names),
         ]
         self.recent_model = ObjectTableModel(headers, accessors, self)
         self.recent_table = QTableView()

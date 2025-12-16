@@ -706,7 +706,7 @@ class OverviewPage(BasePage):
         # 日期和人数 - 右上角
         date_people_layout = QVBoxLayout()
         date_text = BodyLabel(award.award_date.strftime("%Y-%m-%d"))
-        people_count = BodyLabel(f"{len(award.members)} 人")
+        people_count = BodyLabel(f"{len(award.member_names)} 人")
         date_people_layout.addWidget(date_text)
         date_people_layout.addWidget(people_count)
         top_layout.addLayout(date_people_layout)
@@ -714,8 +714,8 @@ class OverviewPage(BasePage):
         card_layout.addLayout(top_layout)
 
         # 中部：成员列表
-        if award.members:
-            members_text = ", ".join([m.name for m in award.members])
+        if award.member_names:
+            members_text = ", ".join(award.member_names)
             members_label = BodyLabel(members_text)
             members_label.setWordWrap(True)
             members_label.setStyleSheet("font-size: 12px;")
@@ -1112,8 +1112,8 @@ class AwardDetailDialog(MaskDialogBase):
         members_layout.addWidget(self.members_container)
 
         # 加载已有成员
-        for member in self.award.members:
-            self._add_member_card(member)
+        for assoc in self.award.award_members:
+            self._add_member_card(assoc)
 
         # 添加成员按钮
         add_member_btn = PrimaryPushButton("添加成员")
@@ -1219,7 +1219,7 @@ class AwardDetailDialog(MaskDialogBase):
         except Exception as e:
             logger.error(f"加载附件失败: {e}", exc_info=True)
 
-    def _add_member_card(self, member=None):
+    def _add_member_card(self, assoc=None):
         """添加成员卡片"""
         # 使用 QFrame 并设置 card 属性以使用 QSS 定义的样式
         member_card = QFrame()
@@ -1239,6 +1239,10 @@ class AwardDetailDialog(MaskDialogBase):
         member_label = QLabel(f"成员 #{member_index}")
         member_label.setStyleSheet("font-weight: bold; font-size: 13px;")
         header_layout.addWidget(member_label)
+        join_checkbox = CheckBox("加入成员库")
+        linked_member = getattr(assoc, "member", None) if assoc is not None else None
+        join_checkbox.setChecked(bool(linked_member) and getattr(assoc, "member_id", None) is not None)
+        header_layout.addWidget(join_checkbox)
         header_layout.addStretch()
 
         # 上/下移动按钮
@@ -1309,26 +1313,29 @@ class AwardDetailDialog(MaskDialogBase):
         ]
 
         member_fields = {}
+        label_widgets: dict[str, QLabel] = {}
         for field_name, label in zip(field_names, field_labels, strict=False):
             # 专业字段使用特殊的搜索组件
             if field_name == "major":
                 input_widget = MajorSearchWidget(self.ctx.majors, self.theme_manager, parent=member_card)
-                if member:
-                    value = getattr(member, field_name, "")
+                if linked_member:
+                    value = getattr(linked_member, field_name, "")
                     if value:
                         input_widget.set_text(str(value))
             elif field_name == "school":
                 input_widget = SchoolSearchWidget(self.ctx.schools, self.theme_manager, parent=member_card)
-                if member:
-                    input_widget.set_school(member.school or "", member.school_code)
+                if linked_member:
+                    input_widget.set_school(linked_member.school or "", linked_member.school_code)
             else:
                 input_widget = LineEdit()
                 clean_input_text(input_widget)  # 自动删除空白字符
                 input_widget.setPlaceholderText(f"请输入{label}")
 
                 # 如果是编辑现有成员，填充数据
-                if member:
-                    value = getattr(member, field_name, "")
+                if field_name == "name" and assoc is not None:
+                    input_widget.setText(getattr(assoc, "member_name", "") or "")
+                elif linked_member:
+                    value = getattr(linked_member, field_name, "")
                     if value:
                         input_widget.setText(str(value))
 
@@ -1346,6 +1353,21 @@ class AwardDetailDialog(MaskDialogBase):
 
             form_grid.addWidget(label_widget, row, col, alignment=Qt.AlignmentFlag.AlignCenter)
             form_grid.addWidget(member_fields[field_name], row, col + 1)
+            label_widgets[field_name] = label_widget
+
+        def _apply_join_state(checked: bool) -> None:
+            for field_name in field_names:
+                if field_name == "name":
+                    continue
+                widget = member_fields.get(field_name)
+                label_widget = label_widgets.get(field_name)
+                if widget is not None:
+                    widget.setVisible(checked)
+                if label_widget is not None:
+                    label_widget.setVisible(checked)
+
+        join_checkbox.toggled.connect(_apply_join_state)
+        _apply_join_state(join_checkbox.isChecked())
 
         # 组装
         member_layout.addLayout(header_layout)
@@ -1354,12 +1376,12 @@ class AwardDetailDialog(MaskDialogBase):
 
         # 连接按钮信号
         import_btn.clicked.connect(lambda: self._import_from_doc(member_fields))
-        history_btn.clicked.connect(lambda: self._select_from_history(member_fields))
+        history_btn.clicked.connect(lambda: self._select_from_history(member_fields, join_checkbox))
         delete_btn.clicked.connect(lambda: self._remove_member_card(member_card, member_fields))
         up_btn.clicked.connect(lambda: self._move_member_up(member_card))
         down_btn.clicked.connect(lambda: self._move_member_down(member_card))
 
-        member_data = {"card": member_card, "fields": member_fields, "label": member_label}
+        member_data = {"card": member_card, "fields": member_fields, "label": member_label, "join_checkbox": join_checkbox}
         self.members_data.append(member_data)
         self.members_list_layout.addWidget(member_card)
         self._update_member_indices()
@@ -1626,7 +1648,7 @@ class AwardDetailDialog(MaskDialogBase):
             InfoBar.error("导入失败", f"提取文档信息时出错: {e!s}", parent=self)
             logger.error(f"导入文档失败: {e}", exc_info=True)
 
-    def _select_from_history(self, member_fields: dict) -> None:
+    def _select_from_history(self, member_fields: dict, join_checkbox: CheckBox) -> None:
         """从历史成员中选择"""
         # 获取所有历史成员
         from ...services.member_service import MemberService
@@ -1644,6 +1666,7 @@ class AwardDetailDialog(MaskDialogBase):
         if dialog.exec():
             selected_member = dialog.selected_member
             if selected_member:
+                join_checkbox.setChecked(True)
                 # 填充所有字段
                 member_fields["name"].setText(selected_member.name or "")
                 member_fields["gender"].setText(selected_member.gender or "")
@@ -1834,20 +1857,23 @@ class AwardDetailDialog(MaskDialogBase):
 
         for member_data in self.members_data:
             member_fields = member_data["fields"]
+            join_checkbox = member_data.get("join_checkbox")
+            join_member_library = bool(join_checkbox.isChecked()) if isinstance(join_checkbox, CheckBox) else True
             name_widget = member_fields.get("name")
             if isinstance(name_widget, QLineEdit):
                 name = name_widget.text().strip()
                 if name:
-                    member_info = {"name": name}
-                    for field_name in field_names[1:]:
-                        widget = member_fields.get(field_name)
-                        if isinstance(widget, (MajorSearchWidget, SchoolSearchWidget, QLineEdit)):
-                            value = widget.text().strip()
-                        else:
-                            value = ""
+                    member_info = {"name": name, "join_member_library": join_member_library}
+                    if join_member_library:
+                        for field_name in field_names[1:]:
+                            widget = member_fields.get(field_name)
+                            if isinstance(widget, (MajorSearchWidget, SchoolSearchWidget, QLineEdit)):
+                                value = widget.text().strip()
+                            else:
+                                value = ""
 
-                        if value:
-                            member_info[field_name] = value
+                            if value:
+                                member_info[field_name] = value
                     members.append(member_info)
         return members
 

@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from ..config import TEMPLATES_DIR
 from ..data.database import Database
-from ..data.models import Award, AwardFlagValue, AwardMember, CustomFlag, ImportJob, TeamMember
+from ..data.models import Award, AwardFlagValue, AwardMember, CustomFlag, ImportJob
 from .attachment_manager import AttachmentManager
 
 logger = logging.getLogger(__name__)
@@ -43,7 +43,6 @@ class ImportExportService:
         self.attachments = attachments
         self.flags = flags
         self._ensure_template()
-        self._member_cache: dict[str, TeamMember] = {}
 
     def get_awards_template_path(self, fmt: str = "xlsx") -> Path:
         """返回荣誉导入模板路径（csv/xlsx）。"""
@@ -79,7 +78,7 @@ class ImportExportService:
                 "奖项等级": award.rank,
                 "证书编号": award.certificate_code,
                 "备注": award.remarks,
-                "成员": ",".join(member.name for member in award.members),
+                "成员": ",".join(award.member_names),
                 "附件数量": len(award.attachments),
             }
             if flag_defs:
@@ -105,8 +104,6 @@ class ImportExportService:
         progress_callback: Callable[[int, int, float], None] | None = None,
         dry_run: bool = False,
     ) -> ImportResult:
-        # Cache is only valid within a single import session
-        self._member_cache.clear()
         flag_defs: list[CustomFlag] = self.flags.list_flags(enabled_only=True) if self.flags else []
         try:
             df = pd.read_excel(file_path) if file_path.suffix.lower() == ".xlsx" else pd.read_csv(file_path)
@@ -153,10 +150,7 @@ class ImportExportService:
             session.flush()
 
             members = self._parse_items(str(row.get("成员", "")))
-            member_objs = [self._get_or_create_member(session, name) for name in members]
-            award.award_members = [
-                AwardMember(member=member, sort_order=index) for index, member in enumerate(member_objs)
-            ]
+            award.award_members = [AwardMember(member_name=name, sort_order=index) for index, name in enumerate(members)]
             session.flush()
 
             if flag_defs and not dry_run:
@@ -174,24 +168,13 @@ class ImportExportService:
                 self.attachments.save_attachments(award.id, award.competition_name, files, session=session)
 
             if not dry_run:
-                member_names = " ".join(member.name for member in member_objs)
+                member_names = " ".join(members)
                 self.db.upsert_award_fts(
                     award.id,
                     award.competition_name,
                     award.certificate_code,
                     member_names,
                 )
-                for member in member_objs:
-                    self.db.upsert_member_fts(
-                        member.id,
-                        name=member.name,
-                        pinyin=member.pinyin,
-                        student_id=member.student_id,
-                        phone=member.phone,
-                        email=member.email,
-                        college=member.college,
-                        major=member.major,
-                    )
 
             success += 1
 
@@ -269,16 +252,3 @@ class ImportExportService:
         with self.db.session_scope() as session:
             q = select(ImportJob).order_by(ImportJob.created_at.desc()).limit(max(1, limit))
             return list(session.scalars(q).all())
-
-    def _get_or_create_member(self, session, name: str) -> TeamMember:
-        if name in self._member_cache:
-            return self._member_cache[name]
-        member = session.scalar(select(TeamMember).where(TeamMember.name == name))
-        if member:
-            self._member_cache[name] = member
-            return member
-        member = TeamMember(name=name, pinyin=name)
-        session.add(member)
-        session.flush()
-        self._member_cache[name] = member
-        return member

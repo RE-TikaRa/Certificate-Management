@@ -60,6 +60,10 @@ class MemberService:
             merged = session.merge(member)
             session.add(merged)
             session.flush()
+            session.query(AwardMember).filter(AwardMember.member_id == merged.id).update(
+                {AwardMember.member_name: merged.name},
+                synchronize_session=False,
+            )
             award_ids = list(
                 session.scalars(select(AwardMember.award_id).where(AwardMember.member_id == merged.id)).all()
             )
@@ -83,6 +87,10 @@ class MemberService:
             award_ids = list(
                 session.scalars(select(AwardMember.award_id).where(AwardMember.member_id == member_id)).all()
             )
+            session.query(AwardMember).filter(AwardMember.member_id == member_id).update(
+                {AwardMember.member_id: None},
+                synchronize_session=False,
+            )
             member = session.query(TeamMember).filter(TeamMember.id == member_id).first()
             if member:
                 session.delete(member)
@@ -96,6 +104,10 @@ class MemberService:
         with self.db.session_scope() as session:
             award_ids = list(
                 session.scalars(select(AwardMember.award_id).where(AwardMember.member_id.in_(member_ids))).all()
+            )
+            session.query(AwardMember).filter(AwardMember.member_id.in_(member_ids)).update(
+                {AwardMember.member_id: None},
+                synchronize_session=False,
             )
             stmt = select(TeamMember).where(TeamMember.id.in_(member_ids))
             members = session.execute(stmt).scalars().all()
@@ -124,11 +136,10 @@ class MemberService:
                     Award.id,
                     Award.competition_name,
                     Award.certificate_code,
-                    func.group_concat(TeamMember.name, " ").label("member_names"),
+                    func.group_concat(AwardMember.member_name, " ").label("member_names"),
                 )
                 .select_from(Award)
                 .join(AwardMember, AwardMember.award_id == Award.id, isouter=True)
-                .join(TeamMember, TeamMember.id == AwardMember.member_id, isouter=True)
                 .where(Award.deleted.is_(False), Award.id.in_(unique_ids))
                 .group_by(Award.id)
             )
