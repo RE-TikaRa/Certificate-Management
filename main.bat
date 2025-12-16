@@ -3,6 +3,7 @@ setlocal
 
 set RUN_ARGS=
 set REMAINING_ARGS=
+set IS_DEBUG=0
 
 pushd "%~dp0"
 
@@ -10,6 +11,7 @@ pushd "%~dp0"
 if "%~1"=="" goto run
 if /I "%~1"=="debug" (
     set RUN_ARGS=--debug
+    set IS_DEBUG=1
 ) else (
     set REMAINING_ARGS=%REMAINING_ARGS% "%~1"
 )
@@ -29,5 +31,8 @@ if exist ".venv\Scripts\python.exe" (
     )
 )
 
-endlocal
-pause
+set EXIT_CODE=%errorlevel%
+if %EXIT_CODE% neq 0 pause
+if %IS_DEBUG% neq 0 pause
+popd
+endlocal & exit /b %EXIT_CODE%

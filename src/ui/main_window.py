@@ -182,7 +182,33 @@ class MainWindow(FluentWindow):
             ani_info.deltaY = 100
 
         self.navigate_to("home")
+        self._warm_up_lazy_pages()
         self._register_shortcuts()
+
+    def _warm_up_lazy_pages(self) -> None:
+        """启动后后台预热懒加载页面，减少首次进入的等待。"""
+        pages: list[QWidget] = [
+            self.dashboard_page,
+            self.overview_page,
+            self.entry_page,
+            self.management_page,
+            self.recycle_page,
+            self.settings_page,
+            self.about_page,
+        ]
+
+        def _load_one(index: int) -> None:
+            if index >= len(pages):
+                return
+            page = pages[index]
+            if isinstance(page, LazyPage):
+                try:
+                    page.load()
+                except Exception as exc:
+                    logger.debug("LazyPage warmup failed: %s", exc, exc_info=True)
+            QTimer.singleShot(120, lambda: _load_one(index + 1))
+
+        QTimer.singleShot(1500, lambda: _load_one(0))
 
     def _register_shortcuts(self) -> None:
         """绑定快捷键导航，避免在输入框时误触"""

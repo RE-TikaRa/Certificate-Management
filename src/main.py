@@ -1,7 +1,12 @@
+from __future__ import annotations
+
+import contextlib
 import logging
 import signal
 import sys
 import time
+from collections.abc import Iterator
+from typing import IO
 
 from PySide6.QtCore import QLibraryInfo, QLocale, QTimer, QTranslator
 from PySide6.QtGui import QFont
@@ -10,10 +15,53 @@ from PySide6.QtWidgets import QApplication
 from .app_context import bootstrap
 from .mcp.helpers import safe_int
 from .mcp.runtime import get_mcp_runtime
-from .ui.main_window import MainWindow
-from .ui.styled_theme import ThemeManager
 
 logger = logging.getLogger(__name__)
+
+
+class _FilteredStream:
+    def __init__(self, stream: IO[str], *, drop_substring: str) -> None:
+        self._stream = stream
+        self._drop = drop_substring
+        self._buf = ""
+
+    @property
+    def encoding(self) -> str | None:  # pragma: no cover
+        return getattr(self._stream, "encoding", None)
+
+    def isatty(self) -> bool:  # pragma: no cover
+        return bool(getattr(self._stream, "isatty", lambda: False)())
+
+    def write(self, s: str) -> int:
+        self._buf += s
+        written = 0
+        while "\n" in self._buf:
+            line, self._buf = self._buf.split("\n", 1)
+            if self._drop not in line:
+                written += self._stream.write(line + "\n")
+        return written
+
+    def flush(self) -> None:
+        if self._buf and self._drop not in self._buf:
+            self._stream.write(self._buf)
+        self._buf = ""
+        self._stream.flush()
+
+
+@contextlib.contextmanager
+def _filter_third_party_tips() -> Iterator[None]:
+    needle = "QFluentWidgets Pro is now released"
+    old_out, old_err = sys.stdout, sys.stderr
+    sys.stdout = _FilteredStream(old_out, drop_substring=needle)
+    sys.stderr = _FilteredStream(old_err, drop_substring=needle)
+    try:
+        yield
+    finally:
+        with contextlib.suppress(Exception):
+            sys.stdout.flush()
+        with contextlib.suppress(Exception):
+            sys.stderr.flush()
+        sys.stdout, sys.stderr = old_out, old_err
 
 
 def main(debug: bool = False) -> None:
@@ -43,6 +91,10 @@ def main(debug: bool = False) -> None:
 
     ctx = bootstrap(debug=debug)
     logger.info(f"Bootstrap completed in {time.time() - start_time:.2f}s")
+
+    with _filter_third_party_tips():
+        from .ui.main_window import MainWindow
+        from .ui.styled_theme import ThemeManager
 
     theme_manager = ThemeManager(app)
     ThemeManager.set_instance(theme_manager)  # 设置单例
