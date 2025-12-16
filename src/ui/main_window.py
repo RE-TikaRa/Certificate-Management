@@ -17,6 +17,7 @@ from qfluentwidgets import (
 )
 
 from ..app_context import AppContext
+from ..version import get_app_version
 from .pages.about_page import AboutPage
 from .pages.dashboard_page import DashboardPage
 from .pages.entry_page import EntryPage
@@ -40,7 +41,7 @@ class MainWindow(FluentWindow):
         super().__init__()
         self.ctx = ctx
         self.theme_manager = theme_manager
-        self.setWindowTitle("证书管理系统")
+        self.setWindowTitle(f"证书管理系统 v{get_app_version()}")
         self.setMinimumSize(1200, 800)
 
         # 将窗口设置在屏幕中心
