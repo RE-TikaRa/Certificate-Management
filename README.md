@@ -12,7 +12,7 @@
   <p>
     一款功能完整、界面精美的荣誉证书管理桌面应用。<br/>
     支持荣誉证书的全生命周期管理：从录入、统计分析、成员管理到附件管理，一应俱全。<br/>
-    <b>当前版本：</b> v1.3.1（2025-12-17）
+    <b>当前版本：</b> v1.4.0（2025-12-18）
   </p>
 
   <!-- Badges -->
@@ -26,15 +26,15 @@
   <!-- Action Buttons -->
   <p>
     <a href="#-快速开始">
-      <img src="https://img.shields.io/badge/🚀_立即运行-Start_Demo-blue?style=flat-square" alt="Start Demo">
+      <img src="https://img.shields.io/badge/🚀_立即运行-Start_Demo-blue?style=flat-square" alt="Start Demo" />
     </a>
     &nbsp;
     <a href="https://github.com/RE-TikaRa/Certificate-Management/issues">
-      <img src="https://img.shields.io/badge/🐛_反馈问题-Report_Bug-red?style=flat-square" alt="Report Bug">
+      <img src="https://img.shields.io/badge/🐛_反馈问题-Report_Bug-red?style=flat-square" alt="Report Bug" />
     </a>
     &nbsp;
     <a href="#-文件目录说明">
-      <img src="https://img.shields.io/badge/📚_浏览文档-Explore_Docs-green?style=flat-square" alt="Explore Docs">
+      <img src="https://img.shields.io/badge/📚_浏览文档-Explore_Docs-green?style=flat-square" alt="Explore Docs" />
     </a>
   </p>
 </div>
@@ -52,7 +52,10 @@
 - [🚀 快速开始](#-快速开始)
   - [📥 安装步骤](#-安装步骤)
   - [🛠️ 常用命令](#-常用命令)
-  - [🤖 MCP / AI 接入](#-mcp--ai-接入)
+  - [🧾 AI 证书识别](#-ai-证书识别)
+    - [⚙️ 配置与模型](#-配置与模型)
+    - [🧾 使用流程](#-使用流程)
+  - [🤖 MCP 接入（本地）](#-mcp-接入本地)
     - [🔌 连接方式](#-连接方式)
     - [🛡️ 权限与安全](#-权限与安全)
     - [🛠️ 能力概览](#-能力概览)
@@ -63,12 +66,15 @@
   - [🏆 荣誉记录 (Awards)](#-荣誉记录-awards)
   - [🧩 荣誉成员快照 (AwardMembers)](#-荣誉成员快照-awardmembers)
   - [👤 参与成员 (TeamMembers)](#-参与成员-teammembers)
+  - [🤖 AI 提供商 (AIProviders)](#-ai-提供商-aiproviders)
+  - [🏷️ 自定义开关 (CustomFlags/AwardFlagValues)](#-自定义开关-customflagsawardflagvalues)
   - [🎓 专业与学校 (Majors/Schools)](#-专业与学校-majorsschools)
 - [🔐 数据安全与备份](#-数据安全与备份)
 - [🎨 主题系统](#-主题系统)
 - [🛠️ 开发指南](#-开发指南)
 - [🧰 故障排查](#-故障排查)
 - [📝 更新日志](#-更新日志)
+  - [v1.4.0 (2025-12-18)](#v140-2025-12-18)
   - [v1.3.1 (2025-12-17)](#v131-2025-12-17)
   - [v1.3.0 (2025-12-16)](#v130-2025-12-16)
   - [v1.2.0 (2025-12-14)](#v120-2025-12-14)
@@ -128,12 +134,14 @@
 
 ### 🎯 功能详情
 
-- **仪表盘**: 实时指标卡片 (总数/级别/等级)，饼图/柱状图可视化，最近录入速览。
-- **荣誉管理**: 完整字段录入 (比赛/日期/级别/等级/证书号)，多成员动态卡片管理。
-- **智能搜索**: 基于 2025 教育部目录，支持中文/拼音/代码模糊搜索，自动回退匹配。
-- **高级筛选**: 多维度排序 (8种)，组合筛选 (等级/奖项/日期)，CSV/XLSX 导入导出。
-- **系统设置**: 自动备份频率，数据目录迁移，日志级别控制，一键重置；提供 MCP 服务开关、Web 依赖安装入口与导入模板下载。
-- **AI 接入**: 内置本地 MCP（stdio/SSE）与可选 Web 控制台，默认只读，支持 PII 脱敏与写入开关。
+- **首页**: 快速导航与最近动态，一键直达常用功能。
+- **仪表盘**: 8 个梯度指标卡 + 饼/柱图可视化 + 最近荣誉速览。
+- **总览**: FTS5 全文搜索（比赛名/证书号/成员）+ 筛选排序分页，支持编辑与批量操作。
+- **录入**: 卡片式表单，多成员动态管理；集成专业/学校智能搜索（中文/拼音/代码）；支持一键 AI 识别证书（图片/PDF）。
+- **成员管理**: 成员库维护与详情，10 字段监控与快速修改。
+- **回收站**: 已删除记录可恢复/彻底删除，双重确认。
+- **系统设置**: 主题/备份/日志/索引维护与清理工具，自定义开关管理，导入模板下载；AI 与 MCP 配置入口。
+- **MCP 接入**: 内置本地 MCP（stdio/SSE）与可选 Web 控制台，默认只读，支持 PII 脱敏与写入开关。
 
 ---
 
@@ -148,7 +156,8 @@
 
 </div>
 
-- **AI/MCP**：`mcp`（FastMCP），支持 stdio/SSE；可选 `gradio` Web 控制台
+- **AI 证书识别**：OpenAI 兼容 API（Chat Completions/Responses）+ PyMuPDF（PDF 渲染）+ Pydantic（结构化解析）
+- **MCP**：`mcp`（FastMCP），支持 stdio/SSE；可选 `gradio` Web 控制台
 - **日志**：`loguru`（应用日志与 MCP 进程日志输出到 `logs/`）
 - **类型检查**：`pyright`（标准模式）+ `ruff`（风格/未使用项）
 
@@ -172,12 +181,12 @@
     </tr>
     <tr>
       <td align="center">
-        <img src="https://s2.loli.net/2025/12/10/IA1hHyCiEGlfNSx.png" alt="Entry" width="100%" />
-        <br/><b>📝 录入页</b><br/>成员卡片式表单
-      </td>
-      <td align="center">
         <img src="https://s2.loli.net/2025/12/10/dKcrQUTo3xghDNq.png" alt="Overview" width="100%" />
         <br/><b>👀 总览页</b><br/>FTS5 搜索 + 筛选排序
+      </td>
+      <td align="center">
+        <img src="https://s2.loli.net/2025/12/10/IA1hHyCiEGlfNSx.png" alt="Entry" width="100%" />
+        <br/><b>📝 录入页</b><br/>成员卡片式表单 + AI 识别
       </td>
     </tr>
     <tr>
@@ -237,13 +246,43 @@
 | **调试** | `uv run python -m src.main --debug` | 开启调试日志 |
 | **检查** | `uv run ruff check .` | 代码 Lint 检查 |
 | **格式化** | `uv run ruff format .` | 代码自动格式化 |
+| **类型检查** | `uv run python -m pyright` | Pyright 标准模式 |
+| **语法检查** | `uv run python -m py_compile src/` | 基础语法编译检查 |
 | **MCP 服务** | `uv run certificate-mcp` | 启动 MCP（默认 stdio，只读） |
 | **MCP SSE** | `CERT_MCP_TRANSPORT=sse uv run certificate-mcp` | 启动 SSE（默认 `http://127.0.0.1:8000/sse`；推荐用设置页随软件启动） |
 | **MCP Web** | `uv run certificate-mcp-web` | 启动本地 Web 控制台（需安装可选依赖） |
 
 ---
 
-### 🤖 MCP / AI 接入
+### 🧾 AI 证书识别
+
+AI 证书识别用于“荣誉录入”页面的一键识别：从证书图片/PDF 自动抽取 **比赛名称、获奖日期、赛事级别、奖项等级、证书编号、成员姓名**，并在预览对话框中确认后再写入表单。
+
+#### ⚙️ 配置与模型
+
+1. 打开 **系统设置 → AI 证书识别**，勾选“启用 AI 证书识别”
+2. 配置一个提供商（Provider）
+   - **API 地址**：OpenAI 兼容地址（如 `https://api.openai.com` 或你的兼容中转）
+   - **API Key**：支持多 Key，程序会按请求轮换（见下文）
+   - **模型**：可手动填写模型 ID；若你的服务支持 `/v1/models`，可在设置页刷新/选择
+   - **PDF 页数**：1~10（PDF 会渲染前 N 页作为图片参与识别）
+3. 点击“测试联通”验证配置（会发起最小请求）
+
+说明（按当前实现）：
+- 支持文件：`.pdf` `.png` `.jpg` `.jpeg` `.webp`
+- Key 轮换：每次调用（识别证书、刷新模型、测试联通）都会轮到下一个 Key；**当前不会在失败时自动切 Key 重试**
+- OpenAI 官方 `api.openai.com`：会走 `responses` 接口；PDF 会以文件方式上传，图片会以单张图片方式上传
+- 兼容服务：走 `/v1/chat/completions`；PDF 会按“PDF 页数”渲染多页图片后发送
+
+#### 🧾 使用流程
+
+1. 在 **荣誉录入** 页点击顶部“AI 识别证书”
+2. 选择证书文件后，程序会自动将其加入附件并开始识别
+3. 在“AI 识别预览”中确认/修改结果后应用到表单
+
+---
+
+### 🤖 MCP 接入（本地）
 
 本项目内置了 MCP (Model Context Protocol) 服务，允许 AI Agent（如 Claude Desktop、Cursor 等）安全地读取本地荣誉数据与附件。
 
@@ -255,12 +294,13 @@
    - **配置示例**：见下文“客户端配置示例”。
 
 2. **SSE 模式（HTTP 服务）**
-   - **适用场景**：需要远程连接或调试。
+   - **适用场景**：本机调试（HTTP）。
    - **地址**：`http://127.0.0.1:8000/sse`
    - **启动方式**：
      - **自动（推荐）**：在“设置页 → MCP 服务”中开启“随软件启动 MCP”。
      - **手动**：`CERT_MCP_TRANSPORT=sse uv run certificate-mcp`
    - **日志**：`logs/mcp_sse.log`
+   - **注意**：服务端强制本地绑定，`CERT_MCP_HOST` 只能是 `127.0.0.1` / `localhost` / `::1`，请勿暴露到公网。
 
    <details>
    <summary><strong>Windows PowerShell 手动启动命令</strong></summary>
@@ -294,6 +334,7 @@
   - `read_attachment`：读取附件内容（支持文本提取）。
   - `health`：健康检查。
 - **Resources (资源)**：
+  - `docs://readme` / `docs://agents`：读取项目 README/AGENTS 指南。
   - `schema://models`：查看数据库模型定义。
   - `templates://awards_csv`：获取导入模板。
 
@@ -302,10 +343,17 @@
 | 变量名 | 说明 | 默认值 |
 | :--- | :--- | :--- |
 | `CERT_MCP_TRANSPORT` | 传输模式 (`stdio`/`sse`) | `stdio` |
+| `CERT_MCP_HOST` | SSE Host（仅允许本地） | `127.0.0.1` |
 | `CERT_MCP_PORT` | SSE 端口 | `8000` |
 | `CERT_MCP_ALLOW_WRITE` | 允许写入 (`0`/`1`) | `0` |
 | `CERT_MCP_REDACT_PII` | 敏感信息脱敏 (`0`/`1`) | `1` |
+| `CERT_MCP_MAX_BYTES` | 单次附件读取上限（字节） | `1048576` |
+| `CERT_MCP_DEBUG` | 输出调试错误细节 (`0`/`1`) | `0` |
+| `CERT_MCP_WEB_HOST` | Web 控制台 Host | `127.0.0.1` |
 | `CERT_MCP_WEB_PORT` | Web 控制台端口 | `7860` |
+| `CERT_MCP_WEB_USERNAME` | Web 控制台用户名 | `local` |
+| `CERT_MCP_WEB_PASSWORD` | Web 控制台密码（设置页生成/保存） | *(random)* |
+| `CERT_MCP_WEB_INBROWSER` | 是否自动打开浏览器 (`0`/`1`) | `1` |
 
 <details>
 <summary><strong>📎 客户端配置示例 (Claude Desktop / Cursor)</strong></summary>
@@ -375,6 +423,11 @@ Certificate-Management/
 │   │   ├── award_service.py        # 荣誉逻辑
 │   │   ├── statistics_service.py   # 统计分析
 │   │   ├── import_export.py        # 导入导出
+│   │   ├── ai_certificate_service.py # AI 证书识别（OpenAI 兼容 API）
+│   │   ├── ai_provider_service.py  # AI Provider / Key 轮换
+│   │   ├── attachment_manager.py   # 附件存储/去重/回收站
+│   │   ├── backup_manager.py       # 备份/验证/恢复（含定时任务）
+│   │   ├── flag_service.py         # 自定义布尔开关（flag）
 │   │   └── ...
 │   │
 │   ├── 🎨 ui/                      # 表现层
@@ -415,6 +468,9 @@ flowchart TD
         StatSvc[统计服务 StatisticsService]
         BackupSvc[备份服务 BackupManager]
         ImportSvc[导入服务 ImportExport]
+        AttachSvc[附件服务 AttachmentManager]
+        FlagSvc[开关服务 FlagService]
+        AISvc[AI 证书识别 AICertificateService]
     end
 
     subgraph Data [数据层 Data Access]
@@ -423,12 +479,19 @@ flowchart TD
         SQLite[(SQLite Database)]
     end
 
+    subgraph Integration [集成 Integration]
+        direction TB
+        MCP[MCP Server (FastMCP)]
+    end
+
     UI --> Service
     Service --> Data
+    MCP --> Service
     
     style UI fill:#e1f5fe,stroke:#01579b
     style Service fill:#fff3e0,stroke:#ff6f00
     style Data fill:#e8f5e9,stroke:#2e7d32
+    style Integration fill:#f3e5f5,stroke:#6a1b9a
 ```
 
 > **架构说明**：本项目采用经典的三层架构（表现层、业务层、数据层），各层职责分明，通过依赖注入（DI）容器 `AppContext` 进行解耦。
@@ -485,6 +548,25 @@ flowchart TD
 | `created_at` / `updated_at` | DateTime | 时间戳 |
 | `award_associations` | Relation | 通过 `AwardMember` 关联荣誉（成员库可变更不影响历史快照） |
 
+### 🤖 AI 提供商 (AIProviders)
+| 字段 | 类型 | 说明 |
+| :--- | :--- | :--- |
+| `id` | Integer | 主键 |
+| `name` | String | 提供商名称（唯一） |
+| `api_base` | String | OpenAI 兼容 API Base |
+| `api_keys` | Text | 多 Key（支持 `name|key`） |
+| `model` | String | 默认模型 ID |
+| `pdf_pages` | Integer | PDF 渲染页数（1~10） |
+| `last_key_index` | Integer | Key 轮换索引（-1 表示未开始） |
+
+> `settings.ai_active_provider_id` 用于标记当前激活的 provider；旧版单配置（`ai_api_base/ai_api_key/ai_model`）会在首次启动时迁移到默认 provider。
+
+### 🏷️ 自定义开关 (CustomFlags/AwardFlagValues)
+| 模型 | 关键字段 | 说明 |
+| :--- | :--- | :--- |
+| `CustomFlag` | `key`(唯一), `label`, `enabled`, `default_value`, `sort_order` | 自定义布尔开关定义（用于录入/导出/筛选） |
+| `AwardFlagValue` | `award_id`, `flag_key`, `value` | 荣誉对应的开关值（与 `award_id+flag_key` 唯一） |
+
 ### 🎓 专业与学校 (Majors/Schools)
 | 模型 | 关键字段 | 说明 |
 | :--- | :--- | :--- |
@@ -510,7 +592,7 @@ flowchart TD
       </td>
       <td width="50%">
         <h4>🔄 自动备份</h4>
-        <p>支持每日/每周/启动前自动备份，恢复前可自动创建还原点。</p>
+        <p>支持手动/启动时/每日/每周备份；基于 SQLite <code>backup()</code> 生成快照，并可在恢复前自动创建还原点。</p>
       </td>
     </tr>
     <tr>
@@ -520,7 +602,7 @@ flowchart TD
       </td>
       <td>
         <h4>🧹 清理策略</h4>
-        <p>提供日志/备份/数据库清理工具，操作前需双重确认。</p>
+        <p>提供日志/备份清空与数据库重建（reset）工具，均带双重确认；数据库清空会重建空库并重载默认设置。</p>
       </td>
     </tr>
   </table>
@@ -553,6 +635,7 @@ flowchart TD
 2. **新增页面**: 继承 `BasePage`，在 `main_window.py` 中注册路由。
 3. **数据库变更**: 修改 `models.py`，目前使用自动建表，生产环境建议引入 Alembic。
 4. **代码规范**: 提交前请运行 `ruff check` 和 `pyright`。
+5. **版本与文档**: 版本号统一来自 `pyproject.toml`（运行时由 `src/version.py` 读取）；升级版本时请同步更新 README 顶部/更新日志与应用“关于”页文案。
 
 ---
 
@@ -568,6 +651,10 @@ flowchart TD
 | **数据库被锁** | 异常退出导致锁文件残留 | 关闭应用，删除 `data/awards.db-shm` 和 `.db-wal` |
 | **导入无响应** | 模板格式错误 | 确认 CSV/XLSX 表头与模板一致，查看设置页日志 |
 | **MCP 连接失败** | 端口未启动/URL 错误/依赖缺失 | SSE：确认 `http://127.0.0.1:8000/sse` 且设置页已启动；Web：先 `uv sync --group mcp-web`，再用设置页用户名/密码登录 |
+| **MCP SSE 启动报 host 限制** | MCP 服务仅允许本地绑定 | 将 `CERT_MCP_HOST` 设置为 `127.0.0.1` / `localhost` / `::1`（或直接用设置页启动） |
+| **AI 识别提示缺少 PDF 依赖** | 未安装 PyMuPDF | 运行 `uv sync` 安装依赖（需要识别 PDF 时必须） |
+| **AI 识别失败：Cloudflare 1010** | 网络/代理/风控拦截 | 更换网络/代理或更换中转；该错误通常与本机环境无关 |
+| **AI 识别失败：模型输出不是有效 JSON** | 模型不按要求输出结构化结果 | 更换模型/提供商；确保模型支持图像输入，并尝试在设置页手动填写模型 ID |
 | **主题不更新** | 信号未连接 | 检查 `__init__` 是否连接 `themeChanged` 信号 |
 | **附件校验失败** | 文件被占用或修改 | 检查文件权限，清空回收站后重试 |
 
@@ -578,6 +665,30 @@ flowchart TD
 ## 📝 更新日志
 
 > 说明：以下版本号按 GitHub `main` 分支提交记录分段整理（无 Tag 时以日期为准），采用 SemVer（主版本/次版本/修订号）。
+
+### v1.4.0 (2025-12-18)
+
+- **AI 证书识别**
+  - 荣誉录入页支持一键从证书图片/PDF 抽取比赛名称、日期、级别、奖项、证书编号与成员姓名，并提供预览确认后再填充
+  - AI 设置页新增/完善：多 Provider 管理（名称/API 地址/模型/PDF 页数）、模型列表刷新/选择、联通测试、API Key 多 Key 轮换
+- **运维与数据**
+  - 新增数据库 reset 与自定义布尔开关批量保存，便于清理与批处理
+  - 修复奖项成员快照在部分路径下的赋值顺序问题
+- **文档**
+  - 修正目录锚点与奖项说明细节
+
+<details>
+<summary><strong>提交记录（v1.4.0，共 7 条）</strong></summary>
+
+- `cde6154` 2025-12-17 docs: 修正目录锚点与补充奖项说明
+- `47a45f0` 2025-12-17 feat: 支持数据库 reset 与 flag 批量保存
+- `0a7abf4` 2025-12-18 fix: 修正奖项成员快照赋值顺序
+- `9e0fde6` 2025-12-18 feat: 增加 AI 证书识别与多 Provider 支持
+- `e70fa2c` 2025-12-18 fix: 优化 AI 证书按钮与模型输入兼容性
+- `c0d2912` 2025-12-18 fix: 优化 AI 密钥表格内容居中显示
+- `8a7c285` 2025-12-18 refactor: 拆分 AI 设置表单结构
+
+</details>
 
 ### v1.3.1 (2025-12-17)
 
@@ -617,7 +728,7 @@ flowchart TD
 
 ### v1.3.0 (2025-12-16)
 
-- **MCP / AI 接入**
+- **MCP 接入**
   - 新增本地 MCP 服务（stdio/SSE），默认只读；支持敏感信息脱敏与附件读取限额
   - 新增可选 Web 控制台（Gradio），用于本机调试 MCP 输出（用户名/密码可配置、随机生成与复制）
   - 设置页集成 MCP 管理（随软件启动、端口/权限/脱敏配置、日志入口、Web 依赖一键安装/更新）
@@ -815,10 +926,10 @@ flowchart TD
   
   <p>
     <a href="https://github.com/RE-TikaRa/Certificate-Management/stargazers">
-      <img src="https://img.shields.io/github/stars/RE-TikaRa/Certificate-Management?style=social" alt="GitHub stars">
+      <img src="https://img.shields.io/github/stars/RE-TikaRa/Certificate-Management?style=social" alt="GitHub stars" />
     </a>
     <a href="https://github.com/RE-TikaRa/Certificate-Management/network/members">
-      <img src="https://img.shields.io/github/forks/RE-TikaRa/Certificate-Management?style=social" alt="GitHub forks">
+      <img src="https://img.shields.io/github/forks/RE-TikaRa/Certificate-Management?style=social" alt="GitHub forks" />
     </a>
   </p>
 </div>

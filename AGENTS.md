@@ -6,6 +6,7 @@
 - 应用：荣誉证书管理桌面端（PySide6 + QFluentWidgets）
 - 语言/平台：Python 3.14+，SQLite + SQLAlchemy 2.x
 - 入口：`uv run python -m src.main`（Windows 可用 `main.bat`）；调试加 `--debug`
+- AI：内置“AI 证书识别”（OpenAI 兼容 API），支持多 Provider 与 API Key 轮换；配置入口在设置页
 - 数据目录：`data/`（awards.db），`attachments/`，`backups/`，`logs/`，`temp/` 均已被 `.gitignore` 忽略（含 SQLite 辅助文件 *.db-wal / *.db-shm）
 
 ## 常用命令
@@ -18,24 +19,35 @@
 - 语法检查：`python -m py_compile src/`
 - Lint：`uv run ruff check .`
 - 格式化：`uv run ruff format .`
-- 类型检查：`uv run pyright`
+- 类型检查：`uv run python -m pyright`
 - 入口脚本：`certificate-management = src.main:main` / `certificate-mcp = src.mcp.server:main` / `certificate-mcp-web = src.mcp.web:main`
 
-## MCP / AI 接入（本地）
+## AI 证书识别（本地）
+- **入口**：荣誉录入页顶部“AI 识别证书”（`src/ui/pages/entry_page.py`）
+- **配置**：设置页 → AI 证书识别（`ai_enabled` / `ai_active_provider_id`；提供商与 Key 存在 `ai_providers` 表）
+- **支持文件**：`.pdf` `.png` `.jpg` `.jpeg` `.webp`
+- **PDF 处理**：OpenAI 官方 `api.openai.com` 走 `responses`（PDF 直接上传）；兼容服务走 `/v1/chat/completions`（按 `pdf_pages` 渲染前 N 页图片）
+- **Key 轮换**：每次请求轮换（识别/测试/刷新模型都会消耗一次）；当前不做“失败自动重试下一个 Key”
+- **相关代码**：`src/services/ai_certificate_service.py`、`src/services/ai_provider_service.py`、`src/ui/pages/settings_page.py`
+
+## MCP 接入（本地）
 - **stdio（推荐）**：由 MCP 客户端拉起本地进程：`uv run certificate-mcp`
 - **SSE（本地 URL）**：`http://127.0.0.1:8000/sse`
   - 推荐启动方式：应用设置页 → MCP 服务 → 开启“随软件启动 MCP”
   - 手动启动：设置 `CERT_MCP_TRANSPORT=sse` 后运行 `uv run certificate-mcp`
+- **仅允许本地绑定**：当 transport 不是 `stdio` 时，`CERT_MCP_HOST` 只能是 `127.0.0.1/localhost/::1`
 - **Web 控制台（可选）**：安装 `mcp-web` 依赖后 `uv run certificate-mcp-web`（默认 `127.0.0.1:7860`，用户名/密码来自设置页）
 - **默认只读 + 脱敏**：写入开关与 PII 脱敏开关均可在设置页配置（仅本地使用，避免对外暴露端口）
 - **日志位置**：`logs/mcp_sse.log`、`logs/mcp_web.log`、`logs/mcp_web_install.log`
 - **主要设置键（settings 表）**：`mcp_auto_start`、`mcp_port`、`mcp_allow_write`、`mcp_redact_pii`、`mcp_max_bytes`、`mcp_web_auto_start`、`mcp_web_host`、`mcp_web_port`、`mcp_web_username`、`mcp_web_token`（密码）
+- **Web 环境变量**：Web 进程实际读取 `CERT_MCP_WEB_USERNAME` / `CERT_MCP_WEB_PASSWORD`（由运行时把 `mcp_web_token` 注入为 password）
 
 ## 目录速览
 - `src/main.py` 应用入口；`app_context.py` 构建 DI 容器与服务；`logger.py` 日志配置；`config.py` 配置加载；`version.py` 版本号管理。
 - MCP：`src/mcp/server.py`（MCP 服务端，stdio/SSE）、`src/mcp/web.py`（本地 Web 控制台，可选）、`src/mcp/runtime.py`（MCP 进程管理与自启动）、`src/mcp/helpers.py`（配置解析辅助）。
+- AI：`src/services/ai_certificate_service.py`（证书识别）、`src/services/ai_provider_service.py`（多 Provider / Key 轮换）
 - 数据层 `src/data/`: `models.py`（Base + Award/TeamMember/Attachment/Setting/BackupRecord/ImportJob/Major/School/SchoolMajorMapping/AwardMember）；`database.py` 提供 `session_scope`。
-- 服务层 `src/services/`: award_service、statistics_service、import_export、backup_manager、attachment_manager、settings_service、major_service 等。
+- 服务层 `src/services/`: award_service、statistics_service、import_export、backup_manager、attachment_manager、flag_service、settings_service、major_service 等。
 - 表现层 `src/ui/`: `main_window.py`（窗口与导航，懒加载页面，窗口居中），`styled_theme.py`（ThemeManager），`theme.py`（通用 UI 工具），`widgets/major_search.py`，`pages/`（home、dashboard、overview、entry、management、recycle、settings、about、base_page）。
 - 资源 `src/resources/`: `styles/styled_light.qss`、`styles/styled_dark.qss`，`templates/awards_template.csv`。
 - 数据/文档 `docs/`: `china_bachelor_majors_2025.csv`（本科专业目录约 840 条）、`china_universities_2025.csv`、`GSAU_majors.xlsx` 示例映射、`personal_info_template.doc`。
@@ -47,6 +59,8 @@
 - TeamMember：姓名、性别、身份证（唯一）、手机号、学号（唯一）、邮箱、学校/学校代码、专业/专业代码、班级、学院、pinyin、active、sort_index；关系 award_associations（通过 `AwardMember` 关联荣誉）。
 - Attachment：award_id、stored_name、original_name、relative_path（唯一）、file_md5、file_size、deleted 标记。
 - Setting/BackupRecord/ImportJob：应用设置、备份记录、导入任务。
+- AIProvider：多 AI 提供商（API 地址/模型/PDF 页数/多 Key 轮换索引）。
+- CustomFlag/AwardFlagValue：自定义布尔开关定义与荣誉对应值（用于录入/导出/筛选）。
 - Major：name/code 唯一，含学科/专业类信息与 pinyin；School、SchoolMajorMapping 存储学校与学校-专业-学院映射。
 - 专业与学校数据源：`docs/china_bachelor_majors_2025.csv`（约 840 条）+ `china_universities_2025.csv`；搜索支持中文/拼音/代码，学校代码缺失时回退学校名称匹配学院。
 
@@ -73,12 +87,14 @@
 - 保持导入有序、移除未用依赖；少量必要注释，遵循现有风格。
 
 ## 开发/修改提示
-- 访问服务总用 `AppContext`（ctx.awards/statistics/settings/members/attachment/backup/major），数据库操作包裹 `session_scope`，勿手写裸会话。
+- 访问服务总用 `AppContext`（`ctx.awards/statistics/settings/members/attachments/backup/importer/ai/ai_providers/flags/majors/schools`），数据库操作包裹 `session_scope`，勿手写裸会话。
 - 添加页面：继承 `BasePage`，实现 `_init_ui`；在 `main_window.py` 注册（导航项、_load_* 分组、route_keys），按需处理主题信号。
 - 添加数据字段：同步更新模型、对应 service、UI 表单/列表、统计或刷新逻辑（管理页的 10 字段监控需保持一致）。
 - 成员字段在 UI 约定为 10 项（含学校）；管理页刷新依赖该集合。
 - 导入/导出：模板位于 `src/resources/templates/`（CSV 版本在仓库内；XLSX 模板会在运行时自动生成并可从设置页下载）；专业与学校/学院映射导入来自 `docs/china_bachelor_majors_2025.csv`、`china_universities_2025.csv`、`GSAU_majors.xlsx`。
-- 导入荣誉：支持 CSV/XLSX，带预检（dry-run，不写入数据库/不落盘附件）、进度 ETA；正式导入会写入 imports 表并可导出错误行。
-- 附件删除：编辑时删除附件会移入 `attachments/.trash` 并在数据库标记 deleted（当前无 UI 入口恢复单个附件）。
+- 导入荣誉：支持 CSV/XLSX，带预检（dry-run 不写入数据库/不落盘附件）、进度 ETA；正式导入会写入 imports 表并可导出错误行；若启用自定义开关，会按列名 `label (key)` 或 `label` 解析。
+- 附件保存：按奖项目录 `attachments/award_{id}` 存放；去重仅在同一奖项内按 MD5/size 判断；删除会移入 `attachments/.trash` 并在数据库标记 deleted。
+- 备份：基于 SQLite `backup()` 生成快照，打包为 zip（可选包含附件/日志）；恢复会覆盖数据库并按选项恢复附件/日志。
+- 数据库 reset：`Database.reset()` 通过 DROP 所有对象后重建空库（避免 Windows 删除文件失败），设置页有入口且带双重确认。
 - 学院自动填充依赖 `SchoolMajorMapping`，如导入数据缺少学校代码会自动用学校名称回退匹配；若要禁用回退需同步保证 school_code 完整。
 - 运行/调试前确认运行目录为仓库根目录；避免提交 `data/`、`attachments/`、`backups/`、`logs/`、`temp/` 生成物。

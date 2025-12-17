@@ -77,7 +77,7 @@ class AboutPage(BasePage):
         tags_layout = QHBoxLayout()
         tags_layout.setSpacing(8)
         tags_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        for text in ("Desktop", "Offline-first", "Local MCP", "SQLite Local"):
+        for text in ("Desktop", "Offline-first", "AI Cert", "Local MCP", "SQLite Local"):
             tag = BodyLabel(text)
             tag.setObjectName("tagChip")
             tag_font = QFont()
@@ -96,6 +96,7 @@ class AboutPage(BasePage):
             "荣誉证书管理系统是一款基于 PySide6 + QFluentWidgets 的桌面端应用，"
             "用于管理竞赛/科研荣誉证书、成员信息与附件材料，完全离线运行。\n\n"
             "内置证书录入、全文检索（FTS5）、成员管理（支持快照）、回收站、自动备份与导入/导出等功能，"
+            "支持 AI 证书识别（OpenAI 兼容 API），可从证书图片/PDF 自动抽取核心字段并预览确认；"
             "并提供本地 MCP（stdio/SSE）服务与可选 Gradio Web 控制台，方便外部智能体安全接入，"
             "支持用户名/密码/令牌、写入开关与 PII 过滤，帮助学校/团队高效组织与查询荣誉数据。",
         )
@@ -107,6 +108,7 @@ class AboutPage(BasePage):
             "• GUI: PySide6 + QFluentWidgets\n"
             "• 数据: SQLAlchemy 2.x + SQLite（本地）\n"
             "• 语言: Python 3.14+\n"
+            "• AI: OpenAI 兼容 Chat Completions/Responses（支持多 Provider、模型与 Key 轮换）\n"
             "• MCP: OpenAI MCP stdio/SSE + 可选 Gradio Web 控制台\n"
             "• 定时/任务: APScheduler\n"
             "• 日志: loguru\n"
@@ -126,6 +128,7 @@ class AboutPage(BasePage):
             "• 统计看板：8 张指标卡 + 饼/柱图 + 最近荣誉\n"
             "• 主题与样式：亮/暗主题即时切换\n"
             "• 备份与清理：自动/手动备份，日志与数据库一键清理\n"
+            "• AI 证书识别：证书图片/PDF 一键抽取字段（可预览确认），支持多 Provider 与 API Key 轮换\n"
             "• AI 接入：内置 MCP（stdio/SSE）与本地 Web 控制台，可配置用户名/密码/令牌、写入开关与 PII 去除",
         )
         layout.addWidget(features_card)
@@ -135,7 +138,7 @@ class AboutPage(BasePage):
             "开发者信息",
             "• 开发者: RE-TikaRa\n"
             "• 项目地址: https://github.com/RE-TikaRa/Certificate-Management\n"
-            "• 最新构建: 2025-12\n"
+            "• 最新构建: 2025-12-18\n"
             "• 许可证: MIT License",
         )
         layout.addWidget(dev_card)
