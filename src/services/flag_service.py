@@ -4,6 +4,7 @@ import re
 from collections.abc import Iterable
 
 from sqlalchemy import delete, select
+from sqlalchemy.orm import Session
 
 from ..data.database import Database
 from ..data.models import AwardFlagValue, CustomFlag
@@ -79,12 +80,16 @@ class FlagService:
             session.delete(flag)
 
     # ---- Award flag values ----
-    def set_award_flags(self, award_id: int, values: dict[str, bool]) -> None:
-        with self.db.session_scope() as session:
-            session.execute(delete(AwardFlagValue).where(AwardFlagValue.award_id == award_id))
-            rows = [AwardFlagValue(award_id=award_id, flag_key=key, value=bool(val)) for key, val in values.items()]
-            if rows:
-                session.add_all(rows)
+    def set_award_flags(self, award_id: int, values: dict[str, bool], *, session: Session | None = None) -> None:
+        if session is None:
+            with self.db.session_scope() as s:
+                self.set_award_flags(award_id, values, session=s)
+                return
+
+        session.execute(delete(AwardFlagValue).where(AwardFlagValue.award_id == award_id))
+        rows = [AwardFlagValue(award_id=award_id, flag_key=key, value=bool(val)) for key, val in values.items()]
+        if rows:
+            session.add_all(rows)
 
     def get_award_flags(self, award_id: int, *, include_disabled: bool = False) -> dict[str, bool]:
         definitions = self.list_flags(enabled_only=not include_disabled)

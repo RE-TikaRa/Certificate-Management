@@ -13,6 +13,9 @@ class SettingsService:
         self._cache: dict[str, str] = {}
         self._load_defaults()
 
+    def reload(self) -> None:
+        self._load_defaults()
+
     def _load_defaults(self) -> None:
         with self.db.session_scope() as session:
             stored = {row.key: row.value for row in session.scalars(select(Setting)).all()}

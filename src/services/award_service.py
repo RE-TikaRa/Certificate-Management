@@ -55,8 +55,8 @@ class AwardService:
                     session=session,
                 )
             if flag_values and self.flags:
-                self.flags.set_award_flags(award.id, flag_values)
-            self._refresh_award_fts(award, snapshot_names)
+                self.flags.set_award_flags(award.id, flag_values, session=session)
+            self._refresh_award_fts(award, snapshot_names, session=session)
             return award
 
     def list_members(self) -> list[TeamMember]:
@@ -85,6 +85,7 @@ class AwardService:
             email=member.email,
             college=member.college,
             major=member.major,
+            session=session,
         )
         return member
 
@@ -115,6 +116,7 @@ class AwardService:
                 email=member.email,
                 college=member.college,
                 major=member.major,
+                session=session,
             )
             return member
 
@@ -131,6 +133,7 @@ class AwardService:
             email=member.email,
             college=member.college,
             major=member.major,
+            session=session,
         )
         return member
 
@@ -189,7 +192,7 @@ class AwardService:
                 award.deleted = True
                 award.deleted_at = datetime.utcnow()
                 session.add(award)
-                self.db.delete_award_fts(award_id)
+                self.db.delete_award_fts(award_id, session=session)
 
     def update_award(
         self,
@@ -248,9 +251,9 @@ class AwardService:
             # Update member associations
             if member_names is not None:
                 snapshot_names = self._set_award_members(session, award, member_names)
-                self._refresh_award_fts(award, snapshot_names)
+                self._refresh_award_fts(award, snapshot_names, session=session)
             else:
-                self._refresh_award_fts(award, award.member_names)
+                self._refresh_award_fts(award, award.member_names, session=session)
 
             session.add(award)
             session.flush()  # Validate before commit
@@ -283,7 +286,7 @@ class AwardService:
                         session=session,
                     )
             if flag_values is not None and self.flags:
-                self.flags.set_award_flags(award.id, flag_values)
+                self.flags.set_award_flags(award.id, flag_values, session=session)
 
             return award
 
@@ -353,13 +356,14 @@ class AwardService:
                 results = sorted(results, key=lambda a: order.get(a.id, len(order)))
             return results
 
-    def _refresh_award_fts(self, award: Award, members: Sequence[str]) -> None:
+    def _refresh_award_fts(self, award: Award, members: Sequence[str], *, session=None) -> None:
         member_names = " ".join(members)
         self.db.upsert_award_fts(
             award.id,
             award.competition_name,
             award.certificate_code,
             member_names,
+            session=session,
         )
 
     def batch_delete_awards(self, award_ids: list[int]) -> int:
@@ -442,7 +446,7 @@ class AwardService:
                 award.deleted = False
                 award.deleted_at = None
                 session.add(award)
-                self._refresh_award_fts(award, award.member_names)
+                self._refresh_award_fts(award, award.member_names, session=session)
 
     def permanently_delete_award(self, award_id: int) -> None:
         """彻底删除荣誉记录（不可恢复）"""

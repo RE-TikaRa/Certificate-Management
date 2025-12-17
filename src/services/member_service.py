@@ -76,6 +76,7 @@ class MemberService:
                 email=merged.email,
                 college=merged.college,
                 major=merged.major,
+                session=session,
             )
         self._reindex_awards(award_ids)
         return merged
@@ -95,7 +96,7 @@ class MemberService:
             if member:
                 session.delete(member)
                 session.flush()
-                self.db.delete_member_fts(member_id)
+                self.db.delete_member_fts(member_id, session=session)
         self._reindex_awards(award_ids)
 
     def delete_members(self, member_ids: list[int]) -> int:

@@ -186,6 +186,7 @@ class ImportExportService:
                     award.competition_name,
                     award.certificate_code,
                     member_names,
+                    session=session,
                 )
 
             success += 1

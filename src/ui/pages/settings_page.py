@@ -38,7 +38,7 @@ from qfluentwidgets import (
     PushButton,
 )
 
-from src.config import BASE_DIR, DB_PATH, LOG_DIR
+from src.config import BASE_DIR, LOG_DIR
 from src.mcp.runtime import get_mcp_runtime
 from src.services.import_export import ImportResult
 from src.services.major_importer import read_major_catalog_from_csv, read_majors_from_excel
@@ -68,6 +68,20 @@ def clean_input_text(line_edit: QLineEdit) -> None:
             line_edit.setText(cleaned)
             line_edit.setCursorPosition(len(cleaned))  # 保持光标位置
             # 重新连接信号
+            line_edit.textChanged.connect(on_text_changed)
+
+    line_edit.textChanged.connect(on_text_changed)
+
+
+def replace_whitespace_with_underscore(line_edit: QLineEdit) -> None:
+    import re
+
+    def on_text_changed(text: str) -> None:
+        replaced = re.sub(r"\s+", "_", text)
+        if replaced != text:
+            line_edit.textChanged.disconnect(on_text_changed)
+            line_edit.setText(replaced)
+            line_edit.setCursorPosition(len(replaced))
             line_edit.textChanged.connect(on_text_changed)
 
     line_edit.textChanged.connect(on_text_changed)
@@ -962,7 +976,7 @@ class SettingsPage(BasePage):
         card, card_layout = create_card()
         card_layout.addWidget(make_section_title("自定义开关"))
 
-        hint = BodyLabel("用于录入/导出/筛选的布尔开关，支持改名、启用、默认值、排序。")
+        hint = BodyLabel("用于录入/导出/筛选的布尔开关，支持改名、启用、默认值、排序（修改后点“保存”生效）。")
         hint.setStyleSheet("color: #7a7a7a;")
         card_layout.addWidget(hint)
 
@@ -970,9 +984,12 @@ class SettingsPage(BasePage):
         header = QHBoxLayout()
         add_btn = PrimaryPushButton("新增开关")
         add_btn.clicked.connect(self._add_flag_dialog)
+        save_btn = PushButton("保存")
+        save_btn.clicked.connect(self._save_flags)
         refresh_btn = PushButton("刷新")
         refresh_btn.clicked.connect(self._refresh_flags)
         header.addWidget(add_btn)
+        header.addWidget(save_btn)
         header.addWidget(refresh_btn)
         header.addStretch()
         card_layout.addLayout(header)
@@ -1201,8 +1218,10 @@ class SettingsPage(BasePage):
 
         up_btn.clicked.connect(lambda _=None, fid=flag.id: self._move_flag_row(fid, -1))
         down_btn.clicked.connect(lambda _=None, fid=flag.id: self._move_flag_row(fid, 1))
-        del_btn.clicked.connect(lambda _=None, fid=flag.id, label=flag.label: self._delete_flag(fid, label))
-        edit_btn.clicked.connect(lambda _=None, f=flag: self._edit_flag_dialog(f))
+        del_btn.clicked.connect(
+            lambda _=None, fid=flag.id, name=name_edit: self._delete_flag(fid, name.text().strip() or flag.key)
+        )
+        edit_btn.clicked.connect(lambda _=None, fid=flag.id: self._edit_flag_dialog(fid))
 
     def _render_flag_rows(self) -> None:
         self.flags_container.setUpdatesEnabled(False)
@@ -1250,20 +1269,24 @@ class SettingsPage(BasePage):
             InfoBar.error("添加失败", str(exc), parent=self.window())
         self._refresh_flags()
 
-    def _edit_flag_dialog(self, flag) -> None:
+    def _edit_flag_dialog(self, flag_id: int) -> None:
+        row = next((r for r in self.flag_rows if r.get("id") == flag_id), None)
+        if not row:
+            return
+
         dialog = FlagDialog(
             parent=self.window(),
-            key_value=flag.key,
-            label_value=flag.label,
-            default_checked=flag.default_value,
-            enabled_checked=flag.enabled,
+            key_value=row["key"],
+            label_value=row["name"].text().strip() or row["key"],
+            default_checked=row["default"].isChecked(),
+            enabled_checked=row["enabled"].isChecked(),
             editable_key=False,
         )
         if not dialog.exec():
             return
         try:
             self.ctx.flags.update_flag(
-                flag.id,
+                flag_id,
                 label=dialog.label_value,
                 default_value=dialog.default_checked,
                 enabled=dialog.enabled_checked,
@@ -1436,7 +1459,7 @@ class SettingsPage(BasePage):
         if not self._double_confirm(
             "清空数据库",
             (
-                "将删除 awards.db 并重建空库，数据将全部丢失。<br><br>"
+                "将清空 awards.db 并重建空库（不依赖删除文件），数据将全部丢失。<br><br>"
                 "<span style='color:#d32f2f; font-weight:700; font-size: 20px;'>"
                 "本操作会删除：<br>所有荣誉/成员、附件记录、设置项、备份记录、学校与专业及映射、导入记录等。<br><br>请谨慎操作！"
                 "</span>"
@@ -1447,10 +1470,10 @@ class SettingsPage(BasePage):
 
     def _do_clear_database(self) -> None:
         try:
-            self.ctx.db.engine.dispose()
-            with suppress(FileNotFoundError):
-                DB_PATH.unlink()
-            self.ctx.db.initialize()
+            with suppress(Exception):
+                self._mcp_runtime.shutdown()
+            self.ctx.db.reset()
+            self.ctx.settings.reload()
             InfoBar.success("完成", "数据库已清空并重建", parent=self.window())
         except Exception as exc:
             self.logger.exception("Clear database failed: %s", exc)
@@ -1958,6 +1981,7 @@ class FlagDialog(MaskDialogBase):
         self.key_edit.setText(self.key_value)
         self.key_edit.setPlaceholderText("key（小写英文字母+数字+_，不可更改）")
         self.key_edit.setDisabled(not self.editable_key)
+        replace_whitespace_with_underscore(self.key_edit)
         form_layout.addRow(key_label, self.key_edit)
 
         hint = BodyLabel("只允许小写字母、数字、下划线，创建后不可修改。")
