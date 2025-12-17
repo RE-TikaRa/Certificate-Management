@@ -43,8 +43,8 @@ class AwardService:
                 certificate_code=certificate_code,
                 remarks=remarks,
             )
-            snapshot_names = self._set_award_members(session, award, member_names)
             session.add(award)
+            snapshot_names = self._set_award_members(session, award, member_names)
             session.flush()
 
             if attachment_files:
