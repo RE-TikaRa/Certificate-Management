@@ -195,6 +195,10 @@ class EntryPage(BasePage):
         title_layout.addStretch()
         from qfluentwidgets import FluentIcon, TransparentToolButton
 
+        self.ai_cert_btn = PushButton("AI 识别证书")
+        self.ai_cert_btn.clicked.connect(self._ai_recognize_certificate)
+        title_layout.addWidget(self.ai_cert_btn)
+
         refresh_btn = TransparentToolButton(FluentIcon.ERASE_TOOL)
         refresh_btn.setToolTip("清空表单")
         refresh_btn.clicked.connect(self._clear_form)
@@ -358,9 +362,6 @@ class EntryPage(BasePage):
         attach_header = QHBoxLayout()
         attach_header.addWidget(make_section_title("附件"))
         attach_header.addStretch()
-        self.ai_cert_btn = PushButton("AI 识别证书")
-        self.ai_cert_btn.clicked.connect(self._ai_recognize_certificate)
-        attach_header.addWidget(self.ai_cert_btn)
         attach_btn = PrimaryPushButton("添加文件")
         attach_btn.clicked.connect(self._pick_files)
         attach_header.addWidget(attach_btn)

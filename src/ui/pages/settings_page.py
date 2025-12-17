@@ -661,6 +661,7 @@ class SettingsPage(BasePage):
         self.ai_keys_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.ai_keys_table.verticalHeader().setVisible(False)
         header = self.ai_keys_table.horizontalHeader()
+        header.setDefaultAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.ai_keys_table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -969,7 +970,7 @@ class SettingsPage(BasePage):
 
         if not providers:
             self.ai_api_base.setText("")
-            self.ai_model.setCurrentText("")
+            self.ai_model.setText("")
             self.ai_pdf_pages.setText("1")
             self.ai_keys_table.setRowCount(0)
             self.ai_key_meta.setText("API Key：0 个")
@@ -980,7 +981,7 @@ class SettingsPage(BasePage):
 
     def _load_ai_provider(self, provider) -> None:
         self.ai_api_base.setText(provider.api_base)
-        self.ai_model.setCurrentText(provider.model)
+        self.ai_model.setText(provider.model)
         self.ai_pdf_pages.setText(str(provider.pdf_pages))
         self._refresh_ai_keys_table(provider.api_keys)
         self._refresh_ai_key_meta()
@@ -1009,7 +1010,7 @@ class SettingsPage(BasePage):
 
         def on_saved(name: str) -> None:
             base = self.ai_api_base.text().strip().rstrip("/")
-            model = self.ai_model.currentText().strip()
+            model = self.ai_model.text().strip()
             try:
                 pdf_pages = int(self.ai_pdf_pages.text().strip() or "1")
             except ValueError:
@@ -1060,11 +1061,13 @@ class SettingsPage(BasePage):
         self.ai_keys_table.setRowCount(len(entries))
         for row, (name, api_key) in enumerate(entries):
             name_item = QTableWidgetItem(name)
+            name_item.setTextAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
             key_item = QTableWidgetItem(_mask_key(api_key))
+            key_item.setTextAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
             key_item.setData(Qt.ItemDataRole.UserRole, api_key)
             self.ai_keys_table.setItem(row, 0, name_item)
             self.ai_keys_table.setItem(row, 1, key_item)
-        self.ai_keys_table.resizeColumnsToContents()
+        self.ai_keys_table.resizeColumnToContents(0)
 
     def _refresh_ai_key_meta(self) -> None:
         try:
@@ -1177,7 +1180,7 @@ class SettingsPage(BasePage):
     def _save_ai_provider_fields(self, provider_id: int, *, silent: bool) -> None:
         base = self.ai_api_base.text().strip().rstrip("/")
         self.ai_api_base.setText(base)
-        model = self.ai_model.currentText().strip()
+        model = self.ai_model.text().strip()
         try:
             pdf_pages = int(self.ai_pdf_pages.text().strip() or "1")
         except ValueError:
@@ -1214,13 +1217,13 @@ class SettingsPage(BasePage):
                 InfoBar.error("AI", str(result), parent=self.window())
                 return
 
-            current = self.ai_model.currentText().strip()
+            current = self.ai_model.text().strip()
             self.ai_model.blockSignals(True)
             try:
                 self.ai_model.clear()
                 self.ai_model.addItems(result)
                 if current:
-                    self.ai_model.setCurrentText(current)
+                    self.ai_model.setText(current)
             finally:
                 self.ai_model.blockSignals(False)
             self.ai_status.setText(f"AI：已获取 {len(result)} 个模型")
@@ -1240,12 +1243,12 @@ class SettingsPage(BasePage):
         self._ai_model_dialog = AIModelPickerDialog(
             self.window(),
             initial_models=existing,
-            current=self.ai_model.currentText().strip(),
+            current=self.ai_model.text().strip(),
             fetch_models=fetch,
         )
 
         def on_selected(model_id: str) -> None:
-            self.ai_model.setCurrentText(model_id)
+            self.ai_model.setText(model_id)
             self._save_ai_settings(silent=True)
             InfoBar.success("AI", f"已选择模型：{model_id}", parent=self.window())
 
@@ -1292,7 +1295,7 @@ class SettingsPage(BasePage):
                 return
             count, msg = result
             base = self.ai_api_base.text().strip()
-            model = self.ai_model.currentText().strip()
+            model = self.ai_model.text().strip()
             self.ai_status.setText(f"AI：{msg}（models={count}）")
             InfoBar.success("AI", f"{self.ai_status.text()}\n{base}\n{model}".strip(), parent=self.window())
 
