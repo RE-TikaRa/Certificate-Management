@@ -1417,15 +1417,16 @@ class SettingsPage(BasePage):
 
         hint = BodyLabel(
             "用于“荣誉录入”页面的一键识别：从证书图片自动抽取比赛名称、日期、级别、奖项、证书编号与成员姓名。\n"
-            "注意：启用后会把证书图片发送到你填写的 API（仅本地保存配置，请勿对外暴露服务）。"
+            "注意：启用后会把证书图片发送到你填写的 API（仅本地保存配置，请勿对外暴露服务）。\n"
+            "           只有填写好APIKey之后才能够刷新模型列表与选择模型"
         )
         hint.setWordWrap(True)
         hint.setStyleSheet("color: #7a7a7a;")
         card_layout.addWidget(hint)
 
-        form = QFormLayout()
-        form.setSpacing(12)
-        form.addRow(self.ai_enabled)
+        top_form = QFormLayout()
+        top_form.setSpacing(12)
+        top_form.addRow(self.ai_enabled)
         provider_row = QWidget()
         provider_layout = QHBoxLayout(provider_row)
         provider_layout.setContentsMargins(0, 0, 0, 0)
@@ -1433,21 +1434,11 @@ class SettingsPage(BasePage):
         provider_layout.addWidget(self.ai_provider_add_btn)
         provider_layout.addWidget(self.ai_provider_rename_btn)
         provider_layout.addWidget(self.ai_provider_delete_btn)
-        form.addRow("提供商", provider_row)
-        form.addRow("API 地址", self.ai_api_base)
-        model_row = QWidget()
-        model_layout = QHBoxLayout(model_row)
-        model_layout.setContentsMargins(0, 0, 0, 0)
-        model_layout.addWidget(self.ai_model, 1)
-        model_layout.addWidget(self.ai_pick_model_btn)
-        model_layout.addWidget(self.ai_refresh_models_btn)
-        model_layout.addWidget(self.ai_test_btn)
-        form.addRow("模型", model_row)
-        form.addRow("PDF 页数（最多 10）", self.ai_pdf_pages)
-        card_layout.addLayout(form)
+        top_form.addRow("提供商", provider_row)
+        top_form.addRow("API Url", self.ai_api_base)
+        card_layout.addLayout(top_form)
 
-        keys_title = BodyLabel("API Key（支持多 Key 轮换）")
-        keys_title.setStyleSheet("color: #7a7a7a;")
+        keys_title = QLabel("API Key（支持多 Key 轮换）")
         card_layout.addWidget(keys_title)
         card_layout.addWidget(self.ai_keys_table)
 
@@ -1458,8 +1449,22 @@ class SettingsPage(BasePage):
         key_action.addStretch()
         card_layout.addLayout(key_action)
 
-        card_layout.addWidget(self.ai_status)
         card_layout.addWidget(self.ai_key_meta)
+
+        bottom_form = QFormLayout()
+        bottom_form.setSpacing(12)
+        model_row = QWidget()
+        model_layout = QHBoxLayout(model_row)
+        model_layout.setContentsMargins(0, 0, 0, 0)
+        model_layout.addWidget(self.ai_model, 1)
+        model_layout.addWidget(self.ai_pick_model_btn)
+        model_layout.addWidget(self.ai_refresh_models_btn)
+        model_layout.addWidget(self.ai_test_btn)
+        bottom_form.addRow("模型", model_row)
+        bottom_form.addRow("PDF 页数（最多 10）", self.ai_pdf_pages)
+        card_layout.addLayout(bottom_form)
+
+        card_layout.addWidget(self.ai_status)
 
         action = QHBoxLayout()
         save_btn = PrimaryPushButton("保存 AI 设置")
