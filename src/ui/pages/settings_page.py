@@ -1110,8 +1110,11 @@ class SettingsPage(BasePage):
         def on_saved(name: str, api_key: str) -> None:
             row = self.ai_keys_table.rowCount()
             self.ai_keys_table.insertRow(row)
-            self.ai_keys_table.setItem(row, 0, QTableWidgetItem(name))
+            name_item = QTableWidgetItem(name)
+            name_item.setTextAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
+            self.ai_keys_table.setItem(row, 0, name_item)
             key_item = QTableWidgetItem(_mask_key(api_key))
+            key_item.setTextAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
             key_item.setData(Qt.ItemDataRole.UserRole, api_key)
             self.ai_keys_table.setItem(row, 1, key_item)
             self._persist_ai_keys()
@@ -1140,8 +1143,11 @@ class SettingsPage(BasePage):
         )
 
         def on_saved(name: str, api_key: str) -> None:
-            self.ai_keys_table.setItem(row, 0, QTableWidgetItem(name))
+            name_item = QTableWidgetItem(name)
+            name_item.setTextAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
+            self.ai_keys_table.setItem(row, 0, name_item)
             new_item = QTableWidgetItem(_mask_key(api_key))
+            new_item.setTextAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
             new_item.setData(Qt.ItemDataRole.UserRole, api_key)
             self.ai_keys_table.setItem(row, 1, new_item)
             self._persist_ai_keys()
