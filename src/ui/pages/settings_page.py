@@ -7,13 +7,15 @@ from queue import Empty, SimpleQueue
 from typing import Any, ClassVar
 
 from pypinyin import lazy_pinyin
-from PySide6.QtCore import QProcess, Qt, QTimer, QUrl
+from PySide6.QtCore import QProcess, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QDesktopServices, QIntValidator
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QFileDialog,
     QFormLayout,
     QGridLayout,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QLineEdit,
     QListWidget,
@@ -23,6 +25,8 @@ from PySide6.QtWidgets import (
     QProgressDialog,
     QScrollArea,
     QSizePolicy,
+    QTableWidget,
+    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -30,6 +34,7 @@ from qfluentwidgets import (
     BodyLabel,
     CheckBox,
     ComboBox,
+    EditableComboBox,
     InfoBar,
     LineEdit,
     MaskDialogBase,
@@ -46,7 +51,46 @@ from src.services.school_importer import read_school_list
 
 from ..styled_theme import ThemeManager
 from ..theme import create_card, create_page_header, make_section_title
+from ..utils.async_utils import run_in_thread
 from .base_page import BasePage
+
+
+def _split_api_keys(raw: str) -> list[str]:
+    parts: list[str] = []
+    for chunk in raw.replace("\n", ",").split(","):
+        item = chunk.strip()
+        if not item:
+            continue
+        if "|" in item:
+            _name, value = item.split("|", 1)
+            item = value.strip()
+        if item:
+            parts.append(item)
+    return parts
+
+
+def _parse_named_api_keys(raw: str) -> list[tuple[str, str]]:
+    out: list[tuple[str, str]] = []
+    for chunk in raw.replace("\n", ",").split(","):
+        item = chunk.strip()
+        if not item:
+            continue
+        name = ""
+        value = item
+        if "|" in item:
+            name, value = item.split("|", 1)
+            name = name.strip()
+            value = value.strip()
+        if value:
+            out.append((name, value))
+    return out
+
+
+def _mask_key(key: str) -> str:
+    k = key.strip()
+    if len(k) <= 10:
+        return k[:2] + "…" if len(k) > 2 else "…"
+    return f"{k[:6]}…{k[-4:]}"
 
 
 def clean_input_text(line_edit: QLineEdit) -> None:
@@ -270,6 +314,295 @@ class UvSyncDialog(MaskDialogBase):
         super().closeEvent(event)
 
 
+class AIKeyManagerDialog(MaskDialogBase):
+    saved = Signal(str)  # comma-separated keys
+
+    def __init__(self, parent, *, initial_keys: str) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("管理 API Key")
+        self.widget.setMinimumWidth(720)
+        self.widget.setMaximumWidth(920)
+        self._initial_keys = initial_keys
+        self._build_ui()
+        self._load_initial()
+
+    def _build_ui(self) -> None:
+        layout = QVBoxLayout(self.widget)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(12)
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        header = create_page_header("API Key 管理", "支持逗号分隔/换行分隔，保存后自动轮换")
+        layout.addWidget(header)
+
+        card, card_layout = create_card()
+        card_layout.setSpacing(10)
+
+        self.count_label = BodyLabel("Key 数量：0")
+        self.count_label.setStyleSheet("color: #7a7a7a;")
+        card_layout.addWidget(self.count_label)
+
+        self.editor = QPlainTextEdit(self.widget)
+        self.editor.setPlaceholderText("一行一个 Key，或用逗号分隔多个 Key")
+        self.editor.setMinimumHeight(220)
+        self.editor.textChanged.connect(self._refresh_count)
+        card_layout.addWidget(self.editor)
+
+        preview_title = BodyLabel("掩码预览（仅显示部分）")
+        preview_title.setStyleSheet("color: #7a7a7a;")
+        card_layout.addWidget(preview_title)
+
+        self.preview = QListWidget(self.widget)
+        self.preview.setMinimumHeight(140)
+        card_layout.addWidget(self.preview)
+
+        layout.addWidget(card)
+
+        btn_row = QHBoxLayout()
+        self.reset_btn = PushButton("还原")
+        self.reset_btn.clicked.connect(self._load_initial)
+        self.clear_btn = PushButton("清空")
+        self.clear_btn.clicked.connect(lambda: self.editor.setPlainText(""))
+        btn_row.addWidget(self.reset_btn)
+        btn_row.addWidget(self.clear_btn)
+        btn_row.addStretch()
+        self.save_btn = PrimaryPushButton("保存")
+        self.save_btn.clicked.connect(self._save)
+        self.cancel_btn = PushButton("取消")
+        self.cancel_btn.clicked.connect(self.close)
+        btn_row.addWidget(self.save_btn)
+        btn_row.addWidget(self.cancel_btn)
+        layout.addLayout(btn_row)
+
+    def _load_initial(self) -> None:
+        keys = _split_api_keys(self._initial_keys)
+        self.editor.blockSignals(True)
+        try:
+            self.editor.setPlainText("\n".join(keys))
+        finally:
+            self.editor.blockSignals(False)
+        self._refresh_count()
+
+    def _refresh_count(self) -> None:
+        keys = _split_api_keys(self.editor.toPlainText())
+        self.count_label.setText(f"Key 数量：{len(keys)}")
+        self.preview.clear()
+        for key in keys[:50]:
+            self.preview.addItem(QListWidgetItem(_mask_key(key)))
+        if len(keys) > 50:
+            self.preview.addItem(QListWidgetItem(f"… 还有 {len(keys) - 50} 个未显示"))
+
+    def _save(self) -> None:
+        keys = _split_api_keys(self.editor.toPlainText())
+        if not keys:
+            InfoBar.warning("AI", "至少需要 1 个 Key", parent=self.window())
+            return
+        self.saved.emit(",".join(keys))
+        self.close()
+
+
+class AIProviderNameDialog(MaskDialogBase):
+    saved = Signal(str)
+
+    def __init__(self, parent, *, title: str, initial_name: str = "") -> None:
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.widget.setMinimumWidth(520)
+        self._initial_name = initial_name
+        self._build_ui()
+
+    def _build_ui(self) -> None:
+        layout = QVBoxLayout(self.widget)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(12)
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        header = create_page_header(self.windowTitle(), "仅用于区分不同提供商（本地保存）")
+        layout.addWidget(header)
+
+        form = QFormLayout()
+        form.setSpacing(12)
+        self.name = LineEdit()
+        self.name.setPlaceholderText("例如：OpenAI / PackyAPI / 自建兼容")
+        self.name.setText(self._initial_name)
+        form.addRow("名称", self.name)
+        layout.addLayout(form)
+
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
+        ok_btn = PrimaryPushButton("保存")
+        cancel_btn = PushButton("取消")
+        ok_btn.clicked.connect(self._save)
+        cancel_btn.clicked.connect(self.close)
+        btn_row.addWidget(ok_btn)
+        btn_row.addWidget(cancel_btn)
+        layout.addLayout(btn_row)
+
+    def _save(self) -> None:
+        name = self.name.text().strip()
+        if not name:
+            InfoBar.warning("AI", "名称不能为空", parent=self.window())
+            return
+        self.saved.emit(name)
+        self.close()
+
+
+class AIKeyEditDialog(MaskDialogBase):
+    saved = Signal(str, str)  # name, api_key
+
+    def __init__(self, parent, *, title: str, initial_name: str = "", initial_key: str = "") -> None:
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.widget.setMinimumWidth(640)
+        self._initial_name = initial_name
+        self._initial_key = initial_key
+        self._build_ui()
+
+    def _build_ui(self) -> None:
+        layout = QVBoxLayout(self.widget)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(12)
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        header = create_page_header(self.windowTitle(), "可配置多个 Key，软件会自动轮换（本地保存）")
+        layout.addWidget(header)
+
+        form = QFormLayout()
+        form.setSpacing(12)
+
+        self.name = LineEdit()
+        self.name.setPlaceholderText("例如：主账号 / 备用账号（可留空）")
+        self.name.setText(self._initial_name)
+        form.addRow("名称", self.name)
+
+        self.key = LineEdit()
+        self.key.setEchoMode(QLineEdit.EchoMode.Password)
+        self.key.setPlaceholderText("sk-... 或你的提供商 token（支持任意字符串）")
+        self.key.setText(self._initial_key)
+        form.addRow("API Key", self.key)
+        layout.addLayout(form)
+
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
+        ok_btn = PrimaryPushButton("保存")
+        cancel_btn = PushButton("取消")
+        ok_btn.clicked.connect(self._save)
+        cancel_btn.clicked.connect(self.close)
+        btn_row.addWidget(ok_btn)
+        btn_row.addWidget(cancel_btn)
+        layout.addLayout(btn_row)
+
+    def _save(self) -> None:
+        api_key = self.key.text().strip()
+        if not api_key:
+            InfoBar.warning("AI", "API Key 不能为空", parent=self.window())
+            return
+        self.saved.emit(self.name.text().strip(), api_key)
+        self.close()
+
+
+class AIModelPickerDialog(MaskDialogBase):
+    selected = Signal(str)
+
+    def __init__(self, parent, *, initial_models: list[str], current: str, fetch_models):
+        super().__init__(parent)
+        self.setWindowTitle("选择模型")
+        self.widget.setMinimumWidth(720)
+        self.widget.setMaximumWidth(920)
+        self._fetch_models = fetch_models
+        self._models: list[str] = list(initial_models)
+        self._current = current
+        self._busy = False
+        self._build_ui()
+        self._apply_models(self._models)
+
+    def _build_ui(self) -> None:
+        layout = QVBoxLayout(self.widget)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(12)
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        header = create_page_header("模型选择", "可刷新获取模型列表，也可用搜索过滤")
+        layout.addWidget(header)
+
+        tool_row = QHBoxLayout()
+        self.search = LineEdit()
+        self.search.setPlaceholderText("搜索模型（支持子串）")
+        self.search.textChanged.connect(self._filter)
+        self.refresh_btn = PrimaryPushButton("刷新列表")
+        self.refresh_btn.clicked.connect(self._refresh)
+        tool_row.addWidget(self.search, 1)
+        tool_row.addWidget(self.refresh_btn)
+        layout.addLayout(tool_row)
+
+        self.status = BodyLabel("模型：0")
+        self.status.setStyleSheet("color: #7a7a7a;")
+        layout.addWidget(self.status)
+
+        self.list = QListWidget(self.widget)
+        self.list.itemDoubleClicked.connect(lambda item: self._select(item.text()))
+        self.list.setMinimumHeight(360)
+        layout.addWidget(self.list)
+
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
+        self.ok_btn = PrimaryPushButton("选择")
+        self.ok_btn.clicked.connect(self._select_current)
+        self.cancel_btn = PushButton("取消")
+        self.cancel_btn.clicked.connect(self.close)
+        btn_row.addWidget(self.ok_btn)
+        btn_row.addWidget(self.cancel_btn)
+        layout.addLayout(btn_row)
+
+    def _apply_models(self, models: list[str]) -> None:
+        self._models = models
+        self._filter()
+
+    def _filter(self) -> None:
+        keyword = self.search.text().strip().lower()
+        self.list.clear()
+        filtered = [m for m in self._models if keyword in m.lower()] if keyword else list(self._models)
+        self.status.setText(f"模型：{len(filtered)} / {len(self._models)}")
+        for model_id in filtered:
+            self.list.addItem(QListWidgetItem(model_id))
+        if self._current:
+            matches = self.list.findItems(self._current, Qt.MatchFlag.MatchExactly)
+            if matches:
+                self.list.setCurrentItem(matches[0])
+
+    def _refresh(self) -> None:
+        if self._busy:
+            return
+        self._busy = True
+        self.refresh_btn.setEnabled(False)
+        self.status.setText("模型：刷新中…")
+
+        def on_done(result: list[str] | Exception) -> None:
+            self._busy = False
+            self.refresh_btn.setEnabled(True)
+            if isinstance(result, Exception):
+                InfoBar.error("AI", str(result), parent=self.window())
+                self._filter()
+                return
+            self._apply_models(result)
+
+        run_in_thread(self._fetch_models, on_done)
+
+    def _select_current(self) -> None:
+        item = self.list.currentItem()
+        if item is None:
+            InfoBar.warning("AI", "请选择一个模型", parent=self.window())
+            return
+        self._select(item.text())
+
+    def _select(self, model_id: str) -> None:
+        model = model_id.strip()
+        if not model:
+            return
+        self.selected.emit(model)
+        self.close()
+
+
 class SettingsPage(BasePage):
     THEME_OPTIONS: ClassVar[dict[str, str]] = {
         "light": "浅色",
@@ -303,6 +636,40 @@ class SettingsPage(BasePage):
         self.email_suffix = LineEdit()
         clean_input_text(self.email_suffix)
         self.email_suffix.setPlaceholderText("例如: @st.gsau.edu.cn")
+        self.ai_enabled = CheckBox("启用 AI 证书识别（将把证书图片发送到你配置的 API）")
+        self.ai_provider = ComboBox()
+        self.ai_provider_add_btn = PushButton("新增提供商")
+        self.ai_provider_rename_btn = PushButton("重命名")
+        self.ai_provider_delete_btn = PushButton("删除")
+        self.ai_api_base = LineEdit()
+        self.ai_api_base.setPlaceholderText("例如：https://api.openai.com 或你的 OpenAI 兼容地址")
+        self.ai_model = EditableComboBox()
+        self.ai_model.setPlaceholderText("例如：gpt-4.1-mini（按你的 API 提供方填写）")
+        self.ai_refresh_models_btn = PushButton("刷新模型")
+        self.ai_test_btn = PrimaryPushButton("测试联通")
+        self.ai_pick_model_btn = PushButton("选择…")
+        self._ai_model_dialog: AIModelPickerDialog | None = None
+        self.ai_pdf_pages = LineEdit()
+        self.ai_pdf_pages.setPlaceholderText("默认 1（建议 1-3）")
+        self.ai_pdf_pages.setValidator(QIntValidator(1, 10, self))
+        self.ai_status = BodyLabel("AI：未测试")
+        self.ai_status.setStyleSheet("color: #7a7a7a;")
+        self.ai_keys_table = QTableWidget(0, 2)
+        self.ai_keys_table.setHorizontalHeaderLabels(["名称", "API Key"])
+        self.ai_keys_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.ai_keys_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.ai_keys_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.ai_keys_table.verticalHeader().setVisible(False)
+        header = self.ai_keys_table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.ai_keys_table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.ai_keys_table.setMinimumHeight(180)
+        self.ai_key_add_btn = PushButton("新增 Key")
+        self.ai_key_edit_btn = PushButton("编辑")
+        self.ai_key_delete_btn = PushButton("删除")
+        self.ai_key_meta = BodyLabel("API Key：0 个")
+        self.ai_key_meta.setStyleSheet("color: #7a7a7a;")
         self.school_total_value = QLabel("--")
         self.school_with_code_value = QLabel("--")
         self.major_total_value = QLabel("--")
@@ -367,11 +734,15 @@ class SettingsPage(BasePage):
         self._process_timer.setInterval(1000)
         self._process_timer.timeout.connect(self._refresh_process_status)
         self._mcp_refreshing = False
+        self._ai_refreshing = False
+        self._ai_busy = False
+        self._ai_current_provider_id: int | None = None
 
         self._build_ui()
         self.refresh()
         self._refresh_process_status()
         self._connect_mcp_signals()
+        self._connect_ai_signals()
 
     def showEvent(self, event) -> None:
         super().showEvent(event)
@@ -435,6 +806,7 @@ class SettingsPage(BasePage):
         action_row.addStretch()
         settings_layout.addLayout(action_row)
         layout.addWidget(settings_card)
+        layout.addWidget(self._build_ai_card())
         layout.addWidget(self._build_mcp_card())
         layout.addWidget(self._build_cleanup_card())
         layout.addWidget(self._build_flags_card())
@@ -474,6 +846,13 @@ class SettingsPage(BasePage):
         # Load email suffix
         email_suffix = self.ctx.settings.get("email_suffix", "@st.gsau.edu.cn")
         self.email_suffix.setText(email_suffix)
+        # AI
+        self._ai_refreshing = True
+        try:
+            self.ai_enabled.setChecked(self.ctx.settings.get("ai_enabled", "false") == "true")
+            self._refresh_ai_provider_ui()
+        finally:
+            self._ai_refreshing = False
         # MCP
         self._mcp_refreshing = True
         try:
@@ -512,6 +891,412 @@ class SettingsPage(BasePage):
             self.mcp_web_username,
         ):
             le.editingFinished.connect(lambda: self._save_mcp_settings(silent=True))
+
+    def _connect_ai_signals(self) -> None:
+        self.ai_enabled.stateChanged.connect(lambda _=0: self._save_ai_settings(silent=True))
+        self.ai_provider.currentIndexChanged.connect(lambda _=0: self._on_ai_provider_changed())
+        self.ai_provider_add_btn.clicked.connect(self._add_ai_provider)
+        self.ai_provider_rename_btn.clicked.connect(self._rename_ai_provider)
+        self.ai_provider_delete_btn.clicked.connect(self._delete_ai_provider)
+        for le in (self.ai_api_base, self.ai_pdf_pages):
+            le.editingFinished.connect(lambda: self._save_ai_settings(silent=True))
+        self.ai_model.currentIndexChanged.connect(lambda _=0: self._save_ai_settings(silent=True))
+        self.ai_model.editingFinished.connect(lambda: self._save_ai_settings(silent=True))
+        self.ai_pick_model_btn.clicked.connect(self._open_ai_model_dialog)
+
+        self.ai_refresh_models_btn.clicked.connect(self._refresh_ai_models)
+        self.ai_test_btn.clicked.connect(self._test_ai_connection)
+        self.ai_key_add_btn.clicked.connect(self._add_ai_key)
+        self.ai_key_edit_btn.clicked.connect(self._edit_ai_key)
+        self.ai_key_delete_btn.clicked.connect(self._delete_ai_key)
+
+    def _ai_selected_provider_id(self) -> int | None:
+        raw = self.ai_provider.currentData()
+        if isinstance(raw, int):
+            return raw
+        if raw is None:
+            return None
+        try:
+            return int(str(raw))
+        except Exception:
+            return None
+
+    def _refresh_ai_provider_ui(self) -> None:
+        providers = self.ctx.ai_providers.list_providers()
+        if not providers:
+            self.ctx.ai_providers.ensure_legacy_migration()
+            providers = self.ctx.ai_providers.list_providers()
+
+        active_id = self.ctx.ai_providers.get_active_provider_id()
+        if active_id is None and providers:
+            active_id = providers[0].id
+            self.ctx.ai_providers.set_active_provider_id(active_id)
+
+        self.ai_provider.blockSignals(True)
+        try:
+            self.ai_provider.clear()
+            for p in providers:
+                self.ai_provider.addItem(p.name)
+                self.ai_provider.setItemData(self.ai_provider.count() - 1, p.id)
+            index = 0
+            for i, p in enumerate(providers):
+                if p.id == active_id:
+                    index = i
+                    break
+            if providers:
+                self.ai_provider.setCurrentIndex(index)
+        finally:
+            self.ai_provider.blockSignals(False)
+
+        self._ai_current_provider_id = active_id if providers else None
+        enabled = bool(providers)
+        for w in (
+            self.ai_provider,
+            self.ai_provider_rename_btn,
+            self.ai_provider_delete_btn,
+            self.ai_api_base,
+            self.ai_model,
+            self.ai_pick_model_btn,
+            self.ai_refresh_models_btn,
+            self.ai_test_btn,
+            self.ai_pdf_pages,
+            self.ai_keys_table,
+            self.ai_key_add_btn,
+            self.ai_key_edit_btn,
+            self.ai_key_delete_btn,
+        ):
+            w.setEnabled(enabled)
+
+        if not providers:
+            self.ai_api_base.setText("")
+            self.ai_model.setCurrentText("")
+            self.ai_pdf_pages.setText("1")
+            self.ai_keys_table.setRowCount(0)
+            self.ai_key_meta.setText("API Key：0 个")
+            return
+
+        provider = self.ctx.ai_providers.get_active_provider()
+        self._load_ai_provider(provider)
+
+    def _load_ai_provider(self, provider) -> None:
+        self.ai_api_base.setText(provider.api_base)
+        self.ai_model.setCurrentText(provider.model)
+        self.ai_pdf_pages.setText(str(provider.pdf_pages))
+        self._refresh_ai_keys_table(provider.api_keys)
+        self._refresh_ai_key_meta()
+
+    def _on_ai_provider_changed(self) -> None:
+        if self._ai_refreshing:
+            return
+        prev_id = self._ai_current_provider_id
+        next_id = self._ai_selected_provider_id()
+        if next_id is None:
+            return
+        if prev_id is not None:
+            self._save_ai_provider_fields(prev_id, silent=True)
+        self.ctx.ai_providers.set_active_provider_id(next_id)
+        self._ai_current_provider_id = next_id
+        provider = self.ctx.ai_providers.get_active_provider()
+        self._ai_refreshing = True
+        try:
+            self._load_ai_provider(provider)
+            self.ai_status.setText("AI：未测试")
+        finally:
+            self._ai_refreshing = False
+
+    def _add_ai_provider(self) -> None:
+        dialog = AIProviderNameDialog(self.window(), title="新增 AI 提供商")
+
+        def on_saved(name: str) -> None:
+            base = self.ai_api_base.text().strip().rstrip("/")
+            model = self.ai_model.currentText().strip()
+            try:
+                pdf_pages = int(self.ai_pdf_pages.text().strip() or "1")
+            except ValueError:
+                pdf_pages = 1
+            provider = self.ctx.ai_providers.create_provider(
+                name=name,
+                api_base=base,
+                api_keys="",
+                model=model,
+                pdf_pages=max(1, min(10, pdf_pages)),
+            )
+            self.ctx.ai_providers.set_active_provider_id(provider.id)
+            self.refresh()
+            InfoBar.success("AI", f"已新增提供商：{name}", parent=self.window())
+
+        dialog.saved.connect(on_saved)
+        dialog.show()
+
+    def _rename_ai_provider(self) -> None:
+        provider_id = self._ai_current_provider_id
+        if provider_id is None:
+            return
+        provider = self.ctx.ai_providers.get_active_provider()
+        dialog = AIProviderNameDialog(self.window(), title="重命名 AI 提供商", initial_name=provider.name)
+
+        def on_saved(name: str) -> None:
+            self.ctx.ai_providers.update_provider(provider_id, name=name)
+            self._refresh_ai_provider_ui()
+            InfoBar.success("AI", f"已重命名为：{name}", parent=self.window())
+
+        dialog.saved.connect(on_saved)
+        dialog.show()
+
+    def _delete_ai_provider(self) -> None:
+        provider_id = self._ai_current_provider_id
+        if provider_id is None:
+            return
+        provider = self.ctx.ai_providers.get_active_provider()
+        box = MessageBox("删除提供商", f"确定删除“{provider.name}”吗？", parent=self.window())
+        if not box.exec():
+            return
+        self.ctx.ai_providers.delete_provider(provider_id)
+        self.refresh()
+        InfoBar.success("AI", "已删除提供商", parent=self.window())
+
+    def _refresh_ai_keys_table(self, raw_keys: str) -> None:
+        entries = _parse_named_api_keys(raw_keys)
+        self.ai_keys_table.setRowCount(len(entries))
+        for row, (name, api_key) in enumerate(entries):
+            name_item = QTableWidgetItem(name)
+            key_item = QTableWidgetItem(_mask_key(api_key))
+            key_item.setData(Qt.ItemDataRole.UserRole, api_key)
+            self.ai_keys_table.setItem(row, 0, name_item)
+            self.ai_keys_table.setItem(row, 1, key_item)
+        self.ai_keys_table.resizeColumnsToContents()
+
+    def _refresh_ai_key_meta(self) -> None:
+        try:
+            provider = self.ctx.ai_providers.get_active_provider()
+        except Exception:
+            self.ai_key_meta.setText("API Key：0 个")
+            return
+        count = len(_split_api_keys(provider.api_keys))
+        self.ai_key_meta.setText(f"API Key：{count} 个（轮换索引 {provider.last_key_index}）")
+
+    def _persist_ai_keys(self) -> None:
+        provider_id = self._ai_current_provider_id
+        if provider_id is None:
+            return
+        entries: list[tuple[str, str]] = []
+        for row in range(self.ai_keys_table.rowCount()):
+            name_item = self.ai_keys_table.item(row, 0)
+            key_item = self.ai_keys_table.item(row, 1)
+            if key_item is None:
+                continue
+            raw = key_item.data(Qt.ItemDataRole.UserRole)
+            if not isinstance(raw, str):
+                continue
+            api_key = raw.strip()
+            if not api_key:
+                continue
+            name = name_item.text().strip() if name_item is not None else ""
+            entries.append((name, api_key))
+        lines = [f"{n}|{k}" if n else k for n, k in entries]
+        self.ctx.ai_providers.update_provider(provider_id, api_keys="\n".join(lines), reset_rotation=True)
+        self._refresh_ai_key_meta()
+
+    def _selected_ai_key_row(self) -> int | None:
+        row = self.ai_keys_table.currentRow()
+        return None if row < 0 else row
+
+    def _add_ai_key(self) -> None:
+        dialog = AIKeyEditDialog(self.window(), title="新增 API Key")
+
+        def on_saved(name: str, api_key: str) -> None:
+            row = self.ai_keys_table.rowCount()
+            self.ai_keys_table.insertRow(row)
+            self.ai_keys_table.setItem(row, 0, QTableWidgetItem(name))
+            key_item = QTableWidgetItem(_mask_key(api_key))
+            key_item.setData(Qt.ItemDataRole.UserRole, api_key)
+            self.ai_keys_table.setItem(row, 1, key_item)
+            self._persist_ai_keys()
+            InfoBar.success("AI", "API Key 已保存", parent=self.window())
+
+        dialog.saved.connect(on_saved)
+        dialog.show()
+
+    def _edit_ai_key(self) -> None:
+        row = self._selected_ai_key_row()
+        if row is None:
+            InfoBar.warning("AI", "请选择要编辑的 Key", parent=self.window())
+            return
+        name_item = self.ai_keys_table.item(row, 0)
+        key_item = self.ai_keys_table.item(row, 1)
+        if key_item is None:
+            return
+        raw = key_item.data(Qt.ItemDataRole.UserRole)
+        if not isinstance(raw, str):
+            return
+        dialog = AIKeyEditDialog(
+            self.window(),
+            title="编辑 API Key",
+            initial_name=name_item.text() if name_item is not None else "",
+            initial_key=raw,
+        )
+
+        def on_saved(name: str, api_key: str) -> None:
+            self.ai_keys_table.setItem(row, 0, QTableWidgetItem(name))
+            new_item = QTableWidgetItem(_mask_key(api_key))
+            new_item.setData(Qt.ItemDataRole.UserRole, api_key)
+            self.ai_keys_table.setItem(row, 1, new_item)
+            self._persist_ai_keys()
+            InfoBar.success("AI", "API Key 已更新", parent=self.window())
+
+        dialog.saved.connect(on_saved)
+        dialog.show()
+
+    def _delete_ai_key(self) -> None:
+        row = self._selected_ai_key_row()
+        if row is None:
+            InfoBar.warning("AI", "请选择要删除的 Key", parent=self.window())
+            return
+        box = MessageBox("删除 API Key", "确定删除选中的 Key 吗？", parent=self.window())
+        if not box.exec():
+            return
+        self.ai_keys_table.removeRow(row)
+        self._persist_ai_keys()
+        InfoBar.success("AI", "API Key 已删除", parent=self.window())
+
+    def _save_ai_settings(self, *, silent: bool = False) -> None:
+        if self._ai_refreshing:
+            return
+        try:
+            self.ctx.settings.set("ai_enabled", str(self.ai_enabled.isChecked()).lower())
+            provider_id = self._ai_current_provider_id
+            if provider_id is not None:
+                self._save_ai_provider_fields(provider_id, silent=True)
+                self._refresh_ai_key_meta()
+            if not silent:
+                InfoBar.success("AI", "AI 设置已保存", parent=self.window())
+        except Exception as exc:
+            if not silent:
+                InfoBar.error("AI", f"AI 设置保存失败：{exc}", parent=self.window())
+
+    def _save_ai_provider_fields(self, provider_id: int, *, silent: bool) -> None:
+        base = self.ai_api_base.text().strip().rstrip("/")
+        self.ai_api_base.setText(base)
+        model = self.ai_model.currentText().strip()
+        try:
+            pdf_pages = int(self.ai_pdf_pages.text().strip() or "1")
+        except ValueError:
+            pdf_pages = 1
+        self.ctx.ai_providers.update_provider(
+            provider_id,
+            api_base=base,
+            model=model,
+            pdf_pages=max(1, min(10, pdf_pages)),
+        )
+        if not silent:
+            InfoBar.success("AI", "提供商设置已保存", parent=self.window())
+
+    def _refresh_ai_models(self) -> None:
+        if self._ai_busy:
+            return
+        self._save_ai_settings(silent=True)
+        self._ai_busy = True
+        self.ai_refresh_models_btn.setEnabled(False)
+        self.ai_test_btn.setEnabled(False)
+        self.ai_pick_model_btn.setEnabled(False)
+        self.ai_status.setText("AI：正在获取模型列表…")
+
+        def task() -> list[str]:
+            return self.ctx.ai.list_models()
+
+        def on_done(result: list[str] | Exception) -> None:
+            self._ai_busy = False
+            self.ai_refresh_models_btn.setEnabled(True)
+            self.ai_test_btn.setEnabled(True)
+            self.ai_pick_model_btn.setEnabled(True)
+            if isinstance(result, Exception):
+                self.ai_status.setText("AI：获取模型失败")
+                InfoBar.error("AI", str(result), parent=self.window())
+                return
+
+            current = self.ai_model.currentText().strip()
+            self.ai_model.blockSignals(True)
+            try:
+                self.ai_model.clear()
+                self.ai_model.addItems(result)
+                if current:
+                    self.ai_model.setCurrentText(current)
+            finally:
+                self.ai_model.blockSignals(False)
+            self.ai_status.setText(f"AI：已获取 {len(result)} 个模型")
+            InfoBar.success("AI", f"已获取 {len(result)} 个模型", parent=self.window())
+
+        run_in_thread(task, on_done)
+
+    def _open_ai_model_dialog(self) -> None:
+        if self._ai_model_dialog is not None:
+            self._ai_model_dialog.close()
+
+        existing = [self.ai_model.itemText(i) for i in range(self.ai_model.count())]
+
+        def fetch() -> list[str]:
+            return self.ctx.ai.list_models()
+
+        self._ai_model_dialog = AIModelPickerDialog(
+            self.window(),
+            initial_models=existing,
+            current=self.ai_model.currentText().strip(),
+            fetch_models=fetch,
+        )
+
+        def on_selected(model_id: str) -> None:
+            self.ai_model.setCurrentText(model_id)
+            self._save_ai_settings(silent=True)
+            InfoBar.success("AI", f"已选择模型：{model_id}", parent=self.window())
+
+        self._ai_model_dialog.selected.connect(on_selected)
+        self._ai_model_dialog.show()
+
+    def _test_ai_connection(self) -> None:
+        if self._ai_busy:
+            return
+        self._save_ai_settings(silent=True)
+        self._ai_busy = True
+        self.ai_refresh_models_btn.setEnabled(False)
+        self.ai_test_btn.setEnabled(False)
+        self.ai_pick_model_btn.setEnabled(False)
+        self.ai_key_add_btn.setEnabled(False)
+        self.ai_key_edit_btn.setEnabled(False)
+        self.ai_key_delete_btn.setEnabled(False)
+        self.ai_status.setText("AI：测试中…")
+
+        def task() -> tuple[int, str]:
+            try:
+                models = self.ctx.ai.list_models()
+            except Exception:
+                latency = self.ctx.ai.check_latency()
+                return 0, f"连通正常（/v1/models 不支持，latency={latency}ms）"
+            provider = self.ctx.ai_providers.get_active_provider()
+            selected = provider.model.strip()
+            if selected and selected not in set(models):
+                return len(models), f"连通正常，但当前模型不在列表中：{selected}"
+            latency = self.ctx.ai.check_latency()
+            return len(models), f"连通正常（latency={latency}ms）"
+
+        def on_done(result: tuple[int, str] | Exception) -> None:
+            self._ai_busy = False
+            self.ai_refresh_models_btn.setEnabled(True)
+            self.ai_test_btn.setEnabled(True)
+            self.ai_pick_model_btn.setEnabled(True)
+            self.ai_key_add_btn.setEnabled(True)
+            self.ai_key_edit_btn.setEnabled(True)
+            self.ai_key_delete_btn.setEnabled(True)
+            if isinstance(result, Exception):
+                self.ai_status.setText("AI：测试失败")
+                InfoBar.error("AI", str(result), parent=self.window())
+                return
+            count, msg = result
+            base = self.ai_api_base.text().strip()
+            model = self.ai_model.currentText().strip()
+            self.ai_status.setText(f"AI：{msg}（models={count}）")
+            InfoBar.success("AI", f"{self.ai_status.text()}\n{base}\n{model}".strip(), parent=self.window())
+
+        run_in_thread(task, on_done)
 
     def _save_mcp_settings(self, *, silent: bool = False) -> None:
         if self._mcp_refreshing:
@@ -597,6 +1382,8 @@ class SettingsPage(BasePage):
 
             # MCP 设置（页面内已自动保存，这里兜底写一次）
             self._save_mcp_settings(silent=True)
+            # AI 设置（页面内已自动保存，这里兜底写一次）
+            self._save_ai_settings(silent=True)
 
             # Apply theme changes
             theme_mode = self.theme_manager.get_theme_from_text(theme_value)
@@ -614,6 +1401,65 @@ class SettingsPage(BasePage):
     def _backup_now(self) -> None:
         path = self.ctx.backup.perform_backup()
         InfoBar.success("备份完成", str(path), duration=2000, parent=self.window())
+
+    def _build_ai_card(self) -> QWidget:
+        card, card_layout = create_card()
+        card_layout.addWidget(make_section_title("AI 证书识别"))
+
+        hint = BodyLabel(
+            "用于“荣誉录入”页面的一键识别：从证书图片自动抽取比赛名称、日期、级别、奖项、证书编号与成员姓名。\n"
+            "注意：启用后会把证书图片发送到你填写的 API（仅本地保存配置，请勿对外暴露服务）。"
+        )
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: #7a7a7a;")
+        card_layout.addWidget(hint)
+
+        form = QFormLayout()
+        form.setSpacing(12)
+        form.addRow(self.ai_enabled)
+        provider_row = QWidget()
+        provider_layout = QHBoxLayout(provider_row)
+        provider_layout.setContentsMargins(0, 0, 0, 0)
+        provider_layout.addWidget(self.ai_provider, 1)
+        provider_layout.addWidget(self.ai_provider_add_btn)
+        provider_layout.addWidget(self.ai_provider_rename_btn)
+        provider_layout.addWidget(self.ai_provider_delete_btn)
+        form.addRow("提供商", provider_row)
+        form.addRow("API 地址", self.ai_api_base)
+        model_row = QWidget()
+        model_layout = QHBoxLayout(model_row)
+        model_layout.setContentsMargins(0, 0, 0, 0)
+        model_layout.addWidget(self.ai_model, 1)
+        model_layout.addWidget(self.ai_pick_model_btn)
+        model_layout.addWidget(self.ai_refresh_models_btn)
+        model_layout.addWidget(self.ai_test_btn)
+        form.addRow("模型", model_row)
+        form.addRow("PDF 页数（最多 10）", self.ai_pdf_pages)
+        card_layout.addLayout(form)
+
+        keys_title = BodyLabel("API Key（支持多 Key 轮换）")
+        keys_title.setStyleSheet("color: #7a7a7a;")
+        card_layout.addWidget(keys_title)
+        card_layout.addWidget(self.ai_keys_table)
+
+        key_action = QHBoxLayout()
+        key_action.addWidget(self.ai_key_add_btn)
+        key_action.addWidget(self.ai_key_edit_btn)
+        key_action.addWidget(self.ai_key_delete_btn)
+        key_action.addStretch()
+        card_layout.addLayout(key_action)
+
+        card_layout.addWidget(self.ai_status)
+        card_layout.addWidget(self.ai_key_meta)
+
+        action = QHBoxLayout()
+        save_btn = PrimaryPushButton("保存 AI 设置")
+        save_btn.clicked.connect(lambda: self._save_ai_settings(silent=False))
+        action.addWidget(save_btn)
+        action.addStretch()
+        card_layout.addLayout(action)
+
+        return card
 
     def _build_mcp_card(self) -> QWidget:
         card, card_layout = create_card()

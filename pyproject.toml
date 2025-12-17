@@ -26,6 +26,7 @@ dependencies = [
   "SQLAlchemy",
   "alembic",
   "pandas",
+  "PyMuPDF",
   "openpyxl",
   "pypinyin",
   "APScheduler",

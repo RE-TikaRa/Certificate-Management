@@ -6,11 +6,12 @@ from functools import partial
 from pathlib import Path
 from typing import cast
 
-from PySide6.QtCore import QDate, Qt, Slot
+from PySide6.QtCore import QDate, Qt, Signal, Slot
 from PySide6.QtGui import QColor, QCursor
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
+    QFormLayout,
     QFrame,
     QGraphicsEffect,
     QGridLayout,
@@ -19,6 +20,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLayout,
     QLineEdit,
+    QPlainTextEdit,
     QProgressDialog,
     QScrollArea,
     QTableView,
@@ -38,6 +40,7 @@ from qfluentwidgets import (
     TransparentToolButton,
 )
 
+from ...services.ai_certificate_service import CertificateExtractedInfo
 from ...services.doc_extractor import extract_member_info_from_doc
 from ...services.validators import FormValidator
 from ..styled_theme import ThemeManager
@@ -50,6 +53,96 @@ from ..widgets.school_search import SchoolSearchWidget
 from .base_page import BasePage
 
 logger = logging.getLogger(__name__)
+
+
+class AICertificatePreviewDialog(MaskDialogBase):
+    applied = Signal(object)  # CertificateExtractedInfo
+
+    def __init__(self, parent, *, info: CertificateExtractedInfo) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("AI 识别预览")
+        self.widget.setMinimumWidth(760)
+        self.widget.setMaximumWidth(960)
+        self._info = info
+        self._build_ui()
+        self._load()
+
+    def _build_ui(self) -> None:
+        layout = QVBoxLayout(self.widget)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(12)
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        header = create_page_header("AI 识别预览", "确认无误后再填充到表单（可手动修改）")
+        layout.addWidget(header)
+
+        card, card_layout = create_card()
+        form = QFormLayout()
+        form.setSpacing(12)
+
+        self.competition_name = LineEdit()
+        self.competition_name.setPlaceholderText("比赛/竞赛名称")
+        form.addRow("比赛名称", self.competition_name)
+
+        self.award_date = LineEdit()
+        self.award_date.setPlaceholderText("YYYY-MM-DD（可留空）")
+        form.addRow("获奖日期", self.award_date)
+
+        self.level = ComboBox()
+        self.level.addItems(["（不填）", "国家级", "省级", "校级"])
+        form.addRow("赛事级别", self.level)
+
+        self.rank = ComboBox()
+        self.rank.addItems(["（不填）", "一等奖", "二等奖", "三等奖", "优秀奖"])
+        form.addRow("奖项等级", self.rank)
+
+        self.certificate_code = LineEdit()
+        self.certificate_code.setPlaceholderText("证书编号（可留空）")
+        form.addRow("证书编号", self.certificate_code)
+
+        self.member_names = QPlainTextEdit(self.widget)
+        self.member_names.setPlaceholderText("一行一个成员姓名")
+        self.member_names.setMinimumHeight(140)
+        form.addRow("成员姓名", self.member_names)
+
+        card_layout.addLayout(form)
+        layout.addWidget(card)
+
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
+        apply_btn = PrimaryPushButton("填充到表单")
+        cancel_btn = PushButton("取消")
+        apply_btn.clicked.connect(self._apply)
+        cancel_btn.clicked.connect(self.close)
+        btn_row.addWidget(apply_btn)
+        btn_row.addWidget(cancel_btn)
+        layout.addLayout(btn_row)
+
+    def _load(self) -> None:
+        self.competition_name.setText(self._info.competition_name or "")
+        self.award_date.setText(self._info.award_date.isoformat() if self._info.award_date else "")
+        self.certificate_code.setText(self._info.certificate_code or "")
+
+        self.level.setCurrentText(self._info.level if self._info.level else "（不填）")
+        self.rank.setCurrentText(self._info.rank if self._info.rank else "（不填）")
+        self.member_names.setPlainText("\n".join(self._info.member_names))
+
+    def _apply(self) -> None:
+        data = {
+            "competition_name": self.competition_name.text().strip() or None,
+            "award_date": self.award_date.text().strip() or None,
+            "level": None if self.level.currentText() == "（不填）" else self.level.currentText(),
+            "rank": None if self.rank.currentText() == "（不填）" else self.rank.currentText(),
+            "certificate_code": self.certificate_code.text().strip() or None,
+            "member_names": [line.strip() for line in self.member_names.toPlainText().splitlines() if line.strip()],
+        }
+        try:
+            info = CertificateExtractedInfo.model_validate(data)
+        except Exception as exc:
+            InfoBar.error("AI", f"预览内容不合法：{exc}", parent=self.window())
+            return
+        self.applied.emit(info)
+        self.close()
 
 
 def clean_input_text(line_edit: QLineEdit) -> None:
@@ -80,6 +173,8 @@ class EntryPage(BasePage):
         self.editing_award = None  # 当前正在编辑的荣誉
         self.flag_checkboxes: dict[str, CheckBox] = {}
         self.flag_defs: list = []
+        self._ai_busy = False
+        self._ai_progress: QProgressDialog | None = None
 
         # 连接主题变化信号
         self.theme_manager.themeChanged.connect(self._on_theme_changed)
@@ -263,6 +358,9 @@ class EntryPage(BasePage):
         attach_header = QHBoxLayout()
         attach_header.addWidget(make_section_title("附件"))
         attach_header.addStretch()
+        self.ai_cert_btn = PushButton("AI 识别证书")
+        self.ai_cert_btn.clicked.connect(self._ai_recognize_certificate)
+        attach_header.addWidget(self.ai_cert_btn)
         attach_btn = PrimaryPushButton("添加文件")
         attach_btn.clicked.connect(self._pick_files)
         attach_header.addWidget(attach_btn)
@@ -302,6 +400,92 @@ class EntryPage(BasePage):
 
         self._apply_theme()
         self.refresh()
+
+    def _ai_recognize_certificate(self) -> None:
+        if self.editing_award is not None:
+            InfoBar.warning("提示", "编辑模式下暂不支持 AI 识别，请先取消编辑或清空表单", parent=self.window())
+            return
+        if self._ai_busy:
+            return
+
+        if self.ctx.settings.get("ai_enabled", "false") != "true":
+            InfoBar.warning("AI", "请先在“系统设置 → AI 证书识别”启用并填写配置", parent=self.window())
+            return
+
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "选择证书图片",
+            "",
+            "证书文件 (*.pdf *.png *.jpg *.jpeg *.webp);;所有文件 (*.*)",
+        )
+        if not file_path:
+            return
+
+        path = Path(file_path)
+        self._add_attachment_files([path])
+
+        self._ai_busy = True
+        self.ai_cert_btn.setEnabled(False)
+        self._ai_progress = QProgressDialog("正在识别证书…", "取消", 0, 0, self)
+        self._ai_progress.setCancelButton(None)
+        self._ai_progress.setWindowModality(Qt.WindowModality.ApplicationModal)
+        self._ai_progress.setAutoClose(True)
+        self._ai_progress.setMinimumDuration(0)
+        self._ai_progress.show()
+
+        def task() -> CertificateExtractedInfo:
+            return self.ctx.ai.extract_from_image(path)
+
+        def on_done(result: CertificateExtractedInfo | Exception) -> None:
+            self._ai_busy = False
+            self.ai_cert_btn.setEnabled(True)
+            if self._ai_progress is not None:
+                self._ai_progress.close()
+                self._ai_progress = None
+
+            if isinstance(result, Exception):
+                InfoBar.error("AI 识别失败", str(result), parent=self.window())
+                return
+
+            dialog = AICertificatePreviewDialog(self.window(), info=result)
+
+            def on_applied(info: CertificateExtractedInfo) -> None:
+                self._apply_ai_certificate_result(info)
+                InfoBar.success("AI", "识别完成：已填充表单", parent=self.window())
+
+            dialog.applied.connect(on_applied)
+            dialog.show()
+
+        run_in_thread(task, on_done)
+
+    def _apply_ai_certificate_result(self, info: CertificateExtractedInfo) -> None:
+        if info.competition_name:
+            self.name_input.setText(info.competition_name)
+        if info.award_date:
+            self.year_input.setValue(info.award_date.year)
+            self.month_input.setValue(info.award_date.month)
+            self.day_input.setValue(info.award_date.day)
+        if info.level and info.level in {"国家级", "省级", "校级"}:
+            self.level_input.setCurrentText(info.level)
+        if info.rank and info.rank in {"一等奖", "二等奖", "三等奖", "优秀奖"}:
+            self.rank_input.setCurrentText(info.rank)
+        if info.certificate_code is not None:
+            self.certificate_input.setText(info.certificate_code or "")
+
+        if info.member_names:
+            for member_data in self.members_data:
+                card = member_data.get("card")
+                if card is not None:
+                    self.members_list_layout.removeWidget(card)
+                    card.setParent(None)
+                    card.deleteLater()
+            self.members_data.clear()
+            for name in info.member_names:
+                self._add_member_row()
+                member_fields = self.members_data[-1]["fields"]
+                name_widget = member_fields.get("name")
+                if name_widget is not None and hasattr(name_widget, "setText"):
+                    name_widget.setText(name)
 
     def _add_member_row(self) -> None:
         """添加新的成员卡片（表单列表风格）"""

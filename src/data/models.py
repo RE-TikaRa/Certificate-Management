@@ -125,6 +125,18 @@ class Setting(Base):
     value: Mapped[str] = mapped_column(String(512))
 
 
+class AIProvider(Base):
+    __tablename__ = "ai_providers"
+    __table_args__ = (UniqueConstraint("name", name="uq_ai_providers_name"),)
+
+    name: Mapped[str] = mapped_column(String(64), nullable=False)
+    api_base: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    api_keys: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    model: Mapped[str] = mapped_column(String(128), nullable=False, default="")
+    pdf_pages: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    last_key_index: Mapped[int] = mapped_column(Integer, nullable=False, default=-1)
+
+
 class BackupRecord(Base):
     __tablename__ = "backups"
 

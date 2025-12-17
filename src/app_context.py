@@ -2,6 +2,8 @@ from dataclasses import dataclass
 
 from .data.database import Database
 from .logger import configure_logging
+from .services.ai_certificate_service import AICertificateService
+from .services.ai_provider_service import AIProviderService
 from .services.attachment_manager import AttachmentManager
 from .services.award_service import AwardService
 from .services.backup_manager import BackupManager
@@ -18,6 +20,8 @@ from .services.statistics_service import StatisticsService
 class AppContext:
     db: Database
     settings: SettingsService
+    ai_providers: AIProviderService
+    ai: AICertificateService
     attachments: AttachmentManager
     backup: BackupManager
     importer: ImportExportService
@@ -36,6 +40,9 @@ def bootstrap(debug: bool = False, *, start_scheduler: bool = True) -> AppContex
     db.initialize()
 
     settings = SettingsService(db)
+    ai_providers = AIProviderService(db, settings)
+    ai_providers.ensure_legacy_migration()
+    ai = AICertificateService(db, settings, ai_providers)
     attachments = AttachmentManager(db, settings)
     flags = FlagService(db)
     awards = AwardService(db, attachments, flags)
@@ -52,6 +59,8 @@ def bootstrap(debug: bool = False, *, start_scheduler: bool = True) -> AppContex
     return AppContext(
         db=db,
         settings=settings,
+        ai_providers=ai_providers,
+        ai=ai,
         attachments=attachments,
         backup=backup,
         importer=importer,

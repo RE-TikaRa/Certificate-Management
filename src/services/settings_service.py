@@ -1,6 +1,7 @@
 from typing import Any
 
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from ..config import DEFAULT_SETTINGS
 from ..data.database import Database
@@ -35,23 +36,20 @@ class SettingsService:
             self._cache[key] = value
         return self._cache[key]
 
-    def set(self, key: str, value: Any) -> None:
+    def set_in_session(self, session: Session, key: str, value: Any) -> None:
         string_value = str(value)
-        with self.db.session_scope() as session:
-            setting = session.scalar(select(Setting).where(Setting.key == key))
-            if setting:
-                setting.value = string_value
-            else:
-                session.add(Setting(key=key, value=string_value))
+        setting = session.scalar(select(Setting).where(Setting.key == key))
+        if setting:
+            setting.value = string_value
+        else:
+            session.add(Setting(key=key, value=string_value))
         self._cache[key] = string_value
+
+    def set(self, key: str, value: Any) -> None:
+        with self.db.session_scope() as session:
+            self.set_in_session(session, key, value)
 
     def bulk_update(self, updates: dict[str, Any]) -> None:
         with self.db.session_scope() as session:
             for key, value in updates.items():
-                string_value = str(value)
-                setting = session.scalar(select(Setting).where(Setting.key == key))
-                if setting:
-                    setting.value = string_value
-                else:
-                    session.add(Setting(key=key, value=string_value))
-                self._cache[key] = string_value
+                self.set_in_session(session, key, value)

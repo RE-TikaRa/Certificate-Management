@@ -89,7 +89,15 @@ def main(debug: bool = False) -> None:
     else:
         logger.warning("Qt中文翻译加载失败")
 
-    ctx = bootstrap(debug=debug)
+    try:
+        ctx = bootstrap(debug=debug)
+    except Exception:
+        logger.exception("Bootstrap failed")
+        with contextlib.suppress(Exception):
+            from PySide6.QtWidgets import QMessageBox
+
+            QMessageBox.critical(None, "启动失败", "启动时发生错误，详情请查看 logs/error.log")
+        raise
     logger.info(f"Bootstrap completed in {time.time() - start_time:.2f}s")
 
     with _filter_third_party_tips():

@@ -19,6 +19,13 @@ DEFAULT_SETTINGS: Final[dict[str, str]] = {
     "theme_mode": "light",
     "backup_retention": "5",
     "email_suffix": "@st.gsau.edu.cn",  # 默认邮箱后缀
+    "ai_enabled": "false",
+    "ai_active_provider_id": "",
+    "ai_api_base": "",
+    "ai_api_key": "",
+    "ai_model": "",
+    "ai_pdf_pages": "1",
+    "ai_last_key_index": "-1",
     "mcp_allow_write": "false",
     "mcp_max_bytes": "1048576",  # 1MB 默认附件读取上限
     "mcp_redact_pii": "true",
