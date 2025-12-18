@@ -43,7 +43,11 @@ def main() -> None:
     except Exception as exc:
         raise RuntimeError("gradio is not installed; run: uv sync --group mcp-web") from exc
 
-    host = os.getenv("CERT_MCP_WEB_HOST", "127.0.0.1")
+    host = (os.getenv("CERT_MCP_WEB_HOST", "127.0.0.1") or "").strip() or "127.0.0.1"
+    if host == "localhost":
+        host = "127.0.0.1"
+    if host not in {"127.0.0.1", "::1"}:
+        raise ValueError("MCP Web is local-only; host must be 127.0.0.1/localhost/::1")
     port = int(os.getenv("CERT_MCP_WEB_PORT", "7860"))
     inbrowser = os.getenv("CERT_MCP_WEB_INBROWSER", "1") == "1"
     username = os.getenv("CERT_MCP_WEB_USERNAME", "").strip()

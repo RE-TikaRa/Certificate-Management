@@ -32,7 +32,7 @@ from ..theme import (
     create_page_header,
     make_section_title,
 )
-from ..utils.async_utils import run_in_thread
+from ..utils.async_utils import run_in_thread_guarded
 from .base_page import BasePage
 
 logger = logging.getLogger(__name__)
@@ -162,7 +162,7 @@ class ManagementPage(BasePage):
 
     def refresh(self) -> None:
         """异步刷新成员表格"""
-        run_in_thread(self.ctx.awards.list_members, self._on_members_loaded)
+        run_in_thread_guarded(self.ctx.awards.list_members, self._on_members_loaded, guard=self)
         self.search_input.blockSignals(True)
         self.search_input.setText("")
         self.search_input.blockSignals(False)
@@ -196,7 +196,7 @@ class ManagementPage(BasePage):
         def task():
             return self.ctx.members.search_members(query, limit=100)
 
-        run_in_thread(task, self._on_members_loaded)
+        run_in_thread_guarded(task, self._on_members_loaded, guard=self)
 
     def _batch_delete_members(self):
         """批量删除选中的成员"""

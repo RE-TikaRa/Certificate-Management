@@ -3,6 +3,7 @@ from collections.abc import Callable
 from typing import Any
 
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal
+from shiboken6 import isValid
 
 logger = logging.getLogger(__name__)
 
@@ -36,9 +37,20 @@ def run_in_thread(func: Callable[[], Any], on_done: Callable[[Any], None]) -> No
     """
     Run func in Qt thread pool, then invoke on_done in the GUI thread with the result.
     """
+    run_in_thread_guarded(func, on_done, guard=None)
+
+
+def run_in_thread_guarded(func: Callable[[], Any], on_done: Callable[[Any], None], *, guard: QObject | None) -> None:
+    """
+    Like run_in_thread, but skips invoking on_done when guard is no longer valid.
+
+    This avoids updating widgets that have been deleted while a background task is running.
+    """
 
     def _wrapped(result: Any) -> None:
         try:
+            if guard is not None and not isValid(guard):
+                return
             on_done(result)
         finally:
             _ACTIVE_WORKERS.discard(worker)

@@ -104,6 +104,11 @@ class McpRuntime:
     def start_mcp_sse(self, *, host: str, port: int, allow_write: bool, max_bytes: int) -> None:
         if self._mcp_proc and self._mcp_proc.poll() is None:
             return
+        host = (host or "").strip() or "127.0.0.1"
+        if host == "localhost":
+            host = "127.0.0.1"
+        if host not in {"127.0.0.1", "::1"}:
+            raise ValueError("MCP is local-only; host must be 127.0.0.1/localhost/::1")
         self._last_mcp_host = host
         self._last_mcp_port = port
 
@@ -143,6 +148,11 @@ class McpRuntime:
     def start_web(self, *, host: str, port: int) -> None:
         if self._web_proc and self._web_proc.poll() is None:
             return
+        host = (host or "").strip() or "127.0.0.1"
+        if host == "localhost":
+            host = "127.0.0.1"
+        if host not in {"127.0.0.1", "::1"}:
+            raise ValueError("MCP Web is local-only; host must be 127.0.0.1/localhost/::1")
         self._last_web_host = host
         self._last_web_port = safe_int(str(port), 7860, min_value=1, max_value=65535)
 

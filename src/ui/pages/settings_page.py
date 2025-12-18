@@ -51,7 +51,7 @@ from src.services.school_importer import read_school_list
 
 from ..styled_theme import ThemeManager
 from ..theme import create_card, create_page_header, make_section_title
-from ..utils.async_utils import run_in_thread
+from ..utils.async_utils import run_in_thread_guarded
 from .base_page import BasePage
 
 
@@ -586,7 +586,7 @@ class AIModelPickerDialog(MaskDialogBase):
                 return
             self._apply_models(result)
 
-        run_in_thread(self._fetch_models, on_done)
+        run_in_thread_guarded(self._fetch_models, on_done, guard=self)
 
     def _select_current(self) -> None:
         item = self.list.currentItem()
@@ -1235,7 +1235,7 @@ class SettingsPage(BasePage):
             self.ai_status.setText(f"AI：已获取 {len(result)} 个模型")
             InfoBar.success("AI", f"已获取 {len(result)} 个模型", parent=self.window())
 
-        run_in_thread(task, on_done)
+        run_in_thread_guarded(task, on_done, guard=self)
 
     def _open_ai_model_dialog(self) -> None:
         if self._ai_model_dialog is not None:
@@ -1305,7 +1305,7 @@ class SettingsPage(BasePage):
             self.ai_status.setText(f"AI：{msg}（models={count}）")
             InfoBar.success("AI", f"{self.ai_status.text()}\n{base}\n{model}".strip(), parent=self.window())
 
-        run_in_thread(task, on_done)
+        run_in_thread_guarded(task, on_done, guard=self)
 
     def _save_mcp_settings(self, *, silent: bool = False) -> None:
         if self._mcp_refreshing:
@@ -1585,11 +1585,21 @@ class SettingsPage(BasePage):
                 allow_write=self.mcp_allow_write.isChecked(),
                 max_bytes=max_bytes_value,
             )
-            InfoBar.success("MCP", f"已启动（本地）：{self._mcp_sse_url()}", parent=self.window())
         except Exception as exc:
             InfoBar.error("MCP", f"启动失败：{exc}", parent=self.window())
+            return
         finally:
             self._refresh_process_status()
+
+        mcp = self._mcp_runtime.mcp_info()
+        if mcp.running:
+            InfoBar.success("MCP", f"已启动（本地）：{self._mcp_sse_url()}", parent=self.window())
+            return
+        InfoBar.error(
+            "MCP",
+            f"启动失败：进程未保持运行，请查看日志：{mcp.log_path}",
+            parent=self.window(),
+        )
 
     def _stop_mcp(self) -> None:
         try:
@@ -1610,11 +1620,21 @@ class SettingsPage(BasePage):
             host = self.mcp_web_host.text().strip() or "127.0.0.1"
             port = self.mcp_web_port.text().strip() or "7860"
             self._mcp_runtime.start_web(host=host, port=int(port))
-            InfoBar.success("MCP Web", "已启动", parent=self.window())
         except Exception as exc:
             InfoBar.error("MCP Web", f"启动失败：{exc}", parent=self.window())
+            return
         finally:
             self._refresh_process_status()
+
+        web = self._mcp_runtime.web_info()
+        if web.running:
+            InfoBar.success("MCP Web", "已启动", parent=self.window())
+            return
+        InfoBar.error(
+            "MCP Web",
+            f"启动失败：进程未保持运行，请查看日志：{web.log_path}",
+            parent=self.window(),
+        )
 
     def _stop_web(self) -> None:
         try:

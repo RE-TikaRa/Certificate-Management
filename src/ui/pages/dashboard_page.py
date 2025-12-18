@@ -32,7 +32,7 @@ from ..theme import (
     create_page_header,
     make_section_title,
 )
-from ..utils.async_utils import run_in_thread
+from ..utils.async_utils import run_in_thread_guarded
 from .base_page import BasePage
 
 
@@ -220,7 +220,7 @@ class DashboardPage(BasePage):
             rank_stats = self.ctx.statistics.get_group_by_rank()
             return stats, level_stats, rank_stats
 
-        run_in_thread(load_all, self._on_data_loaded)
+        run_in_thread_guarded(load_all, self._on_data_loaded, guard=self)
 
     def _on_data_loaded(self, payload) -> None:
         if isinstance(payload, Exception):

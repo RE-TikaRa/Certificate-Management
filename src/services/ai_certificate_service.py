@@ -1,12 +1,14 @@
 import base64
+import contextlib
 import json
 import logging
 import re
+from ast import literal_eval
 from contextlib import suppress
 from datetime import date
 from pathlib import Path
 from time import perf_counter
-from typing import Any
+from typing import Any, cast
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
@@ -121,14 +123,136 @@ def _read_image_payloads(path: Path, *, pdf_pages: int) -> list[tuple[bytes, str
 
 
 def _extract_json_object(text: str) -> str:
-    cleaned = text.strip()
+    obj = _extract_json_object_like(text)
+    return json.dumps(obj, ensure_ascii=False)
+
+
+def _strip_code_fences(text: str) -> str:
+    cleaned = text.strip().lstrip("\ufeff")
     if cleaned.startswith("```"):
-        cleaned = cleaned.strip("`").strip()
-    start = cleaned.find("{")
-    end = cleaned.rfind("}")
-    if start == -1 or end == -1 or end <= start:
-        raise ValueError("模型输出不是有效的 JSON 对象")
-    return cleaned[start : end + 1]
+        cleaned = re.sub(r"^\s*```(?:json)?\s*", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\s*```\s*$", "", cleaned)
+    return cleaned.strip()
+
+
+def _remove_trailing_commas(text: str) -> str:
+    # Remove trailing commas before } or ], repeatedly until stable.
+    previous = None
+    current = text
+    while previous != current:
+        previous = current
+        current = re.sub(r",\s*([}\]])", r"\1", current)
+    return current
+
+
+def _escape_control_chars_in_strings(text: str) -> str:
+    out: list[str] = []
+    in_string = False
+    escaped = False
+    for ch in text:
+        if in_string:
+            if escaped:
+                escaped = False
+                out.append(ch)
+                continue
+            if ch == "\\":
+                escaped = True
+                out.append(ch)
+                continue
+            if ch == '"':
+                in_string = False
+                out.append(ch)
+                continue
+            if ch in {"\n", "\r", "\u2028", "\u2029"}:
+                out.append("\\n")
+                continue
+            if ch == "\t":
+                out.append("\\t")
+                continue
+            if ord(ch) < 0x20:
+                out.append(f"\\u{ord(ch):04x}")
+                continue
+            out.append(ch)
+            continue
+
+        if ch == '"':
+            in_string = True
+        out.append(ch)
+    return "".join(out)
+
+
+def _scan_json_object_candidates(text: str) -> list[str]:
+    candidates: list[str] = []
+    s = text
+    start_indices = [i for i, ch in enumerate(s) if ch == "{"]
+    for start in start_indices:
+        depth = 0
+        in_string = False
+        escaped = False
+        for idx in range(start, len(s)):
+            ch = s[idx]
+            if in_string:
+                if escaped:
+                    escaped = False
+                    continue
+                if ch == "\\":
+                    escaped = True
+                    continue
+                if ch == '"':
+                    in_string = False
+                continue
+
+            if ch == '"':
+                in_string = True
+                continue
+            if ch == "{":
+                depth += 1
+                continue
+            if ch == "}":
+                depth -= 1
+                if depth == 0:
+                    candidates.append(s[start : idx + 1])
+                    break
+                continue
+    return candidates
+
+
+def _extract_json_object_like(text: str) -> dict[str, Any]:
+    cleaned = _strip_code_fences(text)
+    candidates = _scan_json_object_candidates(cleaned)
+    if not candidates:
+        start = cleaned.find("{")
+        end = cleaned.rfind("}")
+        if start != -1 and end == -1:
+            raise ValueError("模型输出疑似被截断（缺少 }）")
+        if start != -1 and end > start:
+            candidates = [cleaned[start : end + 1]]
+        else:
+            raise ValueError("模型输出不是有效的 JSON 对象")
+
+    errors: list[str] = []
+    for candidate in candidates:
+        raw = _remove_trailing_commas(candidate.strip())
+        raw = _escape_control_chars_in_strings(raw)
+        with contextlib.suppress(Exception):
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict):
+                return parsed
+        # Fallback: try Python literal dict (LLM often outputs single quotes/None/True/False)
+        py_raw = raw
+        py_raw = re.sub(r"\bnull\b", "None", py_raw, flags=re.IGNORECASE)
+        py_raw = re.sub(r"\btrue\b", "True", py_raw, flags=re.IGNORECASE)
+        py_raw = re.sub(r"\bfalse\b", "False", py_raw, flags=re.IGNORECASE)
+        try:
+            parsed2 = literal_eval(py_raw)
+        except Exception as exc:
+            errors.append(str(exc))
+            continue
+        if isinstance(parsed2, dict):
+            return cast(dict[str, Any], parsed2)
+
+    detail = "; ".join(errors[:3])
+    raise ValueError(f"模型输出不是有效的 JSON 对象{f'（{detail}）' if detail else ''}")
 
 
 def _normalize_level(value: str | None) -> str | None:
@@ -216,9 +340,23 @@ class AICertificateService:
             if not isinstance(content, str) or not content.strip():
                 raise ValueError("模型返回为空（未获取到可解析内容）")
 
-        raw_json = _extract_json_object(content)
         try:
-            parsed = CertificateExtractedInfo.model_validate_json(raw_json)
+            payload_obj = _extract_json_object_like(content)
+        except Exception as exc:
+            preview = content.strip().replace("\r", "")
+            preview = preview[:800]
+            logger.warning("AI JSON parse failed (model=%s): %s", model, exc)
+            logger.warning("AI raw output preview: %s", preview)
+            if "模型输出不是有效的 JSON 对象" in str(exc):
+                raise ValueError(
+                    "模型输出不是有效的 JSON 对象。"
+                    "这通常意味着：当前模型不支持图片/PDF输入，或被服务端降级为纯文本拒绝，或模型未按要求输出 JSON。\n"
+                    f"模型原文预览（前 800 字符）：{preview}"
+                ) from exc
+            raise ValueError(f"模型输出无法解析为 JSON：{exc}\n模型原文预览（前 800 字符）：{preview}") from exc
+
+        try:
+            parsed = CertificateExtractedInfo.model_validate(payload_obj)
         except ValidationError as exc:
             raise ValueError(f"模型返回 JSON 结构不符合预期：{exc}") from exc
 
@@ -515,7 +653,10 @@ class AICertificateService:
         try:
             data = json.loads(raw.decode("utf-8"))
         except Exception as exc:
-            raise ValueError("AI 返回不是有效 JSON") from exc
+            preview = raw.decode("utf-8", errors="replace").strip().replace("\r", "")
+            preview = preview[:500]
+            logger.warning("AI response is not JSON (url=%s): %s", url, preview)
+            raise ValueError(f"AI 返回不是有效 JSON：{preview}") from exc
         if not isinstance(data, dict):
             raise ValueError("AI 返回格式异常（非对象）")
         if "error" in data:

@@ -25,7 +25,7 @@ from ..theme import (
     create_page_header,
     make_section_title,
 )
-from ..utils.async_utils import run_in_thread
+from ..utils.async_utils import run_in_thread_guarded
 from .base_page import BasePage
 
 logger = logging.getLogger(__name__)
@@ -109,7 +109,7 @@ class RecyclePage(BasePage):
                 return
             self.model.set_objects(payload)
 
-        run_in_thread(self.ctx.awards.list_deleted_awards, on_loaded)
+        run_in_thread_guarded(self.ctx.awards.list_deleted_awards, on_loaded, guard=self)
 
     def _selected_ids(self) -> list[int]:
         ids = []

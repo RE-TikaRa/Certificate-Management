@@ -1,5 +1,6 @@
 import hashlib
 import logging
+from collections.abc import Iterable
 from datetime import date
 from functools import partial
 from pathlib import Path
@@ -17,6 +18,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QLayout,
     QLineEdit,
     QProgressDialog,
     QScrollArea,
@@ -43,10 +45,12 @@ from qfluentwidgets import (
 )
 
 from ...services.doc_extractor import extract_member_info_from_doc
+from ...services.validators import FormValidator
 from ..styled_theme import ThemeManager
 from ..table_models import AttachmentTableModel
 from ..theme import create_card, create_page_header, make_section_title
-from ..utils.async_utils import run_in_thread
+from ..utils.async_utils import run_in_thread_guarded
+from ..widgets.attachment_table_view import AttachmentTableView
 from ..widgets.major_search import MajorSearchWidget
 from ..widgets.school_search import SchoolSearchWidget
 from .base_page import BasePage
@@ -970,7 +974,10 @@ class AwardDetailDialog(MaskDialogBase):
         self.ctx = ctx
         self.members_data = []  # 存储成员卡片数据
         self.selected_files: list[Path] = []  # 存储选中的附件文件
+        self._selected_file_keys: set[str] = set()
         self._attachments_loaded = False
+        self.flag_checkboxes: dict[str, CheckBox] = {}
+        self.flag_defs: list = []
 
         self.setWindowTitle(f"荣誉详情 - {award.competition_name}")
         self.setMinimumWidth(700)
@@ -1013,7 +1020,7 @@ class AwardDetailDialog(MaskDialogBase):
         row1 = QHBoxLayout()
         row1.setSpacing(16)
         name_col = QVBoxLayout()
-        name_label = QLabel("🏆 竞赛名称")
+        name_label = QLabel("比赛名称")
         name_label.setObjectName("formLabel")
         self.name_input = LineEdit()
         self.name_input.setText(self.award.competition_name)
@@ -1021,7 +1028,7 @@ class AwardDetailDialog(MaskDialogBase):
         name_col.addWidget(self.name_input)
 
         date_col = QVBoxLayout()
-        date_label = QLabel("📅 获奖日期")
+        date_label = QLabel("获奖日期")
         date_label.setObjectName("formLabel")
         date_row = QHBoxLayout()
         date_row.setSpacing(8)
@@ -1041,12 +1048,22 @@ class AwardDetailDialog(MaskDialogBase):
         self.day_input.setValue(self.award.award_date.day)
         self.day_input.setMinimumWidth(80)
 
+        year_label = QLabel("年")
+        year_label.setObjectName("formLabel")
+        year_label.setMaximumWidth(20)
+        month_label = QLabel("月")
+        month_label.setObjectName("formLabel")
+        month_label.setMaximumWidth(20)
+        day_label = QLabel("日")
+        day_label.setObjectName("formLabel")
+        day_label.setMaximumWidth(20)
+
         date_row.addWidget(self.year_input)
-        date_row.addWidget(QLabel("年"))
+        date_row.addWidget(year_label)
         date_row.addWidget(self.month_input)
-        date_row.addWidget(QLabel("月"))
+        date_row.addWidget(month_label)
         date_row.addWidget(self.day_input)
-        date_row.addWidget(QLabel("日"))
+        date_row.addWidget(day_label)
         date_row.addStretch()
 
         date_col.addWidget(date_label)
@@ -1086,6 +1103,7 @@ class AwardDetailDialog(MaskDialogBase):
         cert_label = QLabel("证书编号")
         cert_label.setObjectName("formLabel")
         self.cert_input = LineEdit()
+        clean_input_text(self.cert_input)
         self.cert_input.setText(self.award.certificate_code or "")
         cert_col.addWidget(cert_label)
         cert_col.addWidget(self.cert_input)
@@ -1093,7 +1111,7 @@ class AwardDetailDialog(MaskDialogBase):
 
         # Row 4: 备注
         remark_col = QVBoxLayout()
-        remark_label = QLabel("备注信息")
+        remark_label = QLabel("备注")
         remark_label.setObjectName("formLabel")
         self.remarks_input = LineEdit()
         self.remarks_input.setText(self.award.remarks or "")
@@ -1101,11 +1119,24 @@ class AwardDetailDialog(MaskDialogBase):
         remark_col.addWidget(self.remarks_input)
         info_layout.addLayout(remark_col)
 
+        # 自定义开关
+        self.flags_container = QVBoxLayout()
+        self.flags_container.setSpacing(8)
+        info_layout.addLayout(self.flags_container)
+        self._refresh_flag_section()
+        if self.flag_defs:
+            try:
+                flag_values = self.ctx.flags.get_award_flags(self.award.id)
+            except Exception:
+                flag_values = {}
+            for key, cb in self.flag_checkboxes.items():
+                cb.setChecked(bool(flag_values.get(key, cb.isChecked())))
+
         content_layout.addWidget(info_card)
 
         # === 成员卡片 ===
         members_card, members_layout = create_card()
-        members_layout.addWidget(make_section_title("参赛成员"))
+        members_layout.addWidget(make_section_title("参与成员"))
 
         self.members_container = QWidget()
         self.members_container.setStyleSheet("QWidget { background-color: transparent; }")
@@ -1122,7 +1153,6 @@ class AwardDetailDialog(MaskDialogBase):
 
         # 添加成员按钮
         add_member_btn = PrimaryPushButton("添加成员")
-        add_member_btn.setIcon(FluentIcon.ADD)
         add_member_btn.clicked.connect(self._add_member_row)
         members_layout.addWidget(add_member_btn)
 
@@ -1133,17 +1163,16 @@ class AwardDetailDialog(MaskDialogBase):
 
         # 标题和添加按钮
         attach_header = QHBoxLayout()
-        attach_header.addWidget(make_section_title("证书附件"))
+        attach_header.addWidget(make_section_title("附件"))
         attach_header.addStretch()
-        attach_btn = PrimaryPushButton("选择文件")
-        attach_btn.setIcon(FluentIcon.FOLDER)
+        attach_btn = PrimaryPushButton("添加文件")
         attach_btn.clicked.connect(self._pick_files)
         attach_header.addWidget(attach_btn)
         attachment_layout.addLayout(attach_header)
 
         # 附件表格
         self.attach_model = AttachmentTableModel(self)
-        self.attach_table = QTableView()
+        self.attach_table = AttachmentTableView()
         self.attach_table.setModel(self.attach_model)
         header = self.attach_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
@@ -1151,16 +1180,16 @@ class AwardDetailDialog(MaskDialogBase):
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
-        self.attach_table.setMaximumHeight(200)
-        self.attach_table.setMinimumHeight(100)
         self.attach_table.verticalHeader().setVisible(False)
         self.attach_table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
         self.attach_table.setSelectionMode(QTableView.SelectionMode.SingleSelection)
         from ..theme import apply_table_style
 
         apply_table_style(self.attach_table)
+        self.attach_table.fileDropped.connect(self._on_files_dropped)
         attachment_layout.addWidget(self.attach_table)
         content_layout.addWidget(attachment_card)
+        self._resize_attachment_table(0)
 
         content_layout.addStretch()
 
@@ -1170,13 +1199,11 @@ class AwardDetailDialog(MaskDialogBase):
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
 
-        save_btn = PrimaryPushButton("保存修改")
-        save_btn.setIcon(FluentIcon.SAVE)
+        save_btn = PrimaryPushButton("更新荣誉")
         save_btn.clicked.connect(self._save)
         btn_layout.addWidget(save_btn)
 
-        cancel_btn = PushButton("取消")
-        cancel_btn.setIcon(FluentIcon.CLOSE)
+        cancel_btn = PushButton("取消编辑")
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
 
@@ -1184,6 +1211,43 @@ class AwardDetailDialog(MaskDialogBase):
 
         # 加载现有附件
         self._load_existing_attachments()
+
+    def _refresh_flag_section(self) -> None:
+        def _clear_layout(layout: QLayout) -> None:
+            while layout.count():
+                item = layout.takeAt(0)
+                widget = item.widget()
+                if widget is not None:
+                    widget.deleteLater()
+                    continue
+                child_layout = item.layout()
+                if child_layout is not None:
+                    _clear_layout(child_layout)
+                    child_layout.deleteLater()
+
+        _clear_layout(self.flags_container)
+        self.flag_checkboxes.clear()
+        try:
+            self.flag_defs = self.ctx.flags.list_flags(enabled_only=True)
+        except Exception:
+            self.flag_defs = []
+        if not self.flag_defs:
+            return
+        title = QLabel("自定义开关")
+        title.setObjectName("formLabel")
+        self.flags_container.addWidget(title)
+        flags_row = QHBoxLayout()
+        flags_row.setSpacing(12)
+        for flag in self.flag_defs:
+            cb = CheckBox(flag.label)
+            cb.setChecked(bool(flag.default_value))
+            self.flag_checkboxes[flag.key] = cb
+            flags_row.addWidget(cb)
+        flags_row.addStretch()
+        self.flags_container.addLayout(flags_row)
+
+    def _get_flag_values(self) -> dict[str, bool]:
+        return {key: cb.isChecked() for key, cb in self.flag_checkboxes.items()}
 
     def _load_existing_attachments(self) -> None:
         """加载现有荣誉的附件到表格"""
@@ -1193,6 +1257,8 @@ class AwardDetailDialog(MaskDialogBase):
 
             from ...data.models import Award
 
+            self.selected_files = []
+            self._selected_file_keys.clear()
             with self.ctx.db.session_scope() as session:
                 # 使用 joinedload 预加载附件
                 award = (
@@ -1210,11 +1276,15 @@ class AwardDetailDialog(MaskDialogBase):
                     for attachment in award.attachments:
                         if getattr(attachment, "deleted", False):
                             continue
-                        file_path = root / attachment.relative_path
-                        if file_path.exists():
-                            self.selected_files.append(file_path)
-                        else:
+                        file_path = (root / attachment.relative_path).resolve()
+                        if not file_path.exists():
                             logger.warning(f"附件文件不存在: {file_path}")
+                            continue
+                        key = self._to_file_key(file_path)
+                        if key in self._selected_file_keys:
+                            continue
+                        self.selected_files.append(file_path)
+                        self._selected_file_keys.add(key)
 
                     # 更新表格显示
                     self._update_attachment_table()
@@ -1223,6 +1293,7 @@ class AwardDetailDialog(MaskDialogBase):
                 self._attachments_loaded = True
         except Exception as e:
             logger.error(f"加载附件失败: {e}", exc_info=True)
+            self._attachments_loaded = False
 
     def _add_member_card(self, assoc=None):
         """添加成员卡片"""
@@ -1240,6 +1311,7 @@ class AwardDetailDialog(MaskDialogBase):
 
         # 头部：成员编号和删除按钮
         header_layout = QHBoxLayout()
+        header_layout.setSpacing(8)
         member_index = len(self.members_data) + 1
         member_label = QLabel(f"成员 #{member_index}")
         member_label.setStyleSheet("font-weight: bold; font-size: 13px;")
@@ -1263,22 +1335,19 @@ class AwardDetailDialog(MaskDialogBase):
 
         # 导入文档按钮
         import_btn = PushButton("导入文档")
-        import_btn.setIcon(FluentIcon.DOCUMENT)
-        import_btn.setMinimumWidth(95)
+        import_btn.setMinimumWidth(85)
         import_btn.setFixedHeight(28)
         header_layout.addWidget(import_btn)
 
         # 从历史成员选择按钮
-        history_btn = PushButton("历史成员")
-        history_btn.setIcon(FluentIcon.HISTORY)
+        history_btn = PushButton("从历史选择")
         history_btn.setMinimumWidth(95)
         history_btn.setFixedHeight(28)
         header_layout.addWidget(history_btn)
 
         # 删除按钮
-        delete_btn = PushButton("移除")
-        delete_btn.setIcon(FluentIcon.DELETE)
-        delete_btn.setFixedWidth(80)
+        delete_btn = PushButton("删除")
+        delete_btn.setFixedWidth(60)
         delete_btn.setFixedHeight(28)
         header_layout.addWidget(delete_btn)
 
@@ -1378,6 +1447,7 @@ class AwardDetailDialog(MaskDialogBase):
         member_layout.addLayout(header_layout)
         member_layout.addLayout(form_grid)
         self._connect_member_field_signals(member_fields)
+        self._apply_member_initial_filters(member_fields)
 
         # 连接按钮信号
         import_btn.clicked.connect(lambda: self._import_from_doc(member_fields))
@@ -1439,6 +1509,23 @@ class AwardDetailDialog(MaskDialogBase):
 
         if isinstance(major_widget, MajorSearchWidget):
             major_widget.majorSelected.connect(partial(self._on_major_selected, member_fields))
+
+    def _apply_member_initial_filters(self, member_fields: dict) -> None:
+        school_widget = member_fields.get("school")
+        school_code_widget = member_fields.get("school_code")
+        major_widget = member_fields.get("major")
+
+        if not isinstance(major_widget, MajorSearchWidget):
+            return
+
+        school_name = school_widget.text() if isinstance(school_widget, SchoolSearchWidget) else None
+        school_code: str | None = None
+        if isinstance(school_code_widget, QLineEdit):
+            school_code = school_code_widget.text().strip() or None
+        if school_code is None and isinstance(school_widget, SchoolSearchWidget):
+            school_code = school_widget.selected_code()
+
+        major_widget.set_school_filter(name=school_name, code=school_code)
 
     def _on_school_selected(self, member_fields: dict, name: str, code: str | None) -> None:
         school_code_widget = member_fields.get("school_code")
@@ -1511,7 +1598,7 @@ class AwardDetailDialog(MaskDialogBase):
             return
 
         # 创建美化的进度对话框（适配主题）
-        progress = QProgressDialog(self)
+        progress = QProgressDialog(self.window())
         progress.setWindowTitle("📄 导入成员信息")
 
         # 根据主题设置文本颜色
@@ -1602,7 +1689,7 @@ class AwardDetailDialog(MaskDialogBase):
             extracted_count = sum(1 for v in member_info.values() if v is not None)
 
             if extracted_count == 0:
-                InfoBar.warning("提取失败", "未能从文档中提取到任何信息", parent=self)
+                InfoBar.warning("提取失败", "未能从文档中提取到任何信息", parent=self.window())
                 logger.warning(f"未从文档中提取到信息: {file_path}")
                 return
 
@@ -1639,7 +1726,7 @@ class AwardDetailDialog(MaskDialogBase):
                 InfoBar.success(
                     "导入成功",
                     f"已自动填充 {len(filled_fields)} 个字段，请手动输入姓名",
-                    parent=self,
+                    parent=self.window(),
                 )
                 logger.info(f"成功导入 {len(filled_fields)} 个字段: {', '.join(filled_fields)}")
 
@@ -1647,15 +1734,15 @@ class AwardDetailDialog(MaskDialogBase):
                 if "name" in member_fields:
                     member_fields["name"].setFocus()
             else:
-                InfoBar.warning("提取失败", "未能从文档中提取到有效信息", parent=self)
+                InfoBar.warning("提取失败", "未能从文档中提取到有效信息", parent=self.window())
 
         except FileNotFoundError as e:
             progress.close()
-            InfoBar.error("文件错误", str(e), parent=self)
+            InfoBar.error("文件错误", str(e), parent=self.window())
             logger.error(f"文件不存在: {file_path}")
         except Exception as e:
             progress.close()
-            InfoBar.error("导入失败", f"提取文档信息时出错: {e!s}", parent=self)
+            InfoBar.error("导入失败", f"提取文档信息时出错: {e!s}", parent=self.window())
             logger.error(f"导入文档失败: {e}", exc_info=True)
 
     def _select_from_history(self, member_fields: dict, join_checkbox: CheckBox) -> None:
@@ -1668,11 +1755,11 @@ class AwardDetailDialog(MaskDialogBase):
         members = service.list_members()
 
         if not members:
-            InfoBar.warning("提示", "暂无历史成员记录", parent=self)
+            InfoBar.warning("提示", "暂无历史成员记录", parent=self.window())
             return
 
         # 创建历史成员选择对话框
-        dialog = HistoryMemberDialog(members, self.theme_manager, self)
+        dialog = HistoryMemberDialog(members, self.theme_manager, self.window())
         if dialog.exec():
             selected_member = dialog.selected_member
             if selected_member:
@@ -1709,66 +1796,105 @@ class AwardDetailDialog(MaskDialogBase):
 
                 member_fields["class_name"].setText(selected_member.class_name or "")
                 member_fields["college"].setText(selected_member.college or "")
-                InfoBar.success("成功", f"已选择成员: {selected_member.name}", parent=self)
+                InfoBar.success("成功", f"已选择成员: {selected_member.name}", parent=self.window())
 
     def _pick_files(self) -> None:
         """选择附件文件并添加到表格"""
-        files, _ = QFileDialog.getOpenFileNames(self, "选择证书附件")
+        files, _ = QFileDialog.getOpenFileNames(self, "选择附件")
         if not files:
             return
 
+        added = self._add_attachment_files(Path(file_path) for file_path in files)
+        if added:
+            InfoBar.success("成功", f"已添加 {added} 个附件", parent=self.window())
+        else:
+            InfoBar.info("无新增", "文件已存在或不可用", parent=self.window())
+
+    def _on_files_dropped(self, files: list[Path]) -> None:
+        added = self._add_attachment_files(files)
+        if added:
+            InfoBar.success("成功", f"拖入 {added} 个附件", parent=self.window())
+        else:
+            InfoBar.info("无新增", "拖入的文件不可用或已存在", parent=self.window())
+
+    def _add_attachment_files(self, files: Iterable[Path]) -> int:
         added = 0
         duplicates: list[str] = []
-
         for file_path in files:
-            path = Path(file_path).resolve()
-            if not path.exists():
+            resolved = Path(file_path).resolve()
+            if not resolved.exists():
                 continue
 
-            md5_value = self._calculate_md5(path)
-            size_value = path.stat().st_size if path.exists() else None
-            current_award_id = self.award.id if getattr(self, "award", None) else None
+            md5_value = self._calculate_md5(resolved)
+            try:
+                size_value = resolved.stat().st_size
+            except OSError:
+                size_value = None
+            current_award_id = getattr(getattr(self, "award", None), "id", None)
             if (
                 md5_value
                 and md5_value != "无法计算"
                 and self.ctx.attachments.has_duplicate(md5_value, size_value, award_id=current_award_id)
             ):
-                duplicates.append(path.name)
+                duplicates.append(resolved.name)
                 continue
 
-            if path not in self.selected_files:
-                self.selected_files.append(path)
-                added += 1
+            key = self._to_file_key(resolved)
+            if key in self._selected_file_keys:
+                continue
+            self.selected_files.append(resolved)
+            self._selected_file_keys.add(key)
+            added += 1
 
-        # 更新表格显示
-        self._update_attachment_table()
         if added:
-            InfoBar.success("成功", f"已添加 {added} 个附件", parent=self)
+            self._update_attachment_table()
         if duplicates:
             sample = "，".join(duplicates[:3])
             more = "" if len(duplicates) <= 3 else f" 等 {len(duplicates)} 个"
-            InfoBar.warning("重复附件", f"{sample}{more} 与已有附件 MD5 相同，已跳过", parent=self)
+            InfoBar.warning("重复附件", f"{sample}{more} 与已有附件 MD5 相同，已跳过", parent=self.window())
+        return added
+
+    def _to_file_key(self, path: Path) -> str:
+        return str(path.resolve()).lower()
+
+    def _resize_attachment_table(self, row_count: int) -> None:
+        header = self.attach_table.horizontalHeader()
+        header_height = header.height() or 40
+        row_height = self.attach_table.verticalHeader().defaultSectionSize() or 48
+        visible_rows = min(max(row_count, 3), 8)
+        target_height = header_height + row_height * visible_rows + 12
+        self.attach_table.setMinimumHeight(target_height)
+        self.attach_table.setMaximumHeight(target_height)
 
     def _update_attachment_table(self) -> None:
         """更新附件表格显示（异步计算 MD5/大小）"""
 
         def build_rows():
             rows = []
-            for idx, file_path in enumerate(self.selected_files, start=1):
+            display_idx = 1
+            for file_path in self.selected_files:
+                if not file_path.exists():
+                    continue
                 md5_hash = self._calculate_md5(file_path)
-                size_str = self._format_file_size(file_path.stat().st_size)
+                try:
+                    size_value = file_path.stat().st_size
+                except OSError:
+                    size_str = "未知"
+                else:
+                    size_str = self._format_file_size(size_value)
                 rows.append(
                     {
-                        "index": idx,
+                        "index": display_idx,
                         "name": file_path.name,
                         "md5": md5_hash[:16] + "...",
                         "size": size_str,
                         "path": file_path,
                     }
                 )
+                display_idx += 1
             return rows
 
-        run_in_thread(build_rows, self._on_attachments_ready)
+        run_in_thread_guarded(build_rows, self._on_attachments_ready, guard=self)
 
     def _on_attachments_ready(self, rows: list[dict]) -> None:
         if isinstance(rows, Exception):
@@ -1787,6 +1913,7 @@ class AwardDetailDialog(MaskDialogBase):
             btn_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
             index = self.attach_model.index(row_idx, 4)
             self.attach_table.setIndexWidget(index, btn_widget)
+        self._resize_attachment_table(len(rows))
 
     def _calculate_md5(self, file_path: Path) -> str:
         """计算文件MD5值"""
@@ -1811,45 +1938,123 @@ class AwardDetailDialog(MaskDialogBase):
     def _remove_attachment(self, row: int) -> None:
         """删除指定行的附件"""
         if 0 <= row < len(self.selected_files):
-            self.selected_files.pop(row)
+            removed = self.selected_files.pop(row)
+            self._selected_file_keys.discard(self._to_file_key(removed))
             self._update_attachment_table()
 
     def _save(self):
         """保存编辑"""
         try:
+            issues = self._validate_form()
+            if issues:
+                InfoBar.warning("表单不合法", issues[0], parent=self.window())
+                return
+
             # 获取成员数据
             members = self._get_members_data()
 
             self.ctx.awards.update_award(
                 self.award.id,
-                competition_name=self.name_input.text(),
-                award_date=QDate(
-                    self.year_input.value(),
-                    self.month_input.value(),
-                    self.day_input.value(),
-                ).toPython(),
+                competition_name=self.name_input.text().strip(),
+                award_date=cast(
+                    date,
+                    QDate(
+                        self.year_input.value(),
+                        self.month_input.value(),
+                        self.day_input.value(),
+                    ).toPython(),
+                ),
                 level=self.level_input.currentText(),
                 rank=self.rank_input.currentText(),
-                certificate_code=self.cert_input.text() or None,
-                remarks=self.remarks_input.text() or None,
+                certificate_code=self.cert_input.text().strip() or None,
+                remarks=self.remarks_input.text().strip() or None,
                 member_names=members,
                 attachment_files=self.selected_files if self._attachments_loaded else None,
+                flag_values=self._get_flag_values(),
             )
 
-            # 刷新管理页面，因为成员信息可能已更改
-            # 向上查找 main_window，然后刷新 management_page
-            parent = self.parent()
-            while parent:
-                management_page = getattr(parent, "management_page", None)
-                if management_page:
-                    management_page.refresh()
-                    break
-                parent = parent.parent() if hasattr(parent, "parent") else None
+            InfoBar.success("成功", f"已更新：{self.name_input.text().strip()}", parent=self.window())
 
             self.accept()
         except Exception as e:
             logger.exception(f"保存奖项失败: {e}")
             InfoBar.error("错误", f"保存失败: {e!s}", parent=self.window())
+
+    def _validate_form(self) -> list[str]:
+        issues: list[str] = []
+
+        name = self.name_input.text().strip()
+        valid, msg = FormValidator.validate_competition_name(name)
+        if not valid:
+            issues.append(msg)
+            self._highlight_field_error(self.name_input)
+            return issues
+
+        try:
+            award_date = QDate(
+                self.year_input.value(),
+                self.month_input.value(),
+                self.day_input.value(),
+            )
+            if not award_date.isValid():
+                issues.append("获奖日期不合法。")
+                return issues
+            if award_date > QDate.currentDate():
+                issues.append("获奖日期不能晚于今天。")
+                return issues
+        except Exception:
+            issues.append("获奖日期不合法。")
+            return issues
+
+        code = self.cert_input.text().strip()
+        valid, msg = FormValidator.validate_certificate_code(code)
+        if not valid:
+            issues.append(msg)
+            self._highlight_field_error(self.cert_input)
+            return issues
+
+        remarks = self.remarks_input.text().strip()
+        valid, msg = FormValidator.validate_remarks(remarks)
+        if not valid:
+            issues.append(msg)
+            self._highlight_field_error(self.remarks_input)
+            return issues
+
+        members_data = self._get_members_data()
+        if not members_data:
+            issues.append("请至少添加一名成员。")
+            return issues
+
+        for i, member in enumerate(members_data, 1):
+            member_errors = FormValidator.validate_member_info(member)
+            if member_errors:
+                issues.append(f"成员 {i} - {member_errors[0]}")
+                self._highlight_member_error(i - 1)
+                return issues
+
+        return issues
+
+    def _highlight_field_error(self, field_widget: QLineEdit) -> None:
+        field_widget.setStyleSheet("""
+            QLineEdit {
+                border: 2px solid #ff6b6b;
+                border-radius: 4px;
+                padding: 4px;
+                background-color: rgba(255, 107, 107, 0.1);
+            }
+        """)
+        QTimer.singleShot(3000, lambda: field_widget.setStyleSheet(""))
+
+    def _highlight_member_error(self, member_index: int) -> None:
+        if 0 <= member_index < len(self.members_data):
+            member_card = self.members_data[member_index]["card"]
+            member_card.setStyleSheet("""
+                QFrame {
+                    border: 2px solid #ff6b6b;
+                    border-radius: 8px;
+                }
+            """)
+            QTimer.singleShot(3000, lambda: member_card.setStyleSheet(""))
 
     def _get_members_data(self):
         """获取成员数据"""

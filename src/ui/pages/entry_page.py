@@ -46,7 +46,7 @@ from ...services.validators import FormValidator
 from ..styled_theme import ThemeManager
 from ..table_models import AttachmentTableModel
 from ..theme import create_card, create_page_header, make_section_title
-from ..utils.async_utils import run_in_thread
+from ..utils.async_utils import run_in_thread_guarded
 from ..widgets.attachment_table_view import AttachmentTableView
 from ..widgets.major_search import MajorSearchWidget
 from ..widgets.school_search import SchoolSearchWidget
@@ -457,7 +457,7 @@ class EntryPage(BasePage):
             dialog.applied.connect(on_applied)
             dialog.show()
 
-        run_in_thread(task, on_done)
+        run_in_thread_guarded(task, on_done, guard=self)
 
     def _apply_ai_certificate_result(self, info: CertificateExtractedInfo) -> None:
         if info.competition_name:
@@ -1077,7 +1077,7 @@ class EntryPage(BasePage):
                 display_idx += 1
             return rows
 
-        run_in_thread(build_rows, self._on_attachments_ready)
+        run_in_thread_guarded(build_rows, self._on_attachments_ready, guard=self)
 
     def _on_attachments_ready(self, rows: list[dict]) -> None:
         if isinstance(rows, Exception):
