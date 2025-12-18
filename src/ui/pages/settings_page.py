@@ -1625,7 +1625,11 @@ class SettingsPage(BasePage):
 
     def _mcp_sse_url(self) -> str:
         port = self.mcp_port.text().strip() or "8000"
-        host = self.ctx.settings.get("mcp_host", "127.0.0.1")
+        host = (self.ctx.settings.get("mcp_host", "127.0.0.1") or "").strip()
+        if host.startswith("[") and host.endswith("]"):
+            host = host[1:-1].strip()
+        if ":" in host and not host.startswith("["):
+            host = f"[{host}]"
         return f"http://{host}:{port}/sse"
 
     def _start_web(self) -> None:

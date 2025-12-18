@@ -162,10 +162,15 @@ class ManagementPage(BasePage):
 
     def refresh(self) -> None:
         """异步刷新成员表格"""
+        query = self.search_input.text().strip()
+        if query:
+            run_in_thread_guarded(
+                lambda: self.ctx.members.search_members(query, limit=100),
+                self._on_members_loaded,
+                guard=self,
+            )
+            return
         run_in_thread_guarded(self.ctx.awards.list_members, self._on_members_loaded, guard=self)
-        self.search_input.blockSignals(True)
-        self.search_input.setText("")
-        self.search_input.blockSignals(False)
 
     def _on_members_loaded(self, members) -> None:
         if isinstance(members, Exception):

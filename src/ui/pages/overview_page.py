@@ -204,7 +204,7 @@ class OverviewPage(BasePage):
         layout.addWidget(card)
         layout.addStretch()
 
-        self._cached_award_ids = set()
+        self._cached_award_signature: tuple[int, str] | None = None
 
         # 自动刷新定时器（每5秒检查一次数据）
         self.refresh_timer = QTimer(self)
@@ -491,16 +491,21 @@ class OverviewPage(BasePage):
 
     def _auto_refresh(self) -> None:
         """检测数据变化并刷新"""
+        if self.is_batch_mode:
+            return
         try:
-            from sqlalchemy import select
+            from sqlalchemy import func, select
 
             from ...data.models import Award
 
             with self.ctx.db.session_scope() as session:
-                award_ids = set(session.scalars(select(Award.id)).all())
+                count, max_updated = session.execute(
+                    select(func.count(Award.id), func.max(Award.updated_at)).where(Award.deleted.is_(False))
+                ).one()
 
-            if award_ids != self._cached_award_ids:
-                self._cached_award_ids = award_ids
+            signature = (int(count or 0), max_updated.isoformat() if max_updated else "")
+            if signature != self._cached_award_signature:
+                self._cached_award_signature = signature
                 self.refresh()
         except Exception as e:
             logger.debug(f"自动刷新失败: {e}")
@@ -546,6 +551,7 @@ class OverviewPage(BasePage):
             if not self.awards_list:
                 self._show_empty_state()
                 self._update_batch_actions_state()
+                self._cached_award_signature = self._get_award_signature()
                 return
 
             # 首次只加载 20 条
@@ -559,8 +565,20 @@ class OverviewPage(BasePage):
 
             logger.debug(f"已加载 {min(self.PAGE_SIZE, self.total_awards)}/{self.total_awards} 个荣誉项目")
             self._update_batch_actions_state()
+            self._cached_award_signature = self._get_award_signature()
         except Exception as e:
             logger.error(f"刷新失败: {e}", exc_info=True)
+
+    def _get_award_signature(self) -> tuple[int, str]:
+        from sqlalchemy import func, select
+
+        from ...data.models import Award
+
+        with self.ctx.db.session_scope() as session:
+            count, max_updated = session.execute(
+                select(func.count(Award.id), func.max(Award.updated_at)).where(Award.deleted.is_(False))
+            ).one()
+        return int(count or 0), max_updated.isoformat() if max_updated else ""
 
     def _clear_awards_layout(self) -> None:
         """清空布局"""
@@ -641,7 +659,7 @@ class OverviewPage(BasePage):
         """加载更多数据"""
         try:
             # 移除"加载更多"按钮和stretch
-            for _ in range(2):
+            for _ in range(3):
                 if self.awards_layout.count() > 0:
                     item = self.awards_layout.takeAt(self.awards_layout.count() - 1)
                     widget = item.widget()

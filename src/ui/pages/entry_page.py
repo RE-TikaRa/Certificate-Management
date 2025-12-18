@@ -392,7 +392,7 @@ class EntryPage(BasePage):
         action_row = QHBoxLayout()
         action_row.addStretch()
         self.clear_btn = PushButton("清空表单")
-        self.clear_btn.clicked.connect(self._clear_form)
+        self.clear_btn.clicked.connect(self._on_clear_clicked)
         self.submit_btn = PrimaryPushButton("保存荣誉")
         self.submit_btn.clicked.connect(self._submit)
         action_row.addWidget(self.clear_btn)
@@ -1287,7 +1287,7 @@ class EntryPage(BasePage):
             )
             InfoBar.success("成功", f"已保存：{award.competition_name}", parent=self.window())
 
-        self._clear_form()
+        self._clear_form(silent=True)
         if should_back_to_overview:
             main_window = self.window()
             if main_window is None or not hasattr(main_window, "navigate_to") or not hasattr(main_window, "overview_page"):
@@ -1391,10 +1391,31 @@ class EntryPage(BasePage):
 
             QTimer.singleShot(3000, lambda: member_card.setStyleSheet(""))
 
-    def _clear_form(self) -> None:
+    def _on_clear_clicked(self) -> None:
+        was_editing = self.editing_award is not None
+        self._clear_form(silent=False)
+        if not was_editing:
+            return
+
+        main_window = self.window()
+        if main_window is None or not hasattr(main_window, "navigate_to") or not hasattr(main_window, "overview_page"):
+            return
+
+        def _go_back() -> None:
+            mw = cast(Any, main_window)
+            with suppress(Exception):
+                mw.switchTo(mw.overview_page)
+            mw.navigate_to("overview")
+
+        QTimer.singleShot(0, _go_back)
+
+    def _clear_form(self, *, silent: bool = False) -> None:
         """清空表单，重置为新建状态"""
+        was_editing = self.editing_award is not None
         self.editing_award = None
         self._attachments_loaded_for_edit = False
+        self.submit_btn.setText("保存荣誉")
+        self.clear_btn.setText("清空表单")
         self.name_input.clear()
         today = QDate.currentDate()
         self.year_input.setValue(today.year())
@@ -1419,9 +1440,9 @@ class EntryPage(BasePage):
             self._remove_member_card(member_card, member_fields)
         # 添加一个空白成员卡片
         self._add_member_row()
-        from qfluentwidgets import InfoBar
-
-        InfoBar.success("成功", "表单已清空", duration=2000, parent=self.window())
+        if not silent:
+            message = "已退出编辑" if was_editing else "表单已清空"
+            InfoBar.success("成功", message, duration=2000, parent=self.window())
 
     def _on_files_dropped(self, files: list[Path]) -> None:
         added = self._add_attachment_files(files)

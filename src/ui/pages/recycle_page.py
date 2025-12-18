@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 class RecyclePage(BasePage):
     def __init__(self, ctx, theme_manager: ThemeManager):
         super().__init__(ctx, theme_manager)
+        self._busy = False
 
         outer_layout = QVBoxLayout(self)
         outer_layout.setContentsMargins(0, 0, 0, 0)
@@ -88,12 +89,12 @@ class RecyclePage(BasePage):
         self.table.setSelectionMode(QTableView.SelectionMode.ExtendedSelection)
         card_layout.addWidget(self.table)
         btns = QHBoxLayout()
-        restore_btn = PrimaryPushButton("恢复")
-        restore_btn.clicked.connect(self._restore)
-        purge_btn = PushButton("彻底删除")
-        purge_btn.clicked.connect(self._purge)
-        btns.addWidget(restore_btn)
-        btns.addWidget(purge_btn)
+        self.restore_btn = PrimaryPushButton("恢复")
+        self.restore_btn.clicked.connect(self._restore)
+        self.purge_btn = PushButton("彻底删除")
+        self.purge_btn.clicked.connect(self._purge)
+        btns.addWidget(self.restore_btn)
+        btns.addWidget(self.purge_btn)
         btns.addStretch()
         card_layout.addLayout(btns)
         layout.addWidget(card)
@@ -122,6 +123,8 @@ class RecyclePage(BasePage):
 
     def _restore(self) -> None:
         """恢复选中的荣誉记录"""
+        if self._busy:
+            return
         ids = self._selected_ids()
         if not ids:
             InfoBar.warning("提示", "请选择要恢复的荣誉记录", parent=self.window())
@@ -129,14 +132,34 @@ class RecyclePage(BasePage):
 
         box = MessageBox("确认恢复", f"确定要恢复选中的 {len(ids)} 条荣誉记录吗？", self.window())
 
-        if box.exec():
+        if not box.exec():
+            return
+
+        self._busy = True
+        self.restore_btn.setEnabled(False)
+        self.purge_btn.setEnabled(False)
+
+        def task() -> None:
             for award_id in ids:
                 self.ctx.awards.restore_award(award_id)
+
+        def on_done(result) -> None:
+            self._busy = False
+            self.restore_btn.setEnabled(True)
+            self.purge_btn.setEnabled(True)
+            if isinstance(result, Exception):
+                logger.exception("恢复失败: %s", result)
+                InfoBar.error("错误", f"恢复失败：{result}", parent=self.window())
+                return
             self.refresh()
             InfoBar.success("成功", f"已恢复 {len(ids)} 条荣誉记录", parent=self.window())
 
+        run_in_thread_guarded(task, on_done, guard=self)
+
     def _purge(self) -> None:
         """彻底删除选中的荣誉记录"""
+        if self._busy:
+            return
         ids = self._selected_ids()
         if not ids:
             InfoBar.warning("提示", "请选择要彻底删除的荣誉记录", parent=self.window())
@@ -148,8 +171,26 @@ class RecyclePage(BasePage):
             self.window(),
         )
 
-        if box.exec():
+        if not box.exec():
+            return
+
+        self._busy = True
+        self.restore_btn.setEnabled(False)
+        self.purge_btn.setEnabled(False)
+
+        def task() -> None:
             for award_id in ids:
                 self.ctx.awards.permanently_delete_award(award_id)
+
+        def on_done(result) -> None:
+            self._busy = False
+            self.restore_btn.setEnabled(True)
+            self.purge_btn.setEnabled(True)
+            if isinstance(result, Exception):
+                logger.exception("彻底删除失败: %s", result)
+                InfoBar.error("错误", f"彻底删除失败：{result}", parent=self.window())
+                return
             self.refresh()
             InfoBar.success("成功", f"已彻底删除 {len(ids)} 条荣誉记录", parent=self.window())
+
+        run_in_thread_guarded(task, on_done, guard=self)
