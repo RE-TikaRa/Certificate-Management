@@ -885,13 +885,21 @@ class OverviewPage(BasePage):
 
     def _edit_award(self, award) -> None:
         """编辑荣誉"""
+        timer_was_active = False
         try:
-            dialog = AwardDetailDialog(self, award, self.theme_manager, self.ctx)
+            if self.refresh_timer and self.refresh_timer.isActive():
+                timer_was_active = True
+                self.refresh_timer.stop()
+
+            dialog = AwardDetailDialog(self.window(), award, self.theme_manager, self.ctx)
             if dialog.exec():
                 self.refresh()  # 刷新列表
         except Exception as e:
             logger.exception(f"编辑失败: {e}")
             InfoBar.error("错误", f"编辑失败: {e!s}", parent=self.window())
+        finally:
+            if timer_was_active and self.refresh_timer:
+                self.refresh_timer.start()
 
     def _delete_award(self, award) -> None:
         """删除荣誉(移入回收站)"""

@@ -43,26 +43,10 @@ class CertificateExtractedInfo(BaseModel):
         if not s:
             return None
 
-        m = re.search(r"(?P<y>\d{4})[./-](?P<m>\d{1,2})[./-](?P<d>\d{1,2})", s)
-        if m:
-            try:
-                return date(int(m.group("y")), int(m.group("m")), int(m.group("d")))
-            except Exception:
-                return None
-
-        m = re.search(r"(?P<y>\d{4})\s*年\s*(?P<m>\d{1,2})\s*月\s*(?P<d>\d{1,2})\s*日?", s)
-        if m:
-            try:
-                return date(int(m.group("y")), int(m.group("m")), int(m.group("d")))
-            except Exception:
-                return None
-
-        m = re.search(r"(?P<y>\d{4})-(?P<m>\d{1,2})-(?P<d>\d{1,2})", s)
-        if m:
-            try:
-                return date(int(m.group("y")), int(m.group("m")), int(m.group("d")))
-            except Exception:
-                return None
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", s):
+            return None
+        with suppress(Exception):
+            return date.fromisoformat(s)
 
         return None
 
@@ -499,7 +483,7 @@ class AICertificateService:
         system = (
             "你是一个证书信息抽取助手。只根据图片内容抽取信息，不要编造。"
             "输出必须是严格的 JSON 对象，不要使用 Markdown 代码块。"
-            "日期请输出 ISO 格式 YYYY-MM-DD；不确定就用 null。"
+            "日期请输出 ISO 格式 YYYY-MM-DD；不确定就用 null，如果日期只是到某年某月，那就将日期定在那个月一号。"
             "level 仅允许：国家级/省级/校级；不确定用 null。"
             "rank 仅允许：一等奖/二等奖/三等奖/优秀奖；不确定用 null。"
             "member_names 仅输出姓名数组（字符串），不确定就输出空数组。"
@@ -543,7 +527,7 @@ class AICertificateService:
         system = (
             "你是一个证书信息抽取助手。只根据证书内容抽取信息，不要编造。"
             "输出必须是严格的 JSON 对象，不要使用 Markdown 代码块。"
-            "日期请输出 ISO 格式 YYYY-MM-DD；不确定就用 null。"
+            "日期请输出 ISO 格式 YYYY-MM-DD；不确定就用 null，如果日期只是到某年某月，那就将日期定在那个月一号。"
             "level 仅允许：国家级/省级/校级；不确定用 null。"
             "rank 仅允许：一等奖/二等奖/三等奖/优秀奖；不确定用 null。"
             "member_names 仅输出姓名数组（字符串），不确定就输出空数组。"
