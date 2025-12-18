@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from urllib.parse import urlparse
 
 from sqlalchemy import select
 
@@ -40,6 +41,18 @@ def _clamp_int(value: str, *, default: int, min_value: int, max_value: int) -> i
     return max(min_value, min(max_value, parsed))
 
 
+def _normalize_api_base(raw: str) -> str:
+    value = raw.strip()
+    if not value:
+        return ""
+    if "://" not in value:
+        value = f"https://{value}"
+    parsed = urlparse(value)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("API 地址格式不正确，请填写 http(s) URL")
+    return value.rstrip("/")
+
+
 class AIProviderService:
     ACTIVE_KEY = "ai_active_provider_id"
 
@@ -56,7 +69,7 @@ class AIProviderService:
             if count is not None:
                 return
 
-            api_base = self._settings.get("ai_api_base", "").strip()
+            api_base = _normalize_api_base(self._settings.get("ai_api_base", ""))
             api_key = self._settings.get("ai_api_key", "").strip()
             model = self._settings.get("ai_model", "").strip()
             pdf_pages = _clamp_int(self._settings.get("ai_pdf_pages", "1"), default=1, min_value=1, max_value=10)
@@ -115,6 +128,18 @@ class AIProviderService:
             return providers[0]
         for p in providers:
             if p.id == active:
+                if p.api_base and "://" not in p.api_base:
+                    normalized = _normalize_api_base(p.api_base)
+                    self.update_provider(p.id, api_base=normalized)
+                    return AIProviderInfo(
+                        id=p.id,
+                        name=p.name,
+                        api_base=normalized,
+                        api_keys=p.api_keys,
+                        model=p.model,
+                        pdf_pages=p.pdf_pages,
+                        last_key_index=p.last_key_index,
+                    )
                 return p
         if providers:
             self.set_active_provider_id(providers[0].id)
@@ -133,7 +158,7 @@ class AIProviderService:
         with self._db.session_scope() as session:
             row = AIProvider(
                 name=name.strip() or "未命名",
-                api_base=api_base.strip().rstrip("/"),
+                api_base=_normalize_api_base(api_base),
                 api_keys=api_keys.strip(),
                 model=model.strip(),
                 pdf_pages=max(1, min(10, int(pdf_pages))),
@@ -169,7 +194,7 @@ class AIProviderService:
             if name is not None:
                 row.name = name.strip() or row.name
             if api_base is not None:
-                row.api_base = api_base.strip().rstrip("/")
+                row.api_base = _normalize_api_base(api_base)
             if api_keys is not None:
                 row.api_keys = api_keys.strip()
             if model is not None:

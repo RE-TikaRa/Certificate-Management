@@ -1,12 +1,13 @@
 import hashlib
 import logging
 from collections.abc import Iterable
+from contextlib import suppress
 from datetime import date
 from functools import partial
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
-from PySide6.QtCore import QDate, Qt, Signal, Slot
+from PySide6.QtCore import QDate, Qt, QTimer, Signal, Slot
 from PySide6.QtGui import QColor, QCursor
 from PySide6.QtWidgets import (
     QApplication,
@@ -1256,6 +1257,7 @@ class EntryPage(BasePage):
             ).toPython(),
         )
 
+        should_back_to_overview = bool(self.editing_award)
         if self.editing_award:
             award = self.ctx.awards.update_award(
                 self.editing_award.id,
@@ -1286,6 +1288,18 @@ class EntryPage(BasePage):
             InfoBar.success("成功", f"已保存：{award.competition_name}", parent=self.window())
 
         self._clear_form()
+        if should_back_to_overview:
+            main_window = self.window()
+            if main_window is None or not hasattr(main_window, "navigate_to") or not hasattr(main_window, "overview_page"):
+                return
+
+            def _go_back() -> None:
+                mw = cast(Any, main_window)
+                with suppress(Exception):
+                    mw.switchTo(mw.overview_page)
+                mw.navigate_to("overview")
+
+            QTimer.singleShot(0, _go_back)
 
     def _validate_form(self) -> list[str]:
         """验证荣誉表单，返回错误信息列表，空列表表示验证通过"""

@@ -25,6 +25,7 @@ DEFAULT_SETTINGS: Final[dict[str, str]] = {
     "ai_api_key": "",
     "ai_model": "",
     "ai_pdf_pages": "1",
+    "ai_max_bytes": "20971520",  # 20MB 单文件上限（避免 AI 识别读取/渲染导致内存暴涨）
     "ai_last_key_index": "-1",
     "mcp_allow_write": "false",
     "mcp_max_bytes": "1048576",  # 1MB 默认附件读取上限

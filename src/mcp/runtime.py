@@ -59,20 +59,26 @@ class McpRuntime:
     def mcp_info(self) -> ProcInfo:
         running = self._mcp_proc is not None and self._mcp_proc.poll() is None
         pid = self._mcp_proc.pid if running and self._mcp_proc else None
+        host = self._last_mcp_host
+        if ":" in host and not host.startswith("["):
+            host = f"[{host}]"
         return ProcInfo(
             pid=pid,
             running=running,
-            url=f"http://{self._last_mcp_host}:{self._last_mcp_port}/sse" if running else None,
+            url=f"http://{host}:{self._last_mcp_port}/sse" if running else None,
             log_path=str(self._mcp_log),
         )
 
     def web_info(self) -> ProcInfo:
         running = self._web_proc is not None and self._web_proc.poll() is None
         pid = self._web_proc.pid if running and self._web_proc else None
+        host = self._last_web_host
+        if ":" in host and not host.startswith("["):
+            host = f"[{host}]"
         return ProcInfo(
             pid=pid,
             running=running,
-            url=f"http://{self._last_web_host}:{self._last_web_port}" if running else None,
+            url=f"http://{host}:{self._last_web_port}" if running else None,
             log_path=str(self._web_log),
         )
 
@@ -105,6 +111,8 @@ class McpRuntime:
         if self._mcp_proc and self._mcp_proc.poll() is None:
             return
         host = (host or "").strip() or "127.0.0.1"
+        if host.startswith("[") and host.endswith("]"):
+            host = host[1:-1].strip() or "127.0.0.1"
         if host == "localhost":
             host = "127.0.0.1"
         if host not in {"127.0.0.1", "::1"}:
@@ -149,6 +157,8 @@ class McpRuntime:
         if self._web_proc and self._web_proc.poll() is None:
             return
         host = (host or "").strip() or "127.0.0.1"
+        if host.startswith("[") and host.endswith("]"):
+            host = host[1:-1].strip() or "127.0.0.1"
         if host == "localhost":
             host = "127.0.0.1"
         if host not in {"127.0.0.1", "::1"}:

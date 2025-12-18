@@ -62,6 +62,9 @@ MCP_PORT = safe_int(
     max_value=65535,
 )
 
+if MCP_HOST.startswith("[") and MCP_HOST.endswith("]"):
+    MCP_HOST = MCP_HOST[1:-1].strip()
+
 if TRANSPORT != "stdio" and MCP_HOST not in {"127.0.0.1", "localhost", "::1"}:
     raise ValueError("MCP is local-only; host must be 127.0.0.1/localhost/::1")
 

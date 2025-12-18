@@ -68,6 +68,39 @@ def _clamp_int(value: str, *, default: int, min_value: int, max_value: int) -> i
     return max(min_value, min(max_value, parsed))
 
 
+def _normalize_http_url(raw: str) -> str:
+    value = raw.strip()
+    if not value:
+        return ""
+    if "://" not in value:
+        value = f"https://{value}"
+    parsed = urlparse(value)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("API 地址格式不正确，请填写 http(s) URL")
+    return parsed._replace(query="", fragment="").geturl().rstrip("/")
+
+
+def _build_api_url(base: str, endpoint: str) -> str:
+    b = _normalize_http_url(base)
+    if not b:
+        raise ValueError("请先填写 API 地址 / API Key")
+
+    parsed = urlparse(b)
+    path = (parsed.path or "").rstrip("/")
+    if path.endswith(endpoint):
+        return parsed._replace(query="", fragment="").geturl()
+
+    if "/v1" in path:
+        prefix = path.split("/v1", 1)[0].rstrip("/")
+        v1_path = f"{prefix}/v1" if prefix else "/v1"
+    elif path.endswith("/v1"):
+        v1_path = path
+    else:
+        v1_path = f"{path}/v1" if path else "/v1"
+    final_path = f"{v1_path}{endpoint}"
+    return parsed._replace(path=final_path, params="", query="", fragment="").geturl()
+
+
 def _render_pdf_pages_to_pngs(pdf_path: Path, *, page_count: int) -> list[bytes]:
     try:
         import fitz  # PyMuPDF
@@ -298,9 +331,31 @@ class AICertificateService:
         self._settings = settings
         self._providers = providers
 
+    def _max_input_bytes(self) -> int:
+        return _clamp_int(
+            self._settings.get("ai_max_bytes", "20971520"),
+            default=20971520,
+            min_value=1,
+            max_value=200_000_000,
+        )
+
+    def _ensure_input_within_limit(self, path: Path) -> None:
+        if not path.exists():
+            raise ValueError("证书文件不存在")
+        limit = self._max_input_bytes()
+        size = path.stat().st_size
+        if size <= limit:
+            return
+        size_mb = size / (1024 * 1024)
+        limit_mb = limit / (1024 * 1024)
+        raise ValueError(
+            f"证书文件过大（{size_mb:.1f}MB），当前上限 {limit_mb:.1f}MB。"
+            "可在“系统设置 → AI 证书识别”中调整“单文件大小上限（字节）”。"
+        )
+
     def _get_active(self) -> tuple[str, str, str, int, int]:
         provider = self._providers.get_active_provider()
-        base = provider.api_base.strip()
+        base = _normalize_http_url(provider.api_base)
         model = provider.model.strip()
         if not base or not model:
             raise ValueError("请先在“系统设置 → AI 证书识别”中填写 API 地址 / API Key / 模型")
@@ -309,6 +364,7 @@ class AICertificateService:
         return base, api_key, model, pdf_pages, provider.id
 
     def extract_from_image(self, image_path: Path) -> CertificateExtractedInfo:
+        self._ensure_input_within_limit(image_path)
         base, api_key, model, _pdf_pages, _provider_id = self._get_active()
 
         if self._should_use_responses(base):
@@ -357,7 +413,7 @@ class AICertificateService:
 
     def list_models(self) -> list[str]:
         provider = self._providers.get_active_provider()
-        base = provider.api_base.strip()
+        base = _normalize_http_url(provider.api_base)
         if not base:
             raise ValueError("请先填写 API 地址 / API Key")
         api_key = self._providers.get_rotated_api_key(provider.id)
@@ -433,45 +489,16 @@ class AICertificateService:
             raise ValueError("AI 返回格式异常（未获取到 message.content）")
 
     def _build_chat_completions_url(self, base: str) -> str:
-        b = base.strip().rstrip("/")
-        if "/chat/completions" in b:
-            return b
-        if b.endswith("/models") or "/v1/models" in b:
-            b = b.split("/v1")[0]
-        if not b.endswith("/v1"):
-            b = f"{b}/v1"
-        return f"{b}/chat/completions"
+        return _build_api_url(base, "/chat/completions")
 
     def _build_responses_url(self, base: str) -> str:
-        b = base.strip().rstrip("/")
-        if b.endswith("/responses") or "/v1/responses" in b:
-            return b
-        if "/chat/completions" in b:
-            b = b.split("/chat/completions")[0].rstrip("/")
-        if b.endswith("/models") or "/v1/models" in b:
-            b = b.split("/v1")[0].rstrip("/")
-        if not b.endswith("/v1"):
-            b = f"{b}/v1"
-        return f"{b}/responses"
+        return _build_api_url(base, "/responses")
 
     def _build_models_url(self, base: str) -> str:
-        b = base.strip().rstrip("/")
-        if "/chat/completions" in b:
-            b = b.split("/chat/completions")[0].rstrip("/")
-        if b.endswith("/models"):
-            return b
-        if b.endswith("/v1"):
-            return f"{b}/models"
-        if "/v1/" in b:
-            prefix = b.split("/v1/")[0].rstrip("/")
-            return f"{prefix}/v1/models"
-        return f"{b}/v1/models"
+        return _build_api_url(base, "/models")
 
     def _should_use_responses(self, base: str) -> bool:
-        try:
-            parsed = urlparse(base)
-        except Exception:
-            return False
+        parsed = urlparse(_normalize_http_url(base))
         host = (parsed.netloc or "").lower()
         return host == "api.openai.com"
 

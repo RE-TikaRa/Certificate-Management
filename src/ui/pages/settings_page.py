@@ -652,6 +652,9 @@ class SettingsPage(BasePage):
         self.ai_pdf_pages = LineEdit()
         self.ai_pdf_pages.setPlaceholderText("默认 1（建议 1-3）")
         self.ai_pdf_pages.setValidator(QIntValidator(1, 10, self))
+        self.ai_max_bytes = LineEdit()
+        self.ai_max_bytes.setPlaceholderText("默认 20971520（20MB，单位：字节）")
+        self.ai_max_bytes.setValidator(QIntValidator(1, 200_000_000, self))
         self.ai_status = BodyLabel("AI：未测试")
         self.ai_status.setStyleSheet("color: #7a7a7a;")
         self.ai_keys_table = QTableWidget(0, 2)
@@ -851,6 +854,7 @@ class SettingsPage(BasePage):
         self._ai_refreshing = True
         try:
             self.ai_enabled.setChecked(self.ctx.settings.get("ai_enabled", "false") == "true")
+            self.ai_max_bytes.setText(self.ctx.settings.get("ai_max_bytes", "20971520"))
             self._refresh_ai_provider_ui()
         finally:
             self._ai_refreshing = False
@@ -899,7 +903,7 @@ class SettingsPage(BasePage):
         self.ai_provider_add_btn.clicked.connect(self._add_ai_provider)
         self.ai_provider_rename_btn.clicked.connect(self._rename_ai_provider)
         self.ai_provider_delete_btn.clicked.connect(self._delete_ai_provider)
-        for le in (self.ai_api_base, self.ai_pdf_pages):
+        for le in (self.ai_api_base, self.ai_pdf_pages, self.ai_max_bytes):
             le.editingFinished.connect(lambda: self._save_ai_settings(silent=True))
         self.ai_model.currentIndexChanged.connect(lambda _=0: self._save_ai_settings(silent=True))
         self.ai_model.editingFinished.connect(lambda: self._save_ai_settings(silent=True))
@@ -1173,6 +1177,14 @@ class SettingsPage(BasePage):
             return
         try:
             self.ctx.settings.set("ai_enabled", str(self.ai_enabled.isChecked()).lower())
+            max_bytes_raw = self.ai_max_bytes.text().strip() or "20971520"
+            try:
+                max_bytes = int(max_bytes_raw)
+            except ValueError:
+                max_bytes = 20971520
+            max_bytes = max(1, min(200_000_000, max_bytes))
+            self.ai_max_bytes.setText(str(max_bytes))
+            self.ctx.settings.set("ai_max_bytes", str(max_bytes))
             provider_id = self._ai_current_provider_id
             if provider_id is not None:
                 self._save_ai_provider_fields(provider_id, silent=True)
@@ -1462,6 +1474,7 @@ class SettingsPage(BasePage):
         model_layout.addWidget(self.ai_test_btn)
         bottom_form.addRow("模型", model_row)
         bottom_form.addRow("PDF 页数（最多 10）", self.ai_pdf_pages)
+        bottom_form.addRow("单文件大小上限（字节）", self.ai_max_bytes)
         card_layout.addLayout(bottom_form)
 
         card_layout.addWidget(self.ai_status)

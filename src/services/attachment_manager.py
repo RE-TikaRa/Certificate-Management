@@ -33,9 +33,44 @@ class AttachmentManager:
         return root
 
     def _sanitize_name(self, name: str) -> str:
-        keep = [c for c in name if c.isalnum() or c in (" ", "_", "-", ".")]
-        safe = "".join(keep).strip().replace(" ", "_")
-        return safe or "attachment"
+        reserved = {
+            "CON",
+            "PRN",
+            "AUX",
+            "NUL",
+            "COM1",
+            "COM2",
+            "COM3",
+            "COM4",
+            "COM5",
+            "COM6",
+            "COM7",
+            "COM8",
+            "COM9",
+            "LPT1",
+            "LPT2",
+            "LPT3",
+            "LPT4",
+            "LPT5",
+            "LPT6",
+            "LPT7",
+            "LPT8",
+            "LPT9",
+        }
+
+        p = Path(name)
+        suffix = p.suffix
+        base = name[: -len(suffix)] if suffix else name
+
+        keep = [c for c in base if c.isalnum() or c in (" ", "_", "-", ".")]
+        safe = "".join(keep).strip().replace(" ", "_").rstrip(". ")
+        if not safe:
+            safe = "attachment"
+        if safe.upper() in reserved:
+            safe = f"_{safe}"
+        if len(safe) > 120:
+            safe = safe[:120].rstrip(". ")
+        return f"{safe}{suffix}"
 
     def _calculate_md5(self, file_path: Path) -> str:
         """计算文件的MD5哈希值"""
@@ -51,27 +86,39 @@ class AttachmentManager:
         file_size: int | None = None,
         *,
         award_id: int | None = None,
+        session: Session | None = None,
     ) -> list[Attachment]:
         """根据 MD5（可选文件大小）查找附件，可限定在指定 award 内"""
-        with self.db.session_scope() as session:
-            query = session.query(Attachment).filter(Attachment.file_md5 == file_md5)
+        context = self.db.session_scope() if session is None else contextlib.nullcontext(session)
+        with context as active_session:
+            query = active_session.query(Attachment).filter(Attachment.file_md5 == file_md5, Attachment.deleted.is_(False))
             if file_size is not None:
                 query = query.filter(Attachment.file_size == file_size)
             if award_id is not None:
                 query = query.filter(Attachment.award_id == award_id)
             return list(query.all())
 
-    def has_duplicate(self, file_md5: str, file_size: int | None = None, *, award_id: int | None = None) -> bool:
+    def has_duplicate(
+        self,
+        file_md5: str,
+        file_size: int | None = None,
+        *,
+        award_id: int | None = None,
+        session: Session | None = None,
+    ) -> bool:
         """判断指定 award 内是否存在重复附件；未传 award_id 时不做全局查重"""
         if award_id is None:
             return False
-        with self.db.session_scope() as session:
-            query = session.query(Attachment.id).filter(
-                Attachment.award_id == award_id, Attachment.file_md5 == file_md5
+        context = self.db.session_scope() if session is None else contextlib.nullcontext(session)
+        with context as active_session:
+            query = active_session.query(Attachment.id).filter(
+                Attachment.award_id == award_id,
+                Attachment.file_md5 == file_md5,
+                Attachment.deleted.is_(False),
             )
             if file_size is not None:
                 query = query.filter(Attachment.file_size == file_size)
-            return session.query(query.exists()).scalar() is True
+            return active_session.query(query.exists()).scalar() is True
 
     def _ensure_unique_path(self, folder: Path, filename: str) -> Path:
         dest = folder / filename
@@ -97,6 +144,7 @@ class AttachmentManager:
 
         context = self.db.session_scope() if session is None else contextlib.nullcontext(session)
         with context as active_session:
+            seen: set[tuple[str, int]] = set()
             for index, src in enumerate(file_paths, start=1):
                 if not src.exists():
                     logger.warning("Attachment %s not found, skipped", src)
@@ -105,9 +153,14 @@ class AttachmentManager:
                 # 计算MD5和文件大小
                 file_md5 = self._calculate_md5(src)
                 file_size = src.stat().st_size
+                key = (file_md5, file_size)
+                if key in seen:
+                    logger.info("Skip duplicate attachment in selection for award %s (md5=%s): %s", award_id, file_md5, src)
+                    continue
+                seen.add(key)
 
                 # 若已存在相同 MD5 的附件则跳过，避免重复占用空间
-                if self.has_duplicate(file_md5, file_size, award_id=award_id):
+                if self.has_duplicate(file_md5, file_size, award_id=award_id, session=active_session):
                     logger.info("Skip duplicate attachment for award %s (md5=%s): %s", award_id, file_md5, src)
                     continue
 

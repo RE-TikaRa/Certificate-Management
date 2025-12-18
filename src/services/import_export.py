@@ -2,6 +2,7 @@ import csv
 import logging
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from datetime import date as py_date, datetime as py_datetime
 from pathlib import Path
 from typing import cast
 
@@ -54,7 +55,7 @@ class ImportExportService:
     def _ensure_template(self) -> None:
         csv_path = TEMPLATES_DIR / "awards_template.csv"
         if not csv_path.exists():
-            with csv_path.open("w", encoding="utf-8", newline="") as f:
+            with csv_path.open("w", encoding="utf-8-sig", newline="") as f:
                 writer = csv.writer(f)
                 writer.writerow(TEMPLATE_HEADERS)
         xlsx_path = TEMPLATES_DIR / "awards_template.xlsx"
@@ -90,10 +91,10 @@ class ImportExportService:
 
         df = pd.DataFrame(rows)
         export_path.parent.mkdir(parents=True, exist_ok=True)
-        if export_path.suffix == ".xlsx":
+        if export_path.suffix.lower() == ".xlsx":
             df.to_excel(export_path, index=False)
         else:
-            df.to_csv(export_path, index=False)
+            df.to_csv(export_path, index=False, encoding="utf-8-sig")
         logger.info("Exported %s awards to %s", len(awards), export_path)
         return export_path
 
@@ -106,7 +107,13 @@ class ImportExportService:
     ) -> ImportResult:
         flag_defs: list[CustomFlag] = self.flags.list_flags(enabled_only=True) if self.flags else []
         try:
-            df = pd.read_excel(file_path) if file_path.suffix.lower() == ".xlsx" else pd.read_csv(file_path)
+            if file_path.suffix.lower() == ".xlsx":
+                df = pd.read_excel(file_path)
+            else:
+                try:
+                    df = pd.read_csv(file_path, encoding="utf-8-sig")
+                except Exception:
+                    df = pd.read_csv(file_path, encoding="gbk")
         except Exception as exc:
             return ImportResult(total=0, success=0, failed=0, errors=[str(exc)])
 
@@ -147,10 +154,30 @@ class ImportExportService:
 
         def handle_row(session: Session, row_index: int, row) -> None:
             nonlocal success
-            timestamp = cast(pd.Timestamp, pd.to_datetime(clean_cell(row["获奖日期"])))
+            raw_date = row["获奖日期"]
+            timestamp: object
+            if isinstance(raw_date, pd.Timestamp):
+                timestamp = raw_date
+            elif isinstance(raw_date, py_datetime):
+                timestamp = pd.Timestamp(raw_date)
+            elif isinstance(raw_date, py_date):
+                timestamp = pd.Timestamp(py_datetime(raw_date.year, raw_date.month, raw_date.day))
+            elif isinstance(raw_date, (int, float)) and not pd.isna(raw_date):
+                # Excel serial date (days since 1899-12-30 in pandas)
+                ts = pd.to_datetime(raw_date, unit="D", origin="1899-12-30")
+                if pd.isna(ts):
+                    raise ValueError("获奖日期无法解析")
+                timestamp = ts
+            else:
+                ts = pd.to_datetime(clean_cell(raw_date))
+                if pd.isna(ts):
+                    raise ValueError("获奖日期无法解析")
+                timestamp = ts
+            if cast(bool, pd.isna(timestamp)):
+                raise ValueError("获奖日期无法解析")
             award = Award(
                 competition_name=clean_cell(row["比赛名称"]),
-                award_date=timestamp.date(),
+                award_date=cast(pd.Timestamp, timestamp).date(),
                 level=clean_cell(row["赛事级别"]),
                 rank=clean_cell(row["奖项等级"]),
                 certificate_code=clean_cell(row.get("证书编号", "")) or None,
@@ -192,14 +219,14 @@ class ImportExportService:
             success += 1
 
         def process_rows(session: Session) -> None:
-            for idx, row in df.iterrows():
-                row_index = int(idx) if isinstance(idx, (int, float, str)) else 0
+            for pos, (idx, row) in enumerate(df.iterrows()):
+                row_index = pos
                 try:
                     with session.begin_nested():
                         handle_row(session, row_index, row)
                 except Exception as exc:
                     errors.append(f"第 {row_index + 2} 行: {exc}")
-                    error_rows.append({"行号": row_index + 2, "错误": str(exc), **row.to_dict()})
+                    error_rows.append({"行号": row_index + 2, "索引": idx, "错误": str(exc), **row.to_dict()})
 
                 processed = row_index + 1
                 if progress_callback and processed % 10 == 0:
@@ -221,10 +248,11 @@ class ImportExportService:
         else:
             with self.db.session_scope() as session:
                 process_rows(session)
+                status = "success" if not errors else ("failed" if success <= 0 else "partial")
                 session.add(
                     ImportJob(
                         filename=file_path.name,
-                        status="success" if not errors else "partial",
+                        status=status,
                         message="\n".join(errors) if errors else None,
                     )
                 )
@@ -233,7 +261,7 @@ class ImportExportService:
         if error_rows and not dry_run:
             error_file = file_path.parent / f"{file_path.stem}_errors.csv"
             try:
-                pd.DataFrame(error_rows).to_csv(error_file, index=False)
+                pd.DataFrame(error_rows).to_csv(error_file, index=False, encoding="utf-8-sig")
             except Exception:
                 error_file = None
 

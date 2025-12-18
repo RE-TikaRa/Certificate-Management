@@ -1,12 +1,13 @@
 import hashlib
 import logging
 from collections.abc import Iterable
+from contextlib import suppress
 from datetime import date
 from functools import partial
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
-from PySide6.QtCore import QDate, Qt, QTimer, Slot
+from PySide6.QtCore import QDate, QPoint, QRect, Qt, QTimer, Slot
 from PySide6.QtGui import QColor, QFont, QPalette
 from PySide6.QtWidgets import (
     QAbstractSpinBox,
@@ -68,15 +69,12 @@ def clean_input_text(line_edit: QLineEdit) -> None:
     """
     import re
 
-    def on_text_changed(text: str):
-        # 删除所有空白字符（空格、制表符、换行符等）
+    def on_text_changed(text: str) -> None:
         cleaned = re.sub(r"\s+", "", text)
         if cleaned != text:
-            # 临时断开信号避免递归
             line_edit.textChanged.disconnect(on_text_changed)
             line_edit.setText(cleaned)
-            line_edit.setCursorPosition(len(cleaned))  # 保持光标位置
-            # 重新连接信号
+            line_edit.setCursorPosition(len(cleaned))
             line_edit.textChanged.connect(on_text_changed)
 
     line_edit.textChanged.connect(on_text_changed)
@@ -885,21 +883,29 @@ class OverviewPage(BasePage):
 
     def _edit_award(self, award) -> None:
         """编辑荣誉"""
-        timer_was_active = False
         try:
-            if self.refresh_timer and self.refresh_timer.isActive():
-                timer_was_active = True
-                self.refresh_timer.stop()
+            main_window = self.window()
+            if main_window is None or not hasattr(main_window, "navigate_to") or not hasattr(main_window, "entry_page"):
+                raise RuntimeError("MainWindow 未找到，无法跳转到录入页编辑")
 
-            dialog = AwardDetailDialog(self.window(), award, self.theme_manager, self.ctx)
-            if dialog.exec():
-                self.refresh()  # 刷新列表
+            try:
+                entry_lazy = cast(Any, cast(Any, main_window).entry_page)
+                entry_page = cast(Any, entry_lazy).load()
+                if not hasattr(entry_page, "load_award_for_editing"):
+                    raise RuntimeError("EntryPage 不支持 load_award_for_editing()")
+                cast(Any, entry_page).load_award_for_editing(award)
+            except Exception as exc:
+                logger.exception("打开录入页编辑失败: %s", exc)
+                InfoBar.error("错误", f"打开录入页编辑失败: {exc!s}", parent=self.window())
+                return
+
+            # 强制切换到录入页（避免仅选中导航项但不触发页面切换）
+            with suppress(Exception):
+                cast(Any, main_window).switchTo(cast(Any, main_window).entry_page)
+            cast(Any, main_window).navigate_to("entry")
         except Exception as e:
             logger.exception(f"编辑失败: {e}")
             InfoBar.error("错误", f"编辑失败: {e!s}", parent=self.window())
-        finally:
-            if timer_was_active and self.refresh_timer:
-                self.refresh_timer.start()
 
     def _delete_award(self, award) -> None:
         """删除荣誉(移入回收站)"""
@@ -991,15 +997,18 @@ class AwardDetailDialog(MaskDialogBase):
         self.setMinimumWidth(700)
         self.setMinimumHeight(600)
         self.widget.setGraphicsEffect(cast(QGraphicsEffect, None))
-
-        # 设置中心 widget 的圆角
         self.widget.setObjectName("centerWidget")
 
         self._init_ui()
         self._apply_theme()
-
-        # 连接主题变化信号（dialog也需要响应主题切换）
         self.theme_manager.themeChanged.connect(self._on_dialog_theme_changed)
+
+    def showEvent(self, e) -> None:
+        parent = self.parentWidget()
+        if parent is not None:
+            top_left = parent.mapToGlobal(QPoint(0, 0))
+            self.setGeometry(QRect(top_left, parent.size()))
+        super().showEvent(e)
 
     def _init_ui(self):
         from ..theme import create_card, make_section_title

@@ -59,8 +59,15 @@ class BackupManager:
 
     def _build_archive_name(self) -> Path:
         prefix = self.settings.get("backup_prefix", "awards")
-        timestamp = datetime.now().strftime("%Y%m%d-%H%M")
-        return self.backup_root / f"{prefix}-backup-{timestamp}.zip"
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        base = self.backup_root / f"{prefix}-backup-{timestamp}.zip"
+        if not base.exists():
+            return base
+        for index in range(1, 1000):
+            candidate = self.backup_root / f"{prefix}-backup-{timestamp}-{index:02d}.zip"
+            if not candidate.exists():
+                return candidate
+        raise RuntimeError("无法生成唯一备份文件名")
 
     def perform_backup(self, include_attachments: bool | None = None, include_logs: bool | None = None) -> Path:
         include_attachments = (
@@ -152,7 +159,7 @@ class BackupManager:
         temp_dir = Path(tempfile.mkdtemp(prefix="restore-"))
         try:
             with zipfile.ZipFile(backup_path, "r") as zip_ref:
-                zip_ref.extractall(temp_dir)
+                self._safe_extract_zip(zip_ref, temp_dir)
 
             db_src = temp_dir / "data" / DB_PATH.name
             if not db_src.exists():
@@ -183,6 +190,28 @@ class BackupManager:
             logger.info("Restored backup from %s", backup_path)
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)
+
+    @staticmethod
+    def _safe_extract_zip(zip_ref: zipfile.ZipFile, dest_dir: Path) -> None:
+        dest = dest_dir.resolve()
+        for info in zip_ref.infolist():
+            name = (info.filename or "").replace("\\", "/")
+            if not name or name.endswith("/"):
+                continue
+
+            if name.startswith("/") or name.startswith("../") or name.startswith(".."):
+                raise ValueError("备份文件包含非法路径，已拒绝解压")
+            first = name.split("/", 1)[0]
+            if ":" in first:
+                raise ValueError("备份文件包含非法路径，已拒绝解压")
+
+            target = (dest / name).resolve()
+            if target != dest and dest not in target.parents:
+                raise ValueError("备份文件包含路径穿越，已拒绝解压")
+
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with zip_ref.open(info, "r") as src, target.open("wb") as out:
+                shutil.copyfileobj(src, out)
 
     def schedule_jobs(self) -> None:
         self.scheduler.remove_all_jobs()
