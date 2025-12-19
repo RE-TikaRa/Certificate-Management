@@ -98,7 +98,7 @@ class AboutPage(BasePage):
             "内置证书录入、全文检索（FTS5）、成员管理（支持快照）、回收站、自动备份与导入/导出等功能，"
             "支持 AI 证书识别（OpenAI 兼容 API），可从证书图片/PDF 自动抽取核心字段并预览确认；"
             "并提供本地 MCP（stdio/SSE）服务与可选 Gradio Web 控制台，方便外部智能体安全接入，"
-            "支持用户名/密码/令牌、写入开关与 PII 过滤，帮助学校/团队高效组织与查询荣誉数据。",
+            "支持写入开关与 PII 过滤，帮助学校/团队高效组织与查询荣誉数据。",
         )
         layout.addWidget(info_card)
 
@@ -129,7 +129,7 @@ class AboutPage(BasePage):
             "• 主题与样式：亮/暗主题即时切换\n"
             "• 备份与清理：自动/手动备份，日志与数据库一键清理\n"
             "• AI 证书识别：证书图片/PDF 一键抽取字段（可预览确认），支持多 Provider 与 API Key 轮换\n"
-            "• AI 接入：内置 MCP（stdio/SSE）与本地 Web 控制台，可配置用户名/密码/令牌、写入开关与 PII 去除",
+            "• AI 接入：内置 MCP（stdio/SSE）与本地 Web 控制台，支持写入开关与 PII 去除",
         )
         layout.addWidget(features_card)
 

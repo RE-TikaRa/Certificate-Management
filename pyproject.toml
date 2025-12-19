@@ -46,11 +46,12 @@ certificate-mcp = "src.mcp.server:main"
 certificate-mcp-web = "src.mcp.web:main"
 
 [tool.setuptools]
-package-dir = { "" = "src" }
 include-package-data = true
+package-dir = { "" = "." }
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["."]
+include = ["src", "src.*"]
 
 [tool.setuptools.package-data]
 src = ["resources/**/*"]

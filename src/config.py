@@ -36,8 +36,6 @@ DEFAULT_SETTINGS: Final[dict[str, str]] = {
     "mcp_port": "8000",
     "mcp_web_host": "127.0.0.1",
     "mcp_web_port": "7860",
-    "mcp_web_token": "",
-    "mcp_web_username": "local",
 }
 
 

@@ -351,8 +351,6 @@ AI 证书识别用于“荣誉录入”页面的一键识别：从证书图片/P
 | `CERT_MCP_DEBUG` | 输出调试错误细节 (`0`/`1`) | `0` |
 | `CERT_MCP_WEB_HOST` | Web 控制台 Host | `127.0.0.1` |
 | `CERT_MCP_WEB_PORT` | Web 控制台端口 | `7860` |
-| `CERT_MCP_WEB_USERNAME` | Web 控制台用户名 | `local` |
-| `CERT_MCP_WEB_PASSWORD` | Web 控制台密码（设置页生成/保存） | *(random)* |
 | `CERT_MCP_WEB_INBROWSER` | 是否自动打开浏览器 (`0`/`1`) | `1` |
 
 <details>
@@ -650,7 +648,7 @@ flowchart TD
 | **界面文字乱码** | 字体缺失或编码问题 | 检查系统字体，确认未强制覆盖 `QFontDatabase` |
 | **数据库被锁** | 异常退出导致锁文件残留 | 关闭应用，删除 `data/awards.db-shm` 和 `.db-wal` |
 | **导入无响应** | 模板格式错误 | 确认 CSV/XLSX 表头与模板一致，查看设置页日志 |
-| **MCP 连接失败** | 端口未启动/URL 错误/依赖缺失 | SSE：确认 `http://127.0.0.1:8000/sse` 且设置页已启动；Web：先 `uv sync --group mcp-web`，再用设置页用户名/密码登录 |
+| **MCP 连接失败** | 端口未启动/URL 错误/依赖缺失 | SSE：确认 `http://127.0.0.1:8000/sse` 且设置页已启动；Web：先 `uv sync --group mcp-web`，再启动 Web 控制台并访问 `http://127.0.0.1:7860` |
 | **MCP SSE 启动报 host 限制** | MCP 服务仅允许本地绑定 | 将 `CERT_MCP_HOST` 设置为 `127.0.0.1` / `localhost` / `::1`（或直接用设置页启动） |
 | **AI 识别提示缺少 PDF 依赖** | 未安装 PyMuPDF | 运行 `uv sync` 安装依赖（需要识别 PDF 时必须） |
 | **AI 识别失败：Cloudflare 1010** | 网络/代理/风控拦截 | 更换网络/代理或更换中转；该错误通常与本机环境无关 |

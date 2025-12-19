@@ -36,11 +36,10 @@
   - 推荐启动方式：应用设置页 → MCP 服务 → 开启“随软件启动 MCP”
   - 手动启动：设置 `CERT_MCP_TRANSPORT=sse` 后运行 `uv run certificate-mcp`
 - **仅允许本地绑定**：当 transport 不是 `stdio` 时，`CERT_MCP_HOST` 只能是 `127.0.0.1/localhost/::1`
-- **Web 控制台（可选）**：安装 `mcp-web` 依赖后 `uv run certificate-mcp-web`（默认 `127.0.0.1:7860`，用户名/密码来自设置页）
+- **Web 控制台（可选）**：安装 `mcp-web` 依赖后 `uv run certificate-mcp-web`（默认 `127.0.0.1:7860`）
 - **默认只读 + 脱敏**：写入开关与 PII 脱敏开关均可在设置页配置（仅本地使用，避免对外暴露端口）
 - **日志位置**：`logs/mcp_sse.log`、`logs/mcp_web.log`、`logs/mcp_web_install.log`
-- **主要设置键（settings 表）**：`mcp_auto_start`、`mcp_port`、`mcp_allow_write`、`mcp_redact_pii`、`mcp_max_bytes`、`mcp_web_auto_start`、`mcp_web_host`、`mcp_web_port`、`mcp_web_username`、`mcp_web_token`（密码）
-- **Web 环境变量**：Web 进程实际读取 `CERT_MCP_WEB_USERNAME` / `CERT_MCP_WEB_PASSWORD`（由运行时把 `mcp_web_token` 注入为 password）
+- **主要设置键（settings 表）**：`mcp_auto_start`、`mcp_port`、`mcp_allow_write`、`mcp_redact_pii`、`mcp_max_bytes`、`mcp_web_auto_start`、`mcp_web_host`、`mcp_web_port`
 
 ## 目录速览
 - `src/main.py` 应用入口；`app_context.py` 构建 DI 容器与服务；`logger.py` 日志配置；`config.py` 配置加载；`version.py` 版本号管理。
