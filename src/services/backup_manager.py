@@ -3,6 +3,7 @@ import shutil
 import sqlite3
 import tempfile
 import zipfile
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -42,6 +43,13 @@ class BackupManager:
         if start_scheduler:
             self.scheduler.start()
             self._scheduler_started = True
+
+    def shutdown(self) -> None:
+        if not self._scheduler_started:
+            return
+        with suppress(Exception):
+            self.scheduler.shutdown(wait=False)
+        self._scheduler_started = False
 
     @property
     def backup_root(self) -> Path:
@@ -155,6 +163,12 @@ class BackupManager:
             self.db.engine.dispose()
         except Exception:
             logger.warning("Failed to dispose engine before restore", exc_info=True)
+
+        # WAL 模式下可能残留旧的 -wal/-shm，恢复前先尽量清理，避免新旧不一致/锁文件残留
+        with suppress(Exception):
+            Path(str(DB_PATH) + "-wal").unlink(missing_ok=True)
+        with suppress(Exception):
+            Path(str(DB_PATH) + "-shm").unlink(missing_ok=True)
 
         temp_dir = Path(tempfile.mkdtemp(prefix="restore-"))
         try:

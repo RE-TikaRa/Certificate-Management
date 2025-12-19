@@ -5,6 +5,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import time
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
@@ -28,6 +29,8 @@ class McpRuntime:
         self._ctx = ctx
         self._mcp_proc: subprocess.Popen | None = None
         self._web_proc: subprocess.Popen | None = None
+        self._mcp_listen_pid: int | None = None
+        self._web_listen_pid: int | None = None
         self._mcp_log_fp: IO[bytes] | None = None
         self._web_log_fp: IO[bytes] | None = None
         self._mcp_log: Path = LOG_DIR / "mcp_sse.log"
@@ -43,6 +46,80 @@ class McpRuntime:
             self._last_web_port = int(self._ctx.settings.get("mcp_web_port", "7860"))
         except Exception:
             self._last_web_port = 7860
+
+    def _find_local_venv_python(self) -> str | None:
+        candidates = [
+            BASE_DIR / ".venv" / "Scripts" / "python.exe",
+            BASE_DIR / ".venv" / "bin" / "python",
+        ]
+        for path in candidates:
+            if path.exists():
+                return str(path)
+        return None
+
+    def _python_can_import(self, python_exe: str, expr: str) -> bool:
+        check = subprocess.run(
+            [python_exe, "-c", expr],
+            cwd=str(BASE_DIR),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        return check.returncode == 0
+
+    def _assert_port_free(self, host: str, port: int) -> None:
+        last_exc: OSError | None = None
+        for family, socktype, proto, _canon, sockaddr in socket.getaddrinfo(host, port, type=socket.SOCK_STREAM):
+            try:
+                with socket.socket(family, socktype, proto) as sock:
+                    sock.bind(sockaddr)
+                    return
+            except OSError as exc:
+                last_exc = exc
+        if last_exc is not None:
+            raise RuntimeError(f"端口占用或无法绑定：{host}:{port}（{last_exc}）") from last_exc
+        raise RuntimeError(f"端口占用或无法绑定：{host}:{port}")
+
+    def _find_listening_pid(self, port: int) -> int | None:
+        if os.name != "nt":
+            return None
+        try:
+            proc = subprocess.run(
+                ["netstat", "-ano"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                check=False,
+            )
+        except Exception:
+            return None
+        needle = f":{port}"
+        for line in (proc.stdout or "").splitlines():
+            parts = line.strip().split()
+            if len(parts) < 5:
+                continue
+            if parts[0].upper() != "TCP":
+                continue
+            local = parts[1]
+            state = parts[3].upper()
+            if state != "LISTENING":
+                continue
+            if not local.endswith(needle):
+                continue
+            with suppress(Exception):
+                return int(parts[4])
+        return None
+
+    def _wait_listening_pid(self, port: int, *, timeout_s: float = 2.0) -> int | None:
+        deadline = time.time() + timeout_s
+        while time.time() < deadline:
+            pid = self._find_listening_pid(port)
+            if pid is not None:
+                return pid
+            time.sleep(0.05)
+        return self._find_listening_pid(port)
 
     def mcp_info(self) -> ProcInfo:
         running = self._mcp_proc is not None and self._mcp_proc.poll() is None
@@ -82,6 +159,7 @@ class McpRuntime:
             raise ValueError("MCP is local-only; host must be 127.0.0.1/localhost/::1")
         self._last_mcp_host = host
         self._last_mcp_port = port
+        self._assert_port_free(host, port)
 
         LOG_DIR.mkdir(parents=True, exist_ok=True)
         self._close_log(self._mcp_log_fp)
@@ -92,16 +170,18 @@ class McpRuntime:
         env["CERT_MCP_PORT"] = str(port)
         env["CERT_MCP_ALLOW_WRITE"] = "1" if allow_write else "0"
         env["CERT_MCP_MAX_BYTES"] = str(max_bytes)
-        cmd = [sys.executable, "-m", "src.mcp.server"]
-        check = subprocess.run(
-            [sys.executable, "-c", "import mcp"],
-            cwd=str(BASE_DIR),
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            check=False,
-        )
-        if check.returncode != 0 and shutil.which("uv") is not None:
-            cmd = ["uv", "run", "python", "-m", "src.mcp.server"]
+        cmd: list[str]
+        python_exe = sys.executable
+        if self._python_can_import(python_exe, "import mcp"):
+            cmd = [python_exe, "-m", "src.mcp.server"]
+        else:
+            venv_python = self._find_local_venv_python()
+            if venv_python and self._python_can_import(venv_python, "import mcp"):
+                cmd = [venv_python, "-m", "src.mcp.server"]
+            else:
+                if shutil.which("uv") is None:
+                    raise RuntimeError("mcp is not installed; run: uv sync")
+                cmd = ["uv", "run", "python", "-m", "src.mcp.server"]
         self._mcp_proc = subprocess.Popen(
             cmd,
             cwd=str(BASE_DIR),
@@ -109,9 +189,21 @@ class McpRuntime:
             stdout=self._mcp_log_fp,
             stderr=self._mcp_log_fp,
         )
+        self._mcp_listen_pid = self._wait_listening_pid(self._last_mcp_port)
 
     def stop_mcp(self) -> None:
         self._terminate(self._mcp_proc)
+        if self._mcp_listen_pid is not None:
+            current = self._find_listening_pid(self._last_mcp_port)
+            if current == self._mcp_listen_pid:
+                with suppress(Exception):
+                    subprocess.run(
+                        ["taskkill", "/PID", str(current), "/T", "/F"],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        check=False,
+                    )
+        self._mcp_listen_pid = None
         self._mcp_proc = None
         self._close_log(self._mcp_log_fp)
         self._mcp_log_fp = None
@@ -128,37 +220,24 @@ class McpRuntime:
             raise ValueError("MCP Web is local-only; host must be 127.0.0.1/localhost/::1")
         self._last_web_host = host
         self._last_web_port = safe_int(str(port), 7860, min_value=1, max_value=65535)
-
-        try:
-            with socket.socket() as sock:
-                sock.bind((host, self._last_web_port))
-        except OSError as exc:
-            raise RuntimeError(f"MCP Web 端口占用或无法绑定：{host}:{self._last_web_port}（{exc}）") from exc
+        self._assert_port_free(host, self._last_web_port)
 
         LOG_DIR.mkdir(parents=True, exist_ok=True)
         self._close_log(self._web_log_fp)
         self._web_log_fp = self._web_log.open("ab")
-        cmd = [sys.executable, "-m", "src.mcp.web"]
-        check = subprocess.run(
-            [sys.executable, "-c", "import gradio; assert hasattr(gradio, 'Blocks')"],
-            cwd=str(BASE_DIR),
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            check=False,
-        )
-        if check.returncode != 0:
-            if shutil.which("uv") is None:
-                raise RuntimeError("gradio is not installed; run: uv sync --group mcp-web")
-            check_uv = subprocess.run(
-                ["uv", "run", "python", "-c", "import gradio; assert hasattr(gradio, 'Blocks')"],
-                cwd=str(BASE_DIR),
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                check=False,
-            )
-            if check_uv.returncode != 0:
-                raise RuntimeError("gradio is not installed; run: uv sync --group mcp-web")
-            cmd = ["uv", "run", "python", "-m", "src.mcp.web"]
+        cmd: list[str]
+        python_exe = sys.executable
+        check_expr = "import gradio; assert hasattr(gradio, 'Blocks')"
+        if self._python_can_import(python_exe, check_expr):
+            cmd = [python_exe, "-m", "src.mcp.web"]
+        else:
+            venv_python = self._find_local_venv_python()
+            if venv_python and self._python_can_import(venv_python, check_expr):
+                cmd = [venv_python, "-m", "src.mcp.web"]
+            else:
+                if shutil.which("uv") is None:
+                    raise RuntimeError("gradio is not installed; run: uv sync --group mcp-web")
+                cmd = ["uv", "run", "python", "-m", "src.mcp.web"]
         env = os.environ.copy()
         env["CERT_MCP_WEB_HOST"] = host
         env["CERT_MCP_WEB_PORT"] = str(self._last_web_port)
@@ -170,9 +249,21 @@ class McpRuntime:
             stdout=self._web_log_fp,
             stderr=self._web_log_fp,
         )
+        self._web_listen_pid = self._wait_listening_pid(self._last_web_port)
 
     def stop_web(self) -> None:
         self._terminate(self._web_proc)
+        if self._web_listen_pid is not None:
+            current = self._find_listening_pid(self._last_web_port)
+            if current == self._web_listen_pid:
+                with suppress(Exception):
+                    subprocess.run(
+                        ["taskkill", "/PID", str(current), "/T", "/F"],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        check=False,
+                    )
+        self._web_listen_pid = None
         self._web_proc = None
         self._close_log(self._web_log_fp)
         self._web_log_fp = None

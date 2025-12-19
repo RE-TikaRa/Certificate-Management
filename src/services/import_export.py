@@ -8,11 +8,11 @@ from typing import cast
 
 import pandas as pd
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from ..config import TEMPLATES_DIR
 from ..data.database import Database
-from ..data.models import Award, AwardFlagValue, AwardMember, CustomFlag, ImportJob
+from ..data.models import Attachment, Award, AwardFlagValue, AwardMember, CustomFlag, ImportJob
 from .attachment_manager import AttachmentManager
 
 logger = logging.getLogger(__name__)
@@ -70,17 +70,41 @@ class ImportExportService:
             flag_defs = self.flags.list_flags(enabled_only=True)
             flag_values = self.flags.get_flags_for_awards([award.id for award in awards])
 
+        award_ids = [award.id for award in awards]
+        loaded_by_id: dict[int, Award] = {}
+        attachment_by_award: dict[int, list[Attachment]] = {}
+        if award_ids:
+            with self.db.session_scope() as session:
+                loaded = session.scalars(
+                    select(Award)
+                    .where(Award.id.in_(award_ids))
+                    .options(selectinload(Award.award_members), selectinload(Award.attachments))
+                ).all()
+                loaded_by_id = {a.id: a for a in loaded}
+                for a in loaded:
+                    attachment_by_award[a.id] = [att for att in a.attachments if not att.deleted]
+
+        attachments_root = self.attachments.ensure_root()
         rows = []
         for award in awards:
+            src_award = loaded_by_id.get(award.id, award)
+            members = ",".join(getattr(src_award, "member_names", []) or [])
+            attachment_items = attachment_by_award.get(award.id, [])
+            attachment_paths = [
+                str((attachments_root / att.relative_path).resolve())
+                for att in attachment_items
+                if isinstance(att.relative_path, str) and att.relative_path
+            ]
             row = {
-                "比赛名称": award.competition_name,
-                "获奖日期": award.award_date.isoformat(),
-                "赛事级别": award.level,
-                "奖项等级": award.rank,
-                "证书编号": award.certificate_code,
-                "备注": award.remarks,
-                "成员": ",".join(award.member_names),
-                "附件数量": len(award.attachments),
+                "比赛名称": src_award.competition_name,
+                "获奖日期": src_award.award_date.isoformat(),
+                "赛事级别": src_award.level,
+                "奖项等级": src_award.rank,
+                "证书编号": src_award.certificate_code,
+                "备注": src_award.remarks,
+                "成员": members,
+                "附件路径": ";".join(attachment_paths),
+                "附件数量": len(attachment_paths),
             }
             if flag_defs:
                 values = flag_values.get(award.id, {})

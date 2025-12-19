@@ -120,6 +120,8 @@ def main(debug: bool = False) -> None:
     runtime = get_mcp_runtime(ctx)
     app.aboutToQuit.connect(runtime.shutdown)
     app.lastWindowClosed.connect(runtime.shutdown)
+    app.aboutToQuit.connect(ctx.backup.shutdown)
+    app.lastWindowClosed.connect(ctx.backup.shutdown)
     if ctx.settings.get("mcp_auto_start", "false") == "true":
         max_bytes = safe_int(ctx.settings.get("mcp_max_bytes", "1048576"), 1_048_576, min_value=1024)
         host = ctx.settings.get("mcp_host", "127.0.0.1")

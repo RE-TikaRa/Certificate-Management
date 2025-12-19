@@ -15,7 +15,6 @@
 - 调试：`uv run python -m src.main --debug`
 - MCP（默认只读）：`uv run certificate-mcp`（默认 stdio；可切 SSE，本地）
 - MCP Web（可选）：`uv sync --group mcp-web` 后 `uv run certificate-mcp-web`
-- MCP 账号：设置页 → MCP 服务，可修改/随机用户名、重置/复制密码，改后重启 MCP Web 生效
 - 语法检查：`uv run python -m compileall -q src`
 - Lint：`uv run ruff check .`
 - 格式化：`uv run ruff format .`
@@ -36,7 +35,8 @@
   - 推荐启动方式：应用设置页 → MCP 服务 → 开启“随软件启动 MCP”
   - 手动启动：设置 `CERT_MCP_TRANSPORT=sse` 后运行 `uv run certificate-mcp`
 - **仅允许本地绑定**：当 transport 不是 `stdio` 时，`CERT_MCP_HOST` 只能是 `127.0.0.1/localhost/::1`
-- **Web 控制台（可选）**：安装 `mcp-web` 依赖后 `uv run certificate-mcp-web`（默认 `127.0.0.1:7860`）
+- **Web 控制台（可选）**：安装 `mcp-web` 依赖后 `uv run certificate-mcp-web`（默认 `127.0.0.1:7860`；无登录，仅本地调试）
+- **退出与端口**：关闭应用会尝试停止 MCP SSE/Web；如端口仍占用可用 `netstat -ano | findstr :7860` 查 PID，再 `taskkill /PID <pid> /T /F`
 - **默认只读 + 脱敏**：写入开关与 PII 脱敏开关均可在设置页配置（仅本地使用，避免对外暴露端口）
 - **日志位置**：`logs/mcp_sse.log`、`logs/mcp_web.log`、`logs/mcp_web_install.log`
 - **主要设置键（settings 表）**：`mcp_auto_start`、`mcp_port`、`mcp_allow_write`、`mcp_redact_pii`、`mcp_max_bytes`、`mcp_web_auto_start`、`mcp_web_host`、`mcp_web_port`
@@ -90,7 +90,7 @@
 - 添加页面：继承 `BasePage`，实现 `_init_ui`；在 `main_window.py` 注册（导航项、_load_* 分组、route_keys），按需处理主题信号。
 - 添加数据字段：同步更新模型、对应 service、UI 表单/列表、统计或刷新逻辑（管理页的 10 字段监控需保持一致）。
 - 成员字段在 UI 约定为 10 项（含学校）；管理页刷新依赖该集合。
-- 导入/导出：模板位于 `src/resources/templates/`（CSV 版本在仓库内；XLSX 模板会在运行时自动生成并可从设置页下载）；专业与学校/学院映射导入来自 `docs/china_bachelor_majors_2025.csv`、`china_universities_2025.csv`、`GSAU_majors.xlsx`。
+- 导入/导出：模板位于 `src/resources/templates/`（CSV 版本在仓库内；XLSX 模板会在运行时自动生成并可从设置页下载）；导出包含 `附件路径`（用 `;` 分隔绝对路径）与 `附件数量`，可用于同机回导；专业与学校/学院映射导入来自 `docs/china_bachelor_majors_2025.csv`、`china_universities_2025.csv`、`GSAU_majors.xlsx`。
 - 导入荣誉：支持 CSV/XLSX，带预检（dry-run 不写入数据库/不落盘附件）、进度 ETA；正式导入会写入 imports 表并可导出错误行；若启用自定义开关，会按列名 `label (key)` 或 `label` 解析。
 - 附件保存：按奖项目录 `attachments/award_{id}` 存放；去重仅在同一奖项内按 MD5/size 判断；删除会移入 `attachments/.trash` 并在数据库标记 deleted。
 - 备份：基于 SQLite `backup()` 生成快照，打包为 zip（可选包含附件/日志）；恢复会覆盖数据库并按选项恢复附件/日志。
