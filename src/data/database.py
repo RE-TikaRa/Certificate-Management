@@ -51,6 +51,10 @@ class Database:
         - Windows 下删除 .db 文件经常因“文件被占用”失败（例如另一个进程仍持有连接）。
         - 这里改为在同一个文件内 DROP 掉所有对象后重新 initialize，避免依赖 unlink。
         """
+
+        def _quote_ident(value: str) -> str:
+            return '"' + value.replace('"', '""') + '"'
+
         self.engine.dispose()
         with self.engine.begin() as connection:
             connection.execute(text("PRAGMA foreign_keys=OFF"))
@@ -64,12 +68,13 @@ class Database:
                 for name, obj_type in rows:
                     if obj_type != kind:
                         continue
+                    ident = _quote_ident(name)
                     if kind == "trigger":
-                        connection.execute(text(f'DROP TRIGGER IF EXISTS "{name}"'))
+                        connection.execute(text(f"DROP TRIGGER IF EXISTS {ident}"))
                     elif kind == "view":
-                        connection.execute(text(f'DROP VIEW IF EXISTS "{name}"'))
+                        connection.execute(text(f"DROP VIEW IF EXISTS {ident}"))
                     else:
-                        connection.execute(text(f'DROP TABLE IF EXISTS "{name}"'))
+                        connection.execute(text(f"DROP TABLE IF EXISTS {ident}"))
             connection.execute(text("PRAGMA foreign_keys=ON"))
         self.initialize()
 

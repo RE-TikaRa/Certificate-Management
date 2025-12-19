@@ -16,7 +16,7 @@
 - MCP（默认只读）：`uv run certificate-mcp`（默认 stdio；可切 SSE，本地）
 - MCP Web（可选）：`uv sync --group mcp-web` 后 `uv run certificate-mcp-web`
 - MCP 账号：设置页 → MCP 服务，可修改/随机用户名、重置/复制密码，改后重启 MCP Web 生效
-- 语法检查：`python -m py_compile src/`
+- 语法检查：`uv run python -m compileall -q src`
 - Lint：`uv run ruff check .`
 - 格式化：`uv run ruff format .`
 - 类型检查：`uv run python -m pyright`

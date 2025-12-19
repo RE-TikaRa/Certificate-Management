@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from .config import ensure_app_dirs
 from .data.database import Database
 from .logger import configure_logging
 from .services.ai_certificate_service import AICertificateService
@@ -35,6 +36,7 @@ class AppContext:
 
 def bootstrap(debug: bool = False, *, start_scheduler: bool = True) -> AppContext:
     configure_logging(debug_enabled=debug)
+    ensure_app_dirs()
 
     db = Database()
     db.initialize()

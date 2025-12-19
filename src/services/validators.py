@@ -299,7 +299,9 @@ class FormValidator:
 
         try:
             checksum = sum(int(card[i]) * weights[i] for i in range(17)) % 11
-            return card[17] == check_codes[checksum], "身份证号校验位错误"
+            expected = check_codes[checksum]
+            is_valid = card[17].upper() == expected
+            return (is_valid, "" if is_valid else "身份证号校验位错误")
         except (ValueError, IndexError):
             return False, "身份证号格式不正确"
 

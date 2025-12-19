@@ -3,6 +3,7 @@
 从.doc文档中提取关键学生信息用于成员录入
 """
 
+import base64
 import logging
 import re
 import subprocess
@@ -18,42 +19,54 @@ class DocInfoExtractor:
         self.member_info = {}
 
     def extract_text_from_doc(self):
-        """使用PowerShell和Word COM对象提取.doc文件文本"""
+        """使用 PowerShell + Word COM 对象提取 .doc 文件文本"""
         # 转换路径为绝对路径并规范化
         abs_path = str(self.doc_path.resolve())
         safe_path = abs_path.replace("'", "''")
 
-        # 使用 -EncodedCommand 避免路径中的特殊字符问题
         ps_script = f"""
+        $ErrorActionPreference = 'Stop'
+        [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+        $word = $null
+        $doc = $null
         try {{
             $word = New-Object -ComObject Word.Application
             $word.Visible = $false
             $word.DisplayAlerts = 0
             $doc = $word.Documents.Open('{safe_path}', $false, $true)
             $text = $doc.Content.Text
-            $doc.Close($false)
-            $word.Quit()
-            [System.Runtime.Interopservices.Marshal]::ReleaseComObject($doc) | Out-Null
-            [System.Runtime.Interopservices.Marshal]::ReleaseComObject($word) | Out-Null
-            [GC]::Collect()
-            [GC]::WaitForPendingFinalizers()
             Write-Output $text
         }} catch {{
             Write-Error $_.Exception.Message
             exit 1
+        }} finally {{
+            if ($doc) {{
+                try {{ $doc.Close($false) | Out-Null }} catch {{}}
+            }}
+            if ($word) {{
+                try {{ $word.Quit() | Out-Null }} catch {{}}
+            }}
+            if ($doc) {{
+                try {{ [System.Runtime.InteropServices.Marshal]::FinalReleaseComObject($doc) | Out-Null }} catch {{}}
+            }}
+            if ($word) {{
+                try {{ [System.Runtime.InteropServices.Marshal]::FinalReleaseComObject($word) | Out-Null }} catch {{}}
+            }}
+            [GC]::Collect()
+            [GC]::WaitForPendingFinalizers()
         }}
-        """
+        """.strip()
+
+        encoded = base64.b64encode(ps_script.encode("utf-16-le")).decode("ascii")
 
         try:
-            # Windows PowerShell 使用系统默认编码（通常是 GBK）
-            # 使用 errors='replace' 处理编码问题
             result = subprocess.run(
-                ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_script],
+                ["pwsh", "-NoProfile", "-NonInteractive", "-Sta", "-EncodedCommand", encoded],
                 check=False,
                 capture_output=True,
                 text=True,
-                encoding="gbk",  # Windows 中文环境使用 GBK
-                errors="replace",  # 替换无法解码的字符
+                encoding="utf-8",
+                errors="replace",
                 timeout=30,  # 30秒超时
             )
 

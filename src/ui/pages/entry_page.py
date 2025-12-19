@@ -1290,7 +1290,11 @@ class EntryPage(BasePage):
         self._clear_form(silent=True)
         if should_back_to_overview:
             main_window = self.window()
-            if main_window is None or not hasattr(main_window, "navigate_to") or not hasattr(main_window, "overview_page"):
+            if (
+                main_window is None
+                or not hasattr(main_window, "navigate_to")
+                or not hasattr(main_window, "overview_page")
+            ):
                 return
 
             def _go_back() -> None:

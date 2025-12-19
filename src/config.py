@@ -40,5 +40,7 @@ DEFAULT_SETTINGS: Final[dict[str, str]] = {
     "mcp_web_username": "local",
 }
 
-for directory in (DATA_DIR, ATTACHMENTS_DIR, BACKUP_DIR, LOG_DIR, TEMPLATES_DIR):
-    directory.mkdir(parents=True, exist_ok=True)
+
+def ensure_app_dirs() -> None:
+    for directory in (DATA_DIR, ATTACHMENTS_DIR, BACKUP_DIR, LOG_DIR, TEMPLATES_DIR):
+        directory.mkdir(parents=True, exist_ok=True)

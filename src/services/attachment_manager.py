@@ -91,7 +91,9 @@ class AttachmentManager:
         """根据 MD5（可选文件大小）查找附件，可限定在指定 award 内"""
         context = self.db.session_scope() if session is None else contextlib.nullcontext(session)
         with context as active_session:
-            query = active_session.query(Attachment).filter(Attachment.file_md5 == file_md5, Attachment.deleted.is_(False))
+            query = active_session.query(Attachment).filter(
+                Attachment.file_md5 == file_md5, Attachment.deleted.is_(False)
+            )
             if file_size is not None:
                 query = query.filter(Attachment.file_size == file_size)
             if award_id is not None:
@@ -155,7 +157,9 @@ class AttachmentManager:
                 file_size = src.stat().st_size
                 key = (file_md5, file_size)
                 if key in seen:
-                    logger.info("Skip duplicate attachment in selection for award %s (md5=%s): %s", award_id, file_md5, src)
+                    logger.info(
+                        "Skip duplicate attachment in selection for award %s (md5=%s): %s", award_id, file_md5, src
+                    )
                     continue
                 seen.add(key)
 
