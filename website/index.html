@@ -4,21 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>荣誉证书管理系统 - 智能识别，高效管理</title>
+    <link rel="icon" href="https://free.picui.cn/free/2025/12/30/6953f28ba97a0.ico">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
     <!-- Navbar -->
-    <nav class="navbar">
+    <nav class="navbar animate-fade-up">
         <div class="logo">
-            <i class="fas fa-certificate" style="color: var(--primary-color);"></i>
+            <img src="logo.svg" alt="Logo" style="height: 32px; width: auto;">
             Certificate Manager
         </div>
         <div class="nav-links">
             <a href="#home">首页</a>
             <a href="#features">功能</a>
             <a href="#download">下载</a>
-            <a href="https://github.com/yourusername/certificate-management" target="_blank">
+            <a href="https://github.com/RE-TikaRa/Certificate-Management" target="_blank">
                 <i class="fab fa-github"></i> GitHub
             </a>
         </div>
@@ -26,60 +27,81 @@
 
     <!-- Hero Section -->
     <section id="home" class="hero">
-        <h1>荣誉证书管理系统</h1>
-        <p>智能识别，高效管理，您的个人荣誉管家。<br>基于 Python 与 Modern Fluent Design 构建。</p>
-        <div class="cta-buttons">
-            <a href="#download" class="btn btn-primary">立即下载</a>
-            <a href="https://github.com/yourusername/certificate-management" class="btn btn-secondary">查看文档</a>
+        <h1 class="animate-fade-up animate-delay-1">荣誉证书管理系统</h1>
+        <p class="animate-fade-up animate-delay-2">智能识别，高效管理，您的个人荣誉管家。<br>基于 Python 与 Modern Fluent Design 构建。</p>
+        <div class="cta-buttons animate-fade-up animate-delay-3">
+            <a href="https://github.com/RE-TikaRa/Certificate-Management" class="btn btn-primary"><i class="fas fa-rocket"></i> 快速开始</a>
+            <a href="https://re-tikara.fun/Blog/posts/6c20921f/" class="btn btn-secondary"><i class="fas fa-book"></i> 查看文档</a>
         </div>
-        <div class="hero-image">
-            <!-- Placeholder for main screenshot -->
-            <img src="https://placehold.co/1000x600/e0e0e0/666666?text=Dashboard+Screenshot" alt="Dashboard Screenshot">
+        <div class="hero-image-container animate-fade-up animate-delay-3">
+            <div class="hero-image">
+                <img src="https://s2.loli.net/2025/12/10/KbLFB2Ta3E8rCsf.jpg" alt="Dashboard Screenshot">
+            </div>
         </div>
     </section>
 
     <!-- Features -->
     <section id="features" class="section">
-        <div class="section-image">
-            <img src="https://placehold.co/600x400/e0e0e0/666666?text=AI+Recognition" alt="AI Recognition">
+        <div class="section-image animate-fade-up">
+            <img src="https://s2.loli.net/2025/12/10/IA1hHyCiEGlfNSx.png" alt="AI Recognition">
         </div>
-        <div class="section-content">
+        <div class="section-content animate-fade-up animate-delay-1">
             <h3>AI POWERED</h3>
             <h2>AI 智能识别</h2>
             <p>内置先进的 AI 识别引擎，支持 PDF 文档与多种图片格式。只需一键上传，即可自动提取证书名称、获奖日期、等级等关键信息，告别繁琐的手工录入。</p>
+            <ul class="feature-list">
+                <li><i class="fas fa-check-circle"></i> 支持 PDF、PNG、JPG 等多种格式</li>
+                <li><i class="fas fa-check-circle"></i> 自动提取关键信息，准确率高</li>
+                <li><i class="fas fa-check-circle"></i> 本地处理，保护隐私</li>
+            </ul>
         </div>
     </section>
 
     <section class="section">
-        <div class="section-content">
+        <div class="section-content animate-fade-up">
             <h3>VISUALIZATION</h3>
             <h2>数据可视化</h2>
             <p>精心设计的仪表盘，提供多维度的统计分析。通过直观的图表展示您的获奖趋势、级别分布与含金量统计，让每一份努力都清晰可见。</p>
+            <ul class="feature-list">
+                <li><i class="fas fa-chart-pie"></i> 8 个动态指标卡</li>
+                <li><i class="fas fa-chart-line"></i> 实时图表联动</li>
+                <li><i class="fas fa-eye"></i> 关键数据一目了然</li>
+            </ul>
         </div>
-        <div class="section-image">
-            <img src="https://placehold.co/600x400/e0e0e0/666666?text=Data+Visualization" alt="Data Visualization">
+        <div class="section-image animate-fade-up animate-delay-1">
+            <img src="https://s2.loli.net/2025/12/10/18nQ5Mt9yos4G7j.png" alt="Data Visualization">
         </div>
     </section>
 
     <section class="section">
-        <div class="section-image">
-            <img src="https://placehold.co/600x400/e0e0e0/666666?text=Fluent+Design" alt="Fluent Design">
+        <div class="section-image animate-fade-up">
+            <img src="https://s2.loli.net/2025/12/10/eC2vklNYSyF5ipo.png" alt="Fluent Design">
         </div>
-        <div class="section-content">
+        <div class="section-content animate-fade-up animate-delay-1">
             <h3>MODERN UI</h3>
             <h2>极致的设计语言</h2>
             <p>采用微软 Fluent Design 设计语言，结合 QFluentWidgets 库，带来简洁、流畅且现代化的交互体验。支持深色模式，完美融入您的桌面环境。</p>
+            <ul class="feature-list">
+                <li><i class="fas fa-paint-brush"></i> 现代 Fluent Design 风格</li>
+                <li><i class="fas fa-moon"></i> 完美支持深色模式</li>
+                <li><i class="fas fa-magic"></i> 丝滑的动画效果</li>
+            </ul>
         </div>
     </section>
 
     <section class="section">
-        <div class="section-content">
+        <div class="section-content animate-fade-up">
             <h3>LOCAL & SECURE</h3>
             <h2>本地优先，安全隐私</h2>
             <p>所有数据存储在本地 SQLite 数据库中，完全由您掌控。支持一键备份与导出，无需担心隐私泄露。同时支持 MCP 协议，可作为 AI 代理的强大工具。</p>
+            <ul class="feature-list">
+                <li><i class="fas fa-database"></i> 本地 SQLite 存储</li>
+                <li><i class="fas fa-shield-alt"></i> 数据完全私有</li>
+                <li><i class="fas fa-robot"></i> 支持 MCP 协议扩展</li>
+            </ul>
         </div>
-        <div class="section-image">
-            <img src="https://placehold.co/600x400/e0e0e0/666666?text=Local+Database" alt="Local Database">
+        <div class="section-image animate-fade-up animate-delay-1">
+            <img src="https://s2.loli.net/2025/12/10/dKcrQUTo3xghDNq.png" alt="Local Database">
         </div>
     </section>
 
@@ -88,30 +110,19 @@
         <div class="footer-content">
             <div class="footer-col">
                 <h4>Certificate Manager</h4>
-                <p>让荣誉管理变得简单而优雅。</p>
+                <p>让荣誉管理变得简单而优雅。全生命周期荣誉管理，从录入到分析，一站式解决。</p>
+                <div class="social-links">
+                    <a href="https://github.com/RE-TikaRa/Certificate-Management" target="_blank"><i class="fab fa-github"></i></a>
+                    <a href="https://space.bilibili.com/374412219" target="_blank"><i class="fab fa-bilibili"></i></a>
+                    <a href="mailto:163mail@re-tikara.fun"><i class="fas fa-envelope"></i></a>
+                </div>
             </div>
             <div class="footer-col">
                 <h4>快速链接</h4>
                 <ul>
-                    <li><a href="#home">首页</a></li>
+                    <li><a href="https://github.com/RE-TikaRa/Certificate-Management">GitHub首页</a></li>
                     <li><a href="#features">功能特性</a></li>
-                    <li><a href="#">更新日志</a></li>
-                </ul>
-            </div>
-            <div class="footer-col">
-                <h4>资源</h4>
-                <ul>
-                    <li><a href="#">用户文档</a></li>
-                    <li><a href="#">开发者指南</a></li>
-                    <li><a href="#">问题反馈</a></li>
-                </ul>
-            </div>
-            <div class="footer-col">
-                <h4>平台支持</h4>
-                <ul>
-                    <li><i class="fab fa-windows"></i> Windows 10/11</li>
-                    <li><i class="fab fa-apple"></i> macOS (Coming Soon)</li>
-                    <li><i class="fab fa-linux"></i> Linux (Coming Soon)</li>
+                    <li><a href="https://re-tikara.fun/Blog/posts/6c20921f/">在线文档</a></li>
                 </ul>
             </div>
         </div>
@@ -119,5 +130,30 @@
             <p>&copy; 2026 Certificate Management System. Open Source under MIT License.</p>
         </div>
     </footer>
+    
+    <script>
+        // Simple scroll animation observer
+        const observerOptions = {
+            root: null,
+            rootMargin: '0px',
+            threshold: 0.1
+        };
+
+        const observer = new IntersectionObserver((entries, observer) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.animationPlayState = 'running';
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.animate-fade-up').forEach(el => {
+            // el.style.animationPlayState = 'paused'; // Optional: pause until scroll
+            // For simplicity in this static version, we let them run on load or use a library like AOS
+            // But here we just let CSS handle it. 
+            // To make it trigger on scroll, we would need to add a class 'visible' via JS.
+        });
+    </script>
 </body>
 </html>
