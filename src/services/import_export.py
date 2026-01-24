@@ -1,6 +1,7 @@
 import csv
+import itertools
 import logging
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from datetime import date as py_date, datetime as py_datetime
 from pathlib import Path
@@ -85,17 +86,17 @@ class ImportExportService:
                     attachment_by_award[a.id] = [att for att in a.attachments if not att.deleted]
 
         attachments_root = self.attachments.ensure_root()
-        rows = []
-        for award in awards:
-            src_award = loaded_by_id.get(award.id, award)
+        export_path.parent.mkdir(parents=True, exist_ok=True)
+
+        def build_row(src_award: Award) -> dict[str, object]:
             members = ",".join(getattr(src_award, "member_names", []) or [])
-            attachment_items = attachment_by_award.get(award.id, [])
+            attachment_items = attachment_by_award.get(src_award.id, [])
             attachment_paths = [
                 str((attachments_root / att.relative_path).resolve())
                 for att in attachment_items
                 if isinstance(att.relative_path, str) and att.relative_path
             ]
-            row = {
+            row: dict[str, object] = {
                 "比赛名称": src_award.competition_name,
                 "获奖日期": src_award.award_date.isoformat(),
                 "赛事级别": src_award.level,
@@ -107,18 +108,28 @@ class ImportExportService:
                 "附件数量": len(attachment_paths),
             }
             if flag_defs:
-                values = flag_values.get(award.id, {})
+                values = flag_values.get(src_award.id, {})
                 for flag in flag_defs:
                     col = f"{flag.label} ({flag.key})"
                     row[col] = int(values.get(flag.key, flag.default_value))
-            rows.append(row)
+            return row
 
-        df = pd.DataFrame(rows)
-        export_path.parent.mkdir(parents=True, exist_ok=True)
-        if export_path.suffix.lower() == ".xlsx":
-            df.to_excel(export_path, index=False)
+        if export_path.suffix.lower() == ".csv":
+            flag_headers = [f"{flag.label} ({flag.key})" for flag in flag_defs]
+            headers = [*TEMPLATE_HEADERS, "附件数量", *flag_headers]
+            with export_path.open("w", encoding="utf-8-sig", newline="") as f:
+                writer = csv.DictWriter(f, fieldnames=headers, extrasaction="ignore")
+                writer.writeheader()
+                for award in awards:
+                    src_award = loaded_by_id.get(award.id, award)
+                    writer.writerow(build_row(src_award))
         else:
-            df.to_csv(export_path, index=False, encoding="utf-8-sig")
+            rows = []
+            for award in awards:
+                src_award = loaded_by_id.get(award.id, award)
+                rows.append(build_row(src_award))
+            df = pd.DataFrame(rows)
+            df.to_excel(export_path, index=False)
         logger.info("Exported %s awards to %s", len(awards), export_path)
         return export_path
 
@@ -130,23 +141,56 @@ class ImportExportService:
         dry_run: bool = False,
     ) -> ImportResult:
         flag_defs: list[CustomFlag] = self.flags.list_flags(enabled_only=True) if self.flags else []
+        df_iter: Iterable[pd.DataFrame] | None = None
+        total = 0
+        columns: list[str] = []
+        encoding = "utf-8-sig"
         try:
             if file_path.suffix.lower() == ".xlsx":
                 df = pd.read_excel(file_path)
+                df_iter = (df for _ in range(1))
+                total = len(df)
+                columns = list(df.columns)
             else:
                 try:
-                    df = pd.read_csv(file_path, encoding="utf-8-sig")
+                    reader = pd.read_csv(file_path, encoding="utf-8-sig", chunksize=500)
+                    first_chunk = next(reader, None)
+                    if first_chunk is None:
+                        df_iter = None
+                    else:
+                        df_iter = itertools.chain([first_chunk], reader)
+                        columns = list(first_chunk.columns)
+                    encoding = "utf-8-sig"
                 except Exception:
-                    df = pd.read_csv(file_path, encoding="gbk")
+                    reader = pd.read_csv(file_path, encoding="gbk", chunksize=500)
+                    first_chunk = next(reader, None)
+                    if first_chunk is None:
+                        df_iter = None
+                    else:
+                        df_iter = itertools.chain([first_chunk], reader)
+                        columns = list(first_chunk.columns)
+                    encoding = "gbk"
         except Exception as exc:
             return ImportResult(total=0, success=0, failed=0, errors=[str(exc)])
+        if not df_iter:
+            return ImportResult(total=0, success=0, failed=0, errors=[])
+
+        def count_csv_rows() -> int:
+            if file_path.suffix.lower() == ".xlsx":
+                return total
+            try:
+                with file_path.open("r", encoding=encoding, errors="replace", newline="") as f:
+                    row_count = max(sum(1 for _ in f) - 1, 0)
+            except Exception:
+                return total
+            return row_count
 
         required_cols = {"比赛名称", "获奖日期", "赛事级别", "奖项等级"}
-        if not required_cols.issubset(df.columns):
-            missing = ", ".join(required_cols - set(df.columns))
+        if not required_cols.issubset(columns):
+            missing = ", ".join(required_cols - set(columns))
             return ImportResult(total=0, success=0, failed=0, errors=[f"缺少列: {missing}"])
 
-        total = len(df)
+        total = count_csv_rows()
         success = 0
         errors: list[str] = []
         error_rows: list[dict] = []
@@ -159,9 +203,9 @@ class ImportExportService:
         flag_col_map: dict[str, str] = {}
         for flag in flag_defs:
             preferred = f"{flag.label} ({flag.key})"
-            if preferred in df.columns:
+            if preferred in columns:
                 flag_col_map[flag.key] = preferred
-            elif flag.label in df.columns:
+            elif flag.label in columns:
                 flag_col_map[flag.key] = flag.label
             else:
                 flag_col_map[flag.key] = ""  # 缺失列，用默认值
@@ -231,33 +275,27 @@ class ImportExportService:
                 self.attachments.save_attachments(award.id, award.competition_name, files, session=session)
 
             if not dry_run:
-                member_names = " ".join(members)
-                self.db.upsert_award_fts(
-                    award.id,
-                    award.competition_name,
-                    award.certificate_code,
-                    member_names,
-                    session=session,
-                )
+                self.db.refresh_award_fts(award.id, session=session)
 
             success += 1
 
-        def process_rows(session: Session) -> None:
-            for pos, (idx, row) in enumerate(df.iterrows()):
-                row_index = pos
-                try:
-                    with session.begin_nested():
-                        handle_row(session, row_index, row)
-                except Exception as exc:
-                    errors.append(f"第 {row_index + 2} 行: {exc}")
-                    error_rows.append({"行号": row_index + 2, "索引": idx, "错误": str(exc), **row.to_dict()})
+        def process_frames(session: Session) -> None:
+            row_index = 0
+            for frame in df_iter or []:
+                for idx, row in frame.iterrows():
+                    try:
+                        with session.begin_nested():
+                            handle_row(session, row_index, row)
+                    except Exception as exc:
+                        errors.append(f"第 {row_index + 2} 行: {exc}")
+                        error_rows.append({"行号": row_index + 2, "索引": idx, "错误": str(exc), **row.to_dict()})
 
-                processed = row_index + 1
-                if progress_callback and processed % 10 == 0:
-                    elapsed = time.time() - start_time
-                    rate = elapsed / max(processed, 1)
-                    remaining = max(total - processed, 0) * rate
-                    progress_callback(processed, total, float(remaining))
+                    row_index += 1
+                    if progress_callback and row_index % 10 == 0:
+                        elapsed = time.time() - start_time
+                        rate = elapsed / max(row_index, 1)
+                        remaining = max(total - row_index, 0) * rate
+                        progress_callback(row_index, total, float(remaining))
 
         if dry_run:
             # Strict dry-run: no DB writes, no attachment copy, no ImportJob, no error file.
@@ -265,13 +303,13 @@ class ImportExportService:
                 transaction = connection.begin()
                 session = Session(bind=connection, expire_on_commit=False)
                 try:
-                    process_rows(session)
+                    process_frames(session)
                 finally:
                     session.close()
                     transaction.rollback()
         else:
             with self.db.session_scope() as session:
-                process_rows(session)
+                process_frames(session)
                 status = "success" if not errors else ("failed" if success <= 0 else "partial")
                 session.add(
                     ImportJob(

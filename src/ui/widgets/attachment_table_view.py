@@ -4,11 +4,11 @@ from pathlib import Path
 
 from PySide6.QtCore import QMimeData, Signal
 from PySide6.QtGui import QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent, QDropEvent
-from PySide6.QtWidgets import QTableView
+from qfluentwidgets import TableView
 
 
-class AttachmentTableView(QTableView):
-    """QTableView that accepts file drops and emits resolved Path objects."""
+class AttachmentTableView(TableView):
+    """TableView that accepts file drops and emits resolved Path objects."""
 
     fileDropped = Signal(list)
 

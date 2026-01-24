@@ -6,17 +6,11 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtWidgets import (
-    QListWidget,
-    QListWidgetItem,
-    QVBoxLayout,
-    QWidget,
-)
-from qfluentwidgets import LineEdit
+from PySide6.QtWidgets import QListWidgetItem, QVBoxLayout, QWidget
+from qfluentwidgets import LineEdit, ListWidget
 from shiboken6 import isValid
 
 from src.services.major_service import MajorService
-from src.ui.styled_theme import ThemeManager
 from src.ui.utils.async_utils import run_in_thread
 
 
@@ -28,10 +22,9 @@ class MajorSearchWidget(QWidget):
 
     MIN_QUERY_LENGTH = 2
 
-    def __init__(self, major_service: MajorService, theme_manager: ThemeManager, parent=None):
+    def __init__(self, major_service: MajorService, theme_manager, parent=None):
         super().__init__(parent)
         self.major_service = major_service
-        self.theme_manager = theme_manager
         self._school_code: str | None = None
         self._school_name: str | None = None
         self._selected_code: str | None = None
@@ -44,80 +37,23 @@ class MajorSearchWidget(QWidget):
         self._debounce_timer.timeout.connect(self._perform_search)
         self._init_ui()
 
-    def _init_ui(self):
-        """初始化UI"""
+    def _init_ui(self) -> None:
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
 
-        # 输入框 - 使用 Fluent LineEdit
         self.input = LineEdit()
         self.input.setPlaceholderText("输入专业名称/代码...")
         self.input.textChanged.connect(self._on_text_changed)
         layout.addWidget(self.input)
 
-        # 搜索结果列表
-        self.results_list = QListWidget()
+        self.results_list = ListWidget()
         self.results_list.setVisible(False)
         self.results_list.setMaximumHeight(150)
         self.results_list.itemClicked.connect(self._on_item_clicked)
         layout.addWidget(self.results_list)
 
-        # 应用主题（仅针对列表，LineEdit 已是 Fluent 组件）
-        self._apply_theme()
-        self.theme_manager.themeChanged.connect(self._apply_theme)
-
-    def _apply_theme(self):
-        """应用主题样式（仅列表，LineEdit 使用 Fluent 自带样式）"""
-        is_dark = self.theme_manager.is_dark
-
-        if is_dark:
-            list_style = """
-                QListWidget {
-                    background-color: #2a2a3a;
-                    color: #e0e0e0;
-                    border: 1px solid #4a4a5e;
-                    border-radius: 4px;
-                    outline: none;
-                }
-                QListWidget::item {
-                    padding: 8px 12px;
-                    border-bottom: 1px solid #3a3a4a;
-                }
-                QListWidget::item:hover {
-                    background-color: #3a3a4a;
-                }
-                QListWidget::item:selected {
-                    background-color: #5a80f3;
-                    color: white;
-                }
-            """
-        else:
-            list_style = """
-                QListWidget {
-                    background-color: white;
-                    color: #333;
-                    border: 1px solid #ddd;
-                    border-radius: 4px;
-                    outline: none;
-                }
-                QListWidget::item {
-                    padding: 8px 12px;
-                    border-bottom: 1px solid #f0f0f0;
-                }
-                QListWidget::item:hover {
-                    background-color: #f5f5f5;
-                }
-                QListWidget::item:selected {
-                    background-color: #1890ff;
-                    color: white;
-                }
-            """
-
-        self.results_list.setStyleSheet(list_style)
-
-    def _on_text_changed(self, text: str):
-        """输入框文本变化时搜索"""
+    def _on_text_changed(self, text: str) -> None:
         cleaned = text.strip()
         self._pending_text = cleaned
         self._selected_code = None
@@ -165,7 +101,6 @@ class MajorSearchWidget(QWidget):
                 self.results_list.setVisible(False)
                 return
 
-            # 显示搜索结果
             self.results_list.clear()
             for major in majors:
                 display = major.name
@@ -183,8 +118,7 @@ class MajorSearchWidget(QWidget):
 
         run_in_thread(task, on_done)
 
-    def _on_item_clicked(self, item: QListWidgetItem):
-        """点击搜索结果项"""
+    def _on_item_clicked(self, item: QListWidgetItem) -> None:
         major_name = item.data(Qt.ItemDataRole.UserRole)
         major_code = item.data(Qt.ItemDataRole.UserRole + 1) or ""
         college = item.data(Qt.ItemDataRole.UserRole + 2) or ""
@@ -192,20 +126,14 @@ class MajorSearchWidget(QWidget):
         self._selected_code = major_code or None
         self._selected_college = college or None
 
-        # 填充输入框
         self.input.blockSignals(True)
         self.input.setText(major_name)
         self.input.blockSignals(False)
         self._debounce_timer.stop()
-
-        # 隐藏搜索结果
         self.results_list.setVisible(False)
-
-        # 发送信号
         self.majorSelected.emit(major_name, major_code, college)
 
-    def set_text(self, text: str):
-        """设置输入框文本"""
+    def set_text(self, text: str) -> None:
         self.input.blockSignals(True)
         self.input.setText(text)
         self.input.blockSignals(False)
@@ -218,7 +146,6 @@ class MajorSearchWidget(QWidget):
             self._pending_text = text.strip()
 
     def text(self) -> str:
-        """获取输入框文本"""
         return self.input.text()
 
     def set_school_filter(self, *, name: str | None = None, code: str | None = None) -> None:
@@ -231,8 +158,7 @@ class MajorSearchWidget(QWidget):
     def selected_college(self) -> str | None:
         return self._selected_college
 
-    def clear(self):
-        """清空输入框和搜索结果"""
+    def clear(self) -> None:
         self.input.clear()
         self.results_list.clear()
         self.results_list.setVisible(False)

@@ -3,7 +3,7 @@ from collections.abc import Sequence
 from datetime import date, datetime
 from pathlib import Path
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, case, or_, select
 from sqlalchemy.exc import ArgumentError
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.elements import ColumnElement
@@ -355,6 +355,104 @@ class AwardService:
                 order = {id_: idx for idx, id_ in enumerate(fts_ids)}
                 results = sorted(results, key=lambda a: order.get(a.id, len(order)))
             return results
+
+    def list_awards_overview(
+        self,
+        *,
+        query: str = "",
+        level: str | None = None,
+        rank: str | None = None,
+        date_from: date | None = None,
+        date_to: date | None = None,
+        sort_by: str = "日期降序",
+        flag_filters: dict[str, str] | None = None,
+        limit: int = 5000,
+    ) -> tuple[list[Award], dict[int, dict[str, bool]]]:
+        fts_ids: list[int] = []
+        if query:
+            fts_ids = self.db.search_awards_fts(query, limit)
+
+        level_priority = case(
+            (Award.level == "国家级", 3),
+            (Award.level == "省级", 2),
+            (Award.level == "校级", 1),
+            else_=0,
+        )
+        rank_priority = case(
+            (Award.rank == "一等奖", 4),
+            (Award.rank == "二等奖", 3),
+            (Award.rank == "三等奖", 2),
+            (Award.rank == "优秀奖", 1),
+            else_=0,
+        )
+        sort_map = {
+            "日期降序": Award.award_date.desc(),
+            "日期升序": Award.award_date.asc(),
+            "等级降序": level_priority.desc(),
+            "等级升序": level_priority.asc(),
+            "奖项降序": rank_priority.desc(),
+            "奖项升序": rank_priority.asc(),
+            "名称A-Z": Award.competition_name.asc(),
+            "名称Z-A": Award.competition_name.desc(),
+        }
+        order_by = sort_map.get(sort_by, Award.award_date.desc())
+
+        with self.db.session_scope() as session:
+            q = select(Award).options(selectinload(Award.award_members).selectinload(AwardMember.member))
+            conditions: list[ColumnElement[bool]] = [Award.deleted.is_(False)]
+
+            if query:
+                if fts_ids:
+                    conditions.append(Award.id.in_(fts_ids))
+                else:
+                    conditions.append(
+                        or_(
+                            Award.competition_name.ilike(f"%{query}%"),
+                            Award.certificate_code.ilike(f"%{query}%"),
+                        )
+                    )
+            if level:
+                conditions.append(Award.level == level)
+            if rank:
+                conditions.append(Award.rank == rank)
+            if date_from:
+                conditions.append(Award.award_date >= date_from)
+            if date_to:
+                conditions.append(Award.award_date <= date_to)
+            if conditions:
+                q = q.where(and_(*conditions))
+
+            q = q.order_by(order_by).limit(max(1, limit))
+            awards = list(session.scalars(q).all())
+
+        award_flag_values: dict[int, dict[str, bool]] = {}
+        if self.flags:
+            award_ids = [a.id for a in awards]
+            if award_ids:
+                award_flag_values = self.flags.get_flags_for_awards(award_ids)
+            if flag_filters:
+                defaults = self.flags.get_defaults(enabled_only=True)
+                filtered: list[Award] = []
+                for award in awards:
+                    values = award_flag_values.get(award.id)
+                    if values is None:
+                        values = defaults
+                    matched = True
+                    for key, choice in flag_filters.items():
+                        if choice == "全部":
+                            continue
+                        expect = choice == "是"
+                        if values.get(key, defaults.get(key, False)) != expect:
+                            matched = False
+                            break
+                    if matched:
+                        filtered.append(award)
+                awards = filtered
+                if awards:
+                    keep = {award.id for award in awards}
+                    award_flag_values = {aid: vals for aid, vals in award_flag_values.items() if aid in keep}
+
+        return awards, award_flag_values
 
     def _refresh_award_fts(self, award: Award, members: Sequence[str], *, session=None) -> None:
         member_names = " ".join(members)

@@ -1,5 +1,5 @@
 import logging
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 
 from sqlalchemy import create_engine, event, inspect, text
@@ -219,6 +219,59 @@ class Database:
                     connection.execute(text("DELETE FROM awards_fts WHERE rowid = :id"), {"id": award_id})
         except Exception:
             logging.getLogger(__name__).warning("Delete awards_fts failed for id=%s", award_id, exc_info=True)
+
+    def _refresh_award_fts_in_connection(self, connection: Connection, award_id: int) -> None:
+        connection.execute(text("DELETE FROM awards_fts WHERE rowid = :id"), {"id": award_id})
+        row = connection.execute(
+            text(
+                "SELECT a.id, a.competition_name, a.certificate_code, "
+                "COALESCE(GROUP_CONCAT(am.member_name, ' '), '') AS member_names "
+                "FROM awards a "
+                "LEFT JOIN award_members am ON am.award_id = a.id "
+                "WHERE a.id = :id AND a.deleted = 0 "
+                "GROUP BY a.id"
+            ),
+            {"id": award_id},
+        ).fetchone()
+        if row:
+            connection.execute(
+                text(
+                    "INSERT INTO awards_fts(rowid, competition_name, certificate_code, member_names) "
+                    "VALUES (:id, :c, :code, :m)"
+                ),
+                {
+                    "id": row.id,
+                    "c": row.competition_name,
+                    "code": row.certificate_code or "",
+                    "m": row.member_names or "",
+                },
+            )
+
+    def refresh_award_fts(self, award_id: int, session: Session | None = None) -> None:
+        try:
+            if session is not None:
+                self._refresh_award_fts_in_connection(self._get_connection(session), award_id)
+            else:
+                with self.engine.begin() as connection:
+                    self._refresh_award_fts_in_connection(connection, award_id)
+        except Exception:
+            logging.getLogger(__name__).warning("Refresh awards_fts failed for id=%s", award_id, exc_info=True)
+
+    def refresh_awards_fts(self, award_ids: Sequence[int], session: Session | None = None) -> None:
+        if not award_ids:
+            return
+        unique_ids = sorted({int(value) for value in award_ids})
+        try:
+            if session is not None:
+                connection = self._get_connection(session)
+                for award_id in unique_ids:
+                    self._refresh_award_fts_in_connection(connection, award_id)
+            else:
+                with self.engine.begin() as connection:
+                    for award_id in unique_ids:
+                        self._refresh_award_fts_in_connection(connection, award_id)
+        except Exception:
+            logging.getLogger(__name__).warning("Refresh awards_fts failed for ids=%s", unique_ids, exc_info=True)
 
     def search_awards_fts(self, query: str, limit: int = 100) -> list[int]:
         if not query:

@@ -5,22 +5,20 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtWidgets import QListWidget, QListWidgetItem, QVBoxLayout, QWidget
-from qfluentwidgets import LineEdit
+from PySide6.QtWidgets import QListWidgetItem, QVBoxLayout, QWidget
+from qfluentwidgets import LineEdit, ListWidget
 from shiboken6 import isValid
 
 from src.services.school_service import SchoolService
-from src.ui.styled_theme import ThemeManager
 from src.ui.utils.async_utils import run_in_thread
 
 
 class SchoolSearchWidget(QWidget):
     schoolSelected = Signal(str, str)
 
-    def __init__(self, school_service: SchoolService, theme_manager: ThemeManager, parent=None):
+    def __init__(self, school_service: SchoolService, theme_manager, parent=None):
         super().__init__(parent)
         self.school_service = school_service
-        self.theme_manager = theme_manager
         self._selected_code: str | None = None
         self._region: str | None = None
         self._pending_text = ""
@@ -41,31 +39,11 @@ class SchoolSearchWidget(QWidget):
         self.input.textChanged.connect(self._on_text_changed)
         layout.addWidget(self.input)
 
-        self.results = QListWidget()
+        self.results = ListWidget()
         self.results.setVisible(False)
         self.results.setMaximumHeight(160)
         self.results.itemClicked.connect(self._on_item_clicked)
         layout.addWidget(self.results)
-
-        self._apply_theme()
-        self.theme_manager.themeChanged.connect(self._apply_theme)
-
-    def _apply_theme(self) -> None:
-        if self.theme_manager.is_dark:
-            style = """
-                QListWidget { background-color: #2a2a3a; color: #e0e0e0; border: 1px solid #4a4a5e; border-radius: 4px; }
-                QListWidget::item { padding: 8px 10px; }
-                QListWidget::item:hover { background-color: #3a3a4a; }
-                QListWidget::item:selected { background-color: #5a80f3; color: white; }
-            """
-        else:
-            style = """
-                QListWidget { background-color: #ffffff; color: #333; border: 1px solid #ddd; border-radius: 4px; }
-                QListWidget::item { padding: 8px 10px; }
-                QListWidget::item:hover { background-color: #f5f5f5; }
-                QListWidget::item:selected { background-color: #1890ff; color: white; }
-            """
-        self.results.setStyleSheet(style)
 
     def _on_text_changed(self, text: str) -> None:
         text = text.strip()

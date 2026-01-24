@@ -46,6 +46,34 @@ class McpRuntime:
             self._last_web_port = int(self._ctx.settings.get("mcp_web_port", "7860"))
         except Exception:
             self._last_web_port = 7860
+        self._log_max_bytes = safe_int(
+            self._ctx.settings.get("mcp_log_max_bytes", "5242880"),
+            5 * 1024 * 1024,
+            min_value=1024,
+            max_value=500 * 1024 * 1024,
+        )
+        self._log_backups = safe_int(self._ctx.settings.get("mcp_log_backups", "5"), 5, min_value=0, max_value=50)
+
+    def _rotate_log_file(self, path: Path) -> None:
+        if not path.exists():
+            return
+        try:
+            if path.stat().st_size <= self._log_max_bytes:
+                return
+        except Exception:
+            return
+        if self._log_backups <= 0:
+            with suppress(Exception):
+                path.unlink(missing_ok=True)
+            return
+        for index in range(self._log_backups - 1, 0, -1):
+            src = Path(f"{path}.{index}")
+            dst = Path(f"{path}.{index + 1}")
+            if src.exists():
+                with suppress(Exception):
+                    src.replace(dst)
+        with suppress(Exception):
+            path.replace(Path(f"{path}.1"))
 
     def _find_local_venv_python(self) -> str | None:
         candidates = [
@@ -163,6 +191,7 @@ class McpRuntime:
 
         LOG_DIR.mkdir(parents=True, exist_ok=True)
         self._close_log(self._mcp_log_fp)
+        self._rotate_log_file(self._mcp_log)
         self._mcp_log_fp = self._mcp_log.open("ab")
         env = os.environ.copy()
         env["CERT_MCP_TRANSPORT"] = "sse"
@@ -224,6 +253,7 @@ class McpRuntime:
 
         LOG_DIR.mkdir(parents=True, exist_ok=True)
         self._close_log(self._web_log_fp)
+        self._rotate_log_file(self._web_log)
         self._web_log_fp = self._web_log.open("ab")
         cmd: list[str]
         python_exe = sys.executable

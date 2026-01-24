@@ -21,6 +21,7 @@ class AttachmentManager:
     def __init__(self, db: Database, settings: SettingsService):
         self.db = db
         self.settings = settings
+        self._md5_cache: dict[tuple[str, int, int], str] = {}
 
     @property
     def root(self) -> Path:
@@ -79,6 +80,17 @@ class AttachmentManager:
             for chunk in iter(lambda: f.read(4096), b""):
                 md5_hash.update(chunk)
         return md5_hash.hexdigest()
+
+    def _calculate_md5_cached(self, file_path: Path, stat=None) -> str:
+        if stat is None:
+            stat = file_path.stat()
+        key = (str(file_path.resolve()).lower(), int(stat.st_mtime_ns), int(stat.st_size))
+        cached = self._md5_cache.get(key)
+        if cached:
+            return cached
+        value = self._calculate_md5(file_path)
+        self._md5_cache[key] = value
+        return value
 
     def find_duplicates(
         self,
@@ -153,8 +165,9 @@ class AttachmentManager:
                     continue
 
                 # 计算MD5和文件大小
-                file_md5 = self._calculate_md5(src)
-                file_size = src.stat().st_size
+                stat = src.stat()
+                file_md5 = self._calculate_md5_cached(src, stat)
+                file_size = stat.st_size
                 key = (file_md5, file_size)
                 if key in seen:
                     logger.info(

@@ -153,6 +153,30 @@ class BackupManager:
 
         Overwrites current database file and optionally attachments/logs.
         """
+        safety_backup: Path | None = None
+        try:
+            safety_backup = self.perform_backup(include_attachments=restore_attachments, include_logs=restore_logs)
+        except Exception as exc:
+            logger.warning("Safety backup before restore failed: %s", exc)
+
+        try:
+            self._restore_backup_internal(
+                backup_path, restore_attachments=restore_attachments, restore_logs=restore_logs
+            )
+        except Exception:
+            if safety_backup is not None:
+                try:
+                    logger.warning("Restore failed, rolling back from safety backup: %s", safety_backup)
+                    self._restore_backup_internal(
+                        safety_backup, restore_attachments=restore_attachments, restore_logs=restore_logs
+                    )
+                except Exception:
+                    logger.exception("Rollback from safety backup failed")
+            raise
+
+    def _restore_backup_internal(
+        self, backup_path: Path, *, restore_attachments: bool = True, restore_logs: bool = True
+    ) -> None:
         if not backup_path.exists():
             raise FileNotFoundError(f"备份文件不存在：{backup_path}")
         if backup_path.suffix.lower() != ".zip":

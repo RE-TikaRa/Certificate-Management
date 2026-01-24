@@ -4,23 +4,26 @@ from typing import cast
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import (
-    QFrame,
+    QAbstractItemView,
     QGraphicsEffect,
     QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QScrollArea,
-    QTableView,
     QVBoxLayout,
     QWidget,
 )
 from qfluentwidgets import (
+    CardWidget,
     FluentIcon,
+    HorizontalSeparator,
     InfoBar,
+    LineEdit,
     MaskDialogBase,
     MessageBox,
     PushButton,
+    ScrollArea,
+    TableView,
     TransparentToolButton,
 )
 
@@ -82,7 +85,7 @@ class ManagementPage(BasePage):
         title_layout.addWidget(create_page_header("成员管理", "查看历史成员信息"))
         layout.addWidget(title_widget)
 
-        scroll = QScrollArea()
+        scroll = ScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         layout.addWidget(scroll)
@@ -101,36 +104,44 @@ class ManagementPage(BasePage):
 
         # 标题和刷新按钮
         header_layout = QHBoxLayout()
+        header_layout.setSpacing(12)
+        header_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
         header_layout.addWidget(make_section_title("成员列表"))
-        self.search_input = QLineEdit()
+        header_layout.addStretch()
+
+        header_tools = QHBoxLayout()
+        header_tools.setContentsMargins(0, 0, 0, 0)
+        header_tools.setSpacing(8)
+
+        self.search_input = LineEdit()
         self.search_input.setPlaceholderText("搜索姓名/拼音/学号/电话/邮箱/学院/专业…")
         self.search_input.setFixedWidth(280)
         clean_input_text(self.search_input)
         self.search_input.textChanged.connect(self._on_search_text_changed)
-        header_layout.addWidget(self.search_input)
-        header_layout.addStretch()
+        header_tools.addWidget(self.search_input)
 
         # 批量删除按钮
         self.batch_delete_btn = TransparentToolButton(FluentIcon.DELETE, self)
         self.batch_delete_btn.setToolTip("批量删除选中成员")
         self.batch_delete_btn.clicked.connect(self._batch_delete_members)
-        header_layout.addWidget(self.batch_delete_btn)
+        header_tools.addWidget(self.batch_delete_btn)
 
         refresh_btn = TransparentToolButton(FluentIcon.SYNC)
         refresh_btn.setToolTip("刷新数据")
         refresh_btn.clicked.connect(self.refresh)
-        header_layout.addWidget(refresh_btn)
+        header_tools.addWidget(refresh_btn)
+        header_layout.addLayout(header_tools)
         card_layout.addLayout(header_layout)
 
         # 创建表格
         self.members_model = MembersTableModel(self)
-        self.members_table = QTableView()
+        self.members_table = TableView()
         self.members_table.setModel(self.members_model)
         apply_table_style(self.members_table)
         self.members_table.setMinimumHeight(400)
         self.members_table.horizontalHeader().setStretchLastSection(False)
-        self.members_table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
-        self.members_table.setSelectionMode(QTableView.SelectionMode.ExtendedSelection)
+        self.members_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.members_table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.members_table.horizontalHeader().setDefaultSectionSize(110)
         self.members_table.verticalHeader().setDefaultSectionSize(44)
         self.members_table.clicked.connect(self._on_table_clicked)
@@ -275,7 +286,7 @@ class MemberDetailDialog(MaskDialogBase):
         layout.setSpacing(16)
 
         # 滚动区域
-        self.scroll_area = QScrollArea()
+        self.scroll_area = ScrollArea()
         self.scroll_area.setWidgetResizable(True)
 
         # 内容容器
@@ -340,7 +351,7 @@ class MemberDetailDialog(MaskDialogBase):
 
     def _create_section(self, title: str, fields: list[tuple[str, str]]) -> QWidget:
         """创建信息分区卡片"""
-        section = QFrame()
+        section = CardWidget()
         section.setObjectName("memberDetailCard")
 
         layout = QVBoxLayout(section)
@@ -353,8 +364,7 @@ class MemberDetailDialog(MaskDialogBase):
         layout.addWidget(title_label)
 
         # 分隔线
-        separator = QFrame()
-        separator.setFrameShape(QFrame.Shape.HLine)
+        separator = HorizontalSeparator()
         separator.setObjectName("memberDetailSeparator")
         separator.setFixedHeight(1)
         layout.addWidget(separator)
@@ -384,7 +394,7 @@ class MemberDetailDialog(MaskDialogBase):
             self.field_widgets[field_key] = value_label
 
             # 创建输入框并缓存（初始隐藏）
-            input_field = QLineEdit()
+            input_field = LineEdit()
             clean_input_text(input_field)  # 自动删除空白字符
             input_field.setText(value)
             input_field.setObjectName("memberDetailInput")
@@ -529,7 +539,7 @@ class MemberDetailDialog(MaskDialogBase):
         self.setStyleSheet(f"""
             #centerWidget {{
                 background-color: {dialog_bg};
-                border-radius: 12px;
+                border-radius: 8px;
                 border: 1px solid {card_border};
             }}
             QDialog {{
@@ -569,7 +579,7 @@ class MemberDetailDialog(MaskDialogBase):
 
         # 应用卡片样式
         card_stylesheet = f"""
-            QFrame#memberDetailCard {{
+            CardWidget#memberDetailCard {{
                 background-color: {card_bg};
                 border-radius: 8px;
                 border: 1px solid {card_border};
@@ -602,7 +612,7 @@ class MemberDetailDialog(MaskDialogBase):
                 font-size: 12px;
                 font-weight: 500;
                 border: 1px solid {card_border};
-                border-radius: 4px;
+                border-radius: 8px;
                 padding: 4px 6px;
                 background-color: {input_bg};
             }}
@@ -610,7 +620,7 @@ class MemberDetailDialog(MaskDialogBase):
 
         # 应用分隔线样式
         separator_stylesheet = f"""
-            QFrame#memberDetailSeparator {{
+            HorizontalSeparator#memberDetailSeparator {{
                 color: {separator_color};
             }}
         """
@@ -619,7 +629,7 @@ class MemberDetailDialog(MaskDialogBase):
         input_stylesheet = f"""
             QLineEdit#memberDetailInput {{
                 border: 1px solid {input_border};
-                border-radius: 4px;
+                border-radius: 8px;
                 padding: 4px 6px;
                 background-color: {input_bg};
                 color: {input_text};

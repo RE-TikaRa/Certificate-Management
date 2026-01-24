@@ -36,6 +36,10 @@ DEFAULT_SETTINGS: Final[dict[str, str]] = {
     "mcp_port": "8000",
     "mcp_web_host": "127.0.0.1",
     "mcp_web_port": "7860",
+    "member_snapshot_update_on_profile_change": "false",
+    "ai_retry_once": "true",
+    "mcp_log_max_bytes": "5242880",
+    "mcp_log_backups": "5",
 }
 
 

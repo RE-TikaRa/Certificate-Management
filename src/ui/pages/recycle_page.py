@@ -2,9 +2,8 @@ import logging
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QHBoxLayout,
-    QScrollArea,
-    QTableView,
     QVBoxLayout,
     QWidget,
 )
@@ -14,6 +13,8 @@ from qfluentwidgets import (
     MessageBox,
     PrimaryPushButton,
     PushButton,
+    ScrollArea,
+    TableView,
     TransparentToolButton,
 )
 
@@ -48,7 +49,7 @@ class RecyclePage(BasePage):
         title_layout.addWidget(create_page_header("回收站", "管理已删除的荣誉记录"))
         outer_layout.addWidget(title_widget)
 
-        scroll = QScrollArea()
+        scroll = ScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         outer_layout.addWidget(scroll)
@@ -65,6 +66,8 @@ class RecyclePage(BasePage):
         card, card_layout = create_card()
 
         header_layout = QHBoxLayout()
+        header_layout.setSpacing(12)
+        header_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
         header_layout.addWidget(make_section_title("已删除的荣誉列表"))
         header_layout.addStretch()
         refresh_btn = TransparentToolButton(FluentIcon.SYNC)
@@ -82,11 +85,11 @@ class RecyclePage(BasePage):
             lambda a: a.deleted_at.strftime("%Y-%m-%d %H:%M:%S") if a.deleted_at else "",
         ]
         self.model = ObjectTableModel(headers, accessors, self)
-        self.table = QTableView()
+        self.table = TableView()
         self.table.setModel(self.model)
         apply_table_style(self.table)
-        self.table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(QTableView.SelectionMode.ExtendedSelection)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         card_layout.addWidget(self.table)
         btns = QHBoxLayout()
         self.restore_btn = PrimaryPushButton("恢复")

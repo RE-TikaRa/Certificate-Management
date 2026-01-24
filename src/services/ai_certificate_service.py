@@ -363,53 +363,89 @@ class AICertificateService:
         pdf_pages = max(1, min(10, int(provider.pdf_pages)))
         return base, api_key, model, pdf_pages, provider.id
 
+    def _retry_enabled(self) -> bool:
+        value = self._settings.get("ai_retry_once", "true")
+        return value.lower() in {"1", "true", "yes", "on"}
+
+    def _is_retryable_error(self, exc: Exception) -> bool:
+        msg = str(exc).lower()
+        return any(
+            token in msg
+            for token in (
+                "ai 请求失败",
+                "http 429",
+                "http 5",
+                "timeout",
+                "timed out",
+                "temporarily",
+                "连接",
+                "connection",
+            )
+        )
+
     def extract_from_image(self, image_path: Path) -> CertificateExtractedInfo:
         self._ensure_input_within_limit(image_path)
-        base, api_key, model, _pdf_pages, _provider_id = self._get_active()
 
-        if self._should_use_responses(base):
-            url = self._build_responses_url(base)
-            payload = self._build_responses_payload(model=model, file_path=image_path)
-            data = self._post_json(url, api_key=api_key, payload=payload)
-            content = self._extract_output_text(data)
-        else:
-            url = self._build_chat_completions_url(base)
-            payload = self._build_payload(model=model, image_path=image_path)
-            data = self._post_json(url, api_key=api_key, payload=payload)
-            content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
-            if not isinstance(content, str) or not content.strip():
-                raise ValueError("模型返回为空（未获取到可解析内容）")
+        provider_id: int | None = None
+
+        def run_once() -> CertificateExtractedInfo:
+            nonlocal provider_id
+            base, api_key, model, _pdf_pages, _provider_id = self._get_active()
+            provider_id = _provider_id
+
+            if self._should_use_responses(base):
+                url = self._build_responses_url(base)
+                payload = self._build_responses_payload(model=model, file_path=image_path)
+                data = self._post_json(url, api_key=api_key, payload=payload)
+                content = self._extract_output_text(data)
+            else:
+                url = self._build_chat_completions_url(base)
+                payload = self._build_payload(model=model, image_path=image_path)
+                data = self._post_json(url, api_key=api_key, payload=payload)
+                content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                if not isinstance(content, str) or not content.strip():
+                    raise ValueError("模型返回为空（未获取到可解析内容）")
+
+            try:
+                payload_obj = _extract_json_object_like(content)
+            except Exception as exc:
+                preview = content.strip().replace("\r", "")
+                preview = preview[:800]
+                logger.warning("AI JSON parse failed (model=%s): %s", model, exc)
+                logger.warning("AI raw output preview: %s", preview)
+                if "模型输出不是有效的 JSON 对象" in str(exc):
+                    raise ValueError(
+                        "模型输出不是有效的 JSON 对象。"
+                        "这通常意味着：当前模型不支持图片/PDF输入，或被服务端降级为纯文本拒绝，或模型未按要求输出 JSON。\n"
+                        f"模型原文预览（前 800 字符）：{preview}"
+                    ) from exc
+                raise ValueError(f"模型输出无法解析为 JSON：{exc}\n模型原文预览（前 800 字符）：{preview}") from exc
+
+            try:
+                parsed = CertificateExtractedInfo.model_validate(payload_obj)
+            except ValidationError as exc:
+                raise ValueError(f"模型返回 JSON 结构不符合预期：{exc}") from exc
+
+            parsed.level = _normalize_level(parsed.level)
+            parsed.rank = _normalize_rank(parsed.rank)
+            parsed.member_names = _dedupe_names(parsed.member_names)
+
+            if parsed.competition_name is not None:
+                parsed.competition_name = parsed.competition_name.strip() or None
+            if parsed.certificate_code is not None:
+                parsed.certificate_code = parsed.certificate_code.strip() or None
+
+            return parsed
 
         try:
-            payload_obj = _extract_json_object_like(content)
+            return run_once()
         except Exception as exc:
-            preview = content.strip().replace("\r", "")
-            preview = preview[:800]
-            logger.warning("AI JSON parse failed (model=%s): %s", model, exc)
-            logger.warning("AI raw output preview: %s", preview)
-            if "模型输出不是有效的 JSON 对象" in str(exc):
-                raise ValueError(
-                    "模型输出不是有效的 JSON 对象。"
-                    "这通常意味着：当前模型不支持图片/PDF输入，或被服务端降级为纯文本拒绝，或模型未按要求输出 JSON。\n"
-                    f"模型原文预览（前 800 字符）：{preview}"
-                ) from exc
-            raise ValueError(f"模型输出无法解析为 JSON：{exc}\n模型原文预览（前 800 字符）：{preview}") from exc
-
-        try:
-            parsed = CertificateExtractedInfo.model_validate(payload_obj)
-        except ValidationError as exc:
-            raise ValueError(f"模型返回 JSON 结构不符合预期：{exc}") from exc
-
-        parsed.level = _normalize_level(parsed.level)
-        parsed.rank = _normalize_rank(parsed.rank)
-        parsed.member_names = _dedupe_names(parsed.member_names)
-
-        if parsed.competition_name is not None:
-            parsed.competition_name = parsed.competition_name.strip() or None
-        if parsed.certificate_code is not None:
-            parsed.certificate_code = parsed.certificate_code.strip() or None
-
-        return parsed
+            if provider_id is None or not self._retry_enabled() or not self._is_retryable_error(exc):
+                raise
+            if self._providers.get_api_key_count(provider_id) <= 1:
+                raise
+            logger.warning("AI request failed, retrying with next key: %s", exc)
+            return run_once()
 
     def list_models(self) -> list[str]:
         provider = self._providers.get_active_provider()

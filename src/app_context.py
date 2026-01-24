@@ -53,7 +53,7 @@ def bootstrap(debug: bool = False, *, start_scheduler: bool = True) -> AppContex
     statistics = StatisticsService(db)
     majors = MajorService(db)
     schools = SchoolService(db)
-    members = MemberService(db)
+    members = MemberService(db, settings)
 
     if start_scheduler:
         backup.schedule_jobs()

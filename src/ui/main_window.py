@@ -7,11 +7,14 @@ from PySide6.QtCore import (
     QTimer,
 )
 from PySide6.QtGui import QKeySequence, QShortcut
-from PySide6.QtWidgets import QApplication, QLineEdit, QPlainTextEdit, QTextEdit, QWidget
+from PySide6.QtWidgets import QApplication, QWidget
 from qfluentwidgets import (
     FluentIcon as FIF,
     FluentWindow,
+    LineEdit,
     NavigationItemPosition,
+    PlainTextEdit,
+    TextEdit,
     Theme,
     setTheme,
 )
@@ -216,7 +219,7 @@ class MainWindow(FluentWindow):
 
         def can_navigate() -> bool:
             focus = QApplication.focusWidget()
-            return not isinstance(focus, (QLineEdit, QTextEdit, QPlainTextEdit))
+            return not isinstance(focus, (LineEdit, TextEdit, PlainTextEdit))
 
         shortcuts = [
             ("Alt+1", "home"),

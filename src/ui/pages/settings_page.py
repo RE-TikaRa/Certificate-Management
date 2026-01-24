@@ -18,14 +18,9 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLabel,
     QLineEdit,
-    QListWidget,
     QListWidgetItem,
-    QPlainTextEdit,
-    QProgressBar,
     QProgressDialog,
-    QScrollArea,
     QSizePolicy,
-    QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
@@ -37,10 +32,15 @@ from qfluentwidgets import (
     EditableComboBox,
     InfoBar,
     LineEdit,
+    ListWidget,
     MaskDialogBase,
     MessageBox,
+    PlainTextEdit,
     PrimaryPushButton,
+    ProgressBar,
     PushButton,
+    ScrollArea,
+    TableWidget,
 )
 
 from src.config import BASE_DIR, LOG_DIR
@@ -179,14 +179,14 @@ class UvSyncDialog(MaskDialogBase):
         self.status.setStyleSheet("color: #7a7a7a;")
         card_layout.addWidget(self.status)
 
-        self.progress = QProgressBar(self.widget)
+        self.progress = ProgressBar(self.widget)
         self.progress.setRange(0, 1)
         self.progress.setValue(0)
         card_layout.addWidget(self.progress)
 
-        self.output = QPlainTextEdit(self.widget)
+        self.output = PlainTextEdit(self.widget)
         self.output.setReadOnly(True)
-        self.output.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
+        self.output.setLineWrapMode(PlainTextEdit.LineWrapMode.NoWrap)
         self.output.setMinimumHeight(260)
         card_layout.addWidget(self.output)
 
@@ -342,7 +342,7 @@ class AIKeyManagerDialog(MaskDialogBase):
         self.count_label.setStyleSheet("color: #7a7a7a;")
         card_layout.addWidget(self.count_label)
 
-        self.editor = QPlainTextEdit(self.widget)
+        self.editor = PlainTextEdit(self.widget)
         self.editor.setPlaceholderText("一行一个 Key，或用逗号分隔多个 Key")
         self.editor.setMinimumHeight(220)
         self.editor.textChanged.connect(self._refresh_count)
@@ -352,7 +352,7 @@ class AIKeyManagerDialog(MaskDialogBase):
         preview_title.setStyleSheet("color: #7a7a7a;")
         card_layout.addWidget(preview_title)
 
-        self.preview = QListWidget(self.widget)
+        self.preview = ListWidget(self.widget)
         self.preview.setMinimumHeight(140)
         card_layout.addWidget(self.preview)
 
@@ -539,7 +539,7 @@ class AIModelPickerDialog(MaskDialogBase):
         self.status.setStyleSheet("color: #7a7a7a;")
         layout.addWidget(self.status)
 
-        self.list = QListWidget(self.widget)
+        self.list = ListWidget(self.widget)
         self.list.itemDoubleClicked.connect(lambda item: self._select(item.text()))
         self.list.setMinimumHeight(360)
         layout.addWidget(self.list)
@@ -566,9 +566,11 @@ class AIModelPickerDialog(MaskDialogBase):
         for model_id in filtered:
             self.list.addItem(QListWidgetItem(model_id))
         if self._current:
-            matches = self.list.findItems(self._current, Qt.MatchFlag.MatchExactly)
-            if matches:
-                self.list.setCurrentItem(matches[0])
+            for row in range(self.list.count()):
+                item = self.list.item(row)
+                if item is not None and item.text() == self._current:
+                    self.list.setCurrentItem(item)
+                    break
 
     def _refresh(self) -> None:
         if self._busy:
@@ -624,7 +626,7 @@ class SettingsPage(BasePage):
         self.logger = logging.getLogger(__name__)
         self.attach_dir = QLabel()
         self.backup_dir = QLabel()
-        self.backup_list = QListWidget()
+        self.backup_list = ListWidget()
         self.restore_btn = PrimaryPushButton("恢复选中")
         self.verify_btn = PushButton("验证选中")
         self.frequency = ComboBox()
@@ -657,7 +659,9 @@ class SettingsPage(BasePage):
         self.ai_max_bytes.setValidator(QIntValidator(1, 200_000_000, self))
         self.ai_status = BodyLabel("AI：未测试")
         self.ai_status.setStyleSheet("color: #7a7a7a;")
-        self.ai_keys_table = QTableWidget(0, 2)
+        self.ai_keys_table = TableWidget()
+        self.ai_keys_table.setRowCount(0)
+        self.ai_keys_table.setColumnCount(2)
         self.ai_keys_table.setHorizontalHeaderLabels(["名称", "API Key"])
         self.ai_keys_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.ai_keys_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -683,7 +687,7 @@ class SettingsPage(BasePage):
         self.region_selector.currentIndexChanged.connect(self._on_region_changed)
         self.school_selector = ComboBox()
         self.school_selector.currentIndexChanged.connect(self._load_school_major_list)
-        self.school_major_list = QListWidget()
+        self.school_major_list = ListWidget()
         self.school_major_list.setMinimumHeight(200)
         self._school_options: list[tuple[str | None, str | None]] = []
         self._region_options: list[str | None] = [None]
@@ -693,7 +697,7 @@ class SettingsPage(BasePage):
         self.award_import_btn: PrimaryPushButton | None = None
         self.award_export_btn: PushButton | None = None
         self.award_dry_run: CheckBox | None = None
-        self.import_log_list = QListWidget()
+        self.import_log_list = ListWidget()
         self.rebuild_fts_btn: PrimaryPushButton | None = None
         self._import_busy = False
         self._progress_dialog: QProgressDialog | None = None
@@ -762,7 +766,7 @@ class SettingsPage(BasePage):
         title_layout.addWidget(create_page_header("系统设置", "配置目录、主题与备份策略"))
         outer_layout.addWidget(title_widget)
 
-        scroll = QScrollArea()
+        scroll = ScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         outer_layout.addWidget(scroll)

@@ -232,3 +232,11 @@ class AIProviderService:
             row.last_key_index = next_index
             session.add(row)
             return keys[next_index]
+
+    def get_api_key_count(self, provider_id: int) -> int:
+        with self._db.session_scope() as session:
+            row = session.get(AIProvider, provider_id)
+            if row is None:
+                raise ValueError("Provider 不存在")
+            keys = _split_api_keys(row.api_keys)
+            return len(keys)

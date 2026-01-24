@@ -2,9 +2,9 @@ from enum import Enum
 from typing import Self, cast
 
 from PySide6.QtCore import QCoreApplication, QObject, Signal
-from PySide6.QtGui import QGuiApplication, QPalette
+from PySide6.QtGui import QColor, QGuiApplication, QPalette
 from PySide6.QtWidgets import QApplication
-from qfluentwidgets import Theme, setTheme
+from qfluentwidgets import Theme, setTheme, setThemeColor
 from qfluentwidgets.common.config import qconfig
 
 from ..config import BASE_DIR
@@ -97,6 +97,8 @@ class ThemeManager(QObject):
         q_theme = Theme.DARK if self._is_dark else Theme.LIGHT
         setTheme(q_theme, lazy=True)
         qconfig.themeMode.value = q_theme
+        accent = QColor("#2899f5") if self._is_dark else QColor("#0f6cbd")
+        setThemeColor(accent, save=False, lazy=True)
 
         # 发出主题变化信号
         self.themeChanged.emit()

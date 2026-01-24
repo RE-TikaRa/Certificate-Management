@@ -10,10 +10,10 @@ from typing import Any, cast
 from PySide6.QtCore import QDate, Qt, QTimer, Signal, Slot
 from PySide6.QtGui import QColor, QCursor
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QApplication,
     QFileDialog,
     QFormLayout,
-    QFrame,
     QGraphicsEffect,
     QGridLayout,
     QHBoxLayout,
@@ -21,22 +21,23 @@ from PySide6.QtWidgets import (
     QLabel,
     QLayout,
     QLineEdit,
-    QPlainTextEdit,
     QProgressDialog,
-    QScrollArea,
-    QTableView,
     QVBoxLayout,
     QWidget,
 )
 from qfluentwidgets import (
+    CardWidget,
     CheckBox,
     ComboBox,
     FluentIcon,
+    HorizontalSeparator,
     InfoBar,
     LineEdit,
     MaskDialogBase,
+    PlainTextEdit,
     PrimaryPushButton,
     PushButton,
+    ScrollArea,
     SpinBox,
     TransparentToolButton,
 )
@@ -101,7 +102,7 @@ class AICertificatePreviewDialog(MaskDialogBase):
         self.certificate_code.setPlaceholderText("证书编号（可留空）")
         form.addRow("证书编号", self.certificate_code)
 
-        self.member_names = QPlainTextEdit(self.widget)
+        self.member_names = PlainTextEdit(self.widget)
         self.member_names.setPlaceholderText("一行一个成员姓名")
         self.member_names.setMinimumHeight(140)
         form.addRow("成员姓名", self.member_names)
@@ -206,7 +207,7 @@ class EntryPage(BasePage):
         title_layout.addWidget(refresh_btn)
         outer_layout.addWidget(title_widget)
 
-        self.scrollArea = QScrollArea()
+        self.scrollArea = ScrollArea()
         self.scrollArea.setWidgetResizable(True)
         self.scrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         outer_layout.addWidget(self.scrollArea)
@@ -361,6 +362,8 @@ class EntryPage(BasePage):
 
         # 标题和添加按钮
         attach_header = QHBoxLayout()
+        attach_header.setSpacing(12)
+        attach_header.setAlignment(Qt.AlignmentFlag.AlignVCenter)
         attach_header.addWidget(make_section_title("附件"))
         attach_header.addStretch()
         attach_btn = PrimaryPushButton("添加文件")
@@ -379,8 +382,8 @@ class EntryPage(BasePage):
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)  # 大小
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)  # 操作
         self.attach_table.verticalHeader().setVisible(False)
-        self.attach_table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
-        self.attach_table.setSelectionMode(QTableView.SelectionMode.SingleSelection)
+        self.attach_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.attach_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         from ..theme import apply_table_style
 
         apply_table_style(self.attach_table)
@@ -495,8 +498,8 @@ class EntryPage(BasePage):
 
         logger = logging.getLogger(__name__)
 
-        # 创建成员卡片 - 使用 QFrame 并设置 card 属性以使用 QSS 定义的样式
-        member_card = QFrame()
+        # 创建成员卡片 - 使用 CardWidget 并设置 card 属性以使用 QSS 定义的样式
+        member_card = CardWidget()
         member_card.setProperty("card", True)
 
         # 获取当前样式用于标签
@@ -842,7 +845,7 @@ class EntryPage(BasePage):
 
         # 创建美化的进度对话框（适配主题）
         progress = QProgressDialog(self.window())
-        progress.setWindowTitle("📄 导入成员信息")
+        progress.setWindowTitle("导入成员信息")
 
         # 根据主题设置文本颜色
         is_dark = self.theme_manager.is_dark
@@ -857,9 +860,9 @@ class EntryPage(BasePage):
 
         progress.setLabelText(
             f"<div style='padding: 10px;'>"
-            f"<p style='font-size: 14px; margin-bottom: 8px; color: {text_color};'><b>🔄 正在处理文档...</b></p>"
+            f"<p style='font-size: 14px; margin-bottom: 8px; color: {text_color};'><b>正在处理文档...</b></p>"
             f"<p style='font-size: 12px; color: {desc_color};'>正在打开 Word 文档并提取成员信息</p>"
-            f"<p style='font-size: 12px; color: {hint_color};'>这可能需要几秒钟，请耐心等待 ☕</p>"
+            f"<p style='font-size: 12px; color: {hint_color};'>这可能需要几秒钟，请耐心等待</p>"
             "</div>"
         )
         progress.setRange(0, 0)  # 不确定进度，显示滚动条
@@ -872,7 +875,8 @@ class EntryPage(BasePage):
         if is_dark:
             progress.setStyleSheet("""
                 QProgressDialog {
-                    background-color: #2b2b2b;
+                    background-color: #1f1f1f;
+                    border: 1px solid #3a3a3a;
                     border-radius: 8px;
                 }
                 QLabel {
@@ -880,8 +884,8 @@ class EntryPage(BasePage):
                     padding: 15px;
                 }
                 QProgressBar {
-                    border: 2px solid #3a3a3a;
-                    border-radius: 5px;
+                    border: 1px solid #3a3a3a;
+                    border-radius: 8px;
                     text-align: center;
                     background-color: #1e1e1e;
                     color: #e0e0e0;
@@ -889,14 +893,15 @@ class EntryPage(BasePage):
                 }
                 QProgressBar::chunk {
                     background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                        stop:0 #4a90e2, stop:0.5 #5fa3ef, stop:1 #4a90e2);
-                    border-radius: 3px;
+                        stop:0 #2899f5, stop:0.5 #3aa0f6, stop:1 #2899f5);
+                    border-radius: 8px;
                 }
             """)
         else:
             progress.setStyleSheet("""
                 QProgressDialog {
                     background-color: white;
+                    border: 1px solid #e5e5e5;
                     border-radius: 8px;
                 }
                 QLabel {
@@ -904,16 +909,16 @@ class EntryPage(BasePage):
                     padding: 15px;
                 }
                 QProgressBar {
-                    border: 2px solid #e0e0e0;
-                    border-radius: 5px;
+                    border: 1px solid #e1e1e1;
+                    border-radius: 8px;
                     text-align: center;
-                    background-color: #f5f5f5;
+                    background-color: #f3f3f3;
                     height: 20px;
                 }
                 QProgressBar::chunk {
                     background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                        stop:0 #4a90e2, stop:0.5 #5fa3ef, stop:1 #4a90e2);
-                    border-radius: 3px;
+                        stop:0 #0f6cbd, stop:0.5 #2899f5, stop:1 #0f6cbd);
+                    border-radius: 8px;
                 }
             """)
 
@@ -1369,10 +1374,10 @@ class EntryPage(BasePage):
         """高亮出错的字段"""
         field_widget.setStyleSheet("""
             QLineEdit {
-                border: 2px solid #ff6b6b;
-                border-radius: 4px;
+                border: 2px solid #d13438;
+                border-radius: 8px;
                 padding: 4px;
-                background-color: rgba(255, 107, 107, 0.1);
+                background-color: rgba(209, 52, 56, 0.08);
             }
         """)
         # 3 秒后移除高亮
@@ -1385,8 +1390,8 @@ class EntryPage(BasePage):
         if 0 <= member_index < len(self.members_data):
             member_card = self.members_data[member_index]["card"]
             member_card.setStyleSheet("""
-                QFrame {
-                    border: 2px solid #ff6b6b;
+                CardWidget {
+                    border: 2px solid #d13438;
                     border-radius: 8px;
                 }
             """)
@@ -1611,7 +1616,7 @@ class HistoryMemberDialog(MaskDialogBase):
         layout.addWidget(title_label)
 
         # === 搜索框区域 ===
-        search_card = QFrame()
+        search_card = CardWidget()
         search_card.setProperty("card", True)
         search_layout = QHBoxLayout(search_card)
         search_layout.setContentsMargins(12, 12, 12, 12)
@@ -1633,7 +1638,7 @@ class HistoryMemberDialog(MaskDialogBase):
         layout.addWidget(self.result_label)
 
         # === 成员列表（滚动区域）===
-        scroll = QScrollArea()
+        scroll = ScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setMinimumHeight(420)
         scroll.setMinimumWidth(650)
@@ -1671,7 +1676,7 @@ class HistoryMemberDialog(MaskDialogBase):
 
     def _create_member_card(self, member) -> QWidget:
         """创建美化的成员卡片"""
-        card = QFrame()
+        card = CardWidget()
         card.setProperty("card", True)  # 使用 QSS 定义的 Fluent 卡片样式
         card.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
 
@@ -1706,7 +1711,7 @@ class HistoryMemberDialog(MaskDialogBase):
                 badge_style = """
                     background-color: #2d4a7c;
                     color: #5fa3ef;
-                    border-radius: 4px;
+                    border-radius: 8px;
                     padding: 4px 10px;
                     font-size: 11px;
                     font-weight: 500;
@@ -1715,7 +1720,7 @@ class HistoryMemberDialog(MaskDialogBase):
                 badge_style = """
                     background-color: #e6f4ff;
                     color: #1890ff;
-                    border-radius: 4px;
+                    border-radius: 8px;
                     padding: 4px 10px;
                     font-size: 11px;
                     font-weight: 500;
@@ -1726,8 +1731,7 @@ class HistoryMemberDialog(MaskDialogBase):
         layout.addLayout(header)
 
         # === 分隔线 ===
-        separator = QFrame()
-        separator.setFrameShape(QFrame.Shape.HLine)
+        separator = HorizontalSeparator()
         is_dark = self.theme_manager.is_dark
         separator.setStyleSheet(f"background-color: {'#4a4a5e' if is_dark else '#e8e8e8'}; max-height: 1px;")
         layout.addWidget(separator)
@@ -1862,12 +1866,12 @@ class HistoryMemberDialog(MaskDialogBase):
             QLabel {{
                 background-color: transparent;
             }}
-            QFrame[card="true"] {{
+            CardWidget[card="true"] {{
                 background-color: {card_bg};
                 border: 1px solid {border_color};
-                border-radius: 12px;
+                border-radius: 8px;
             }}
-            QFrame[card="true"]:hover {{
+            CardWidget[card="true"]:hover {{
                 background-color: {card_hover};
                 border: 1px solid #5a80f3;
             }}
@@ -1881,11 +1885,11 @@ class HistoryMemberDialog(MaskDialogBase):
             QScrollBar:vertical {{
                 background-color: transparent;
                 width: 8px;
-                border-radius: 4px;
+                border-radius: 8px;
             }}
             QScrollBar::handle:vertical {{
                 background-color: rgba(138, 159, 255, 0.3);
-                border-radius: 4px;
+                border-radius: 8px;
                 min-height: 30px;
             }}
             QScrollBar::handle:vertical:hover {{
@@ -1903,7 +1907,7 @@ class HistoryMemberDialog(MaskDialogBase):
             + f"""
             QWidget#centerWidget {{
                 background-color: {bg_color};
-                border-radius: 12px;
+                border-radius: 8px;
             }}
         """
         )

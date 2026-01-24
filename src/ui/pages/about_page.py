@@ -5,8 +5,8 @@
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
-from PySide6.QtWidgets import QHBoxLayout, QScrollArea, QVBoxLayout, QWidget
-from qfluentwidgets import BodyLabel, FluentIcon, HyperlinkButton, TitleLabel
+from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
+from qfluentwidgets import BodyLabel, FluentIcon, HyperlinkButton, ScrollArea, TitleLabel
 
 from ...version import get_app_version
 from ..styled_theme import ThemeManager
@@ -25,7 +25,7 @@ class AboutPage(BasePage):
         outer_layout = QVBoxLayout(self)
         outer_layout.setContentsMargins(0, 0, 0, 0)
 
-        scroll_area = QScrollArea()
+        scroll_area = ScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll_area.setObjectName("aboutScrollArea")
@@ -234,7 +234,7 @@ class AboutPage(BasePage):
             QLabel#tagChip {{
                 background-color: {chip_bg};
                 color: {chip_text};
-                border-radius: 12px;
+                border-radius: 8px;
                 padding: 2px 10px;
             }}
             QLabel {{

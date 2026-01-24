@@ -12,17 +12,14 @@ from PySide6.QtCharts import (
 from PySide6.QtCore import Qt, QTimer, QUrl, Slot
 from PySide6.QtGui import QBrush, QColor, QDesktopServices, QPainter
 from PySide6.QtWidgets import (
-    QFrame,
     QGridLayout,
     QHBoxLayout,
     QLabel,
-    QScrollArea,
     QSizePolicy,
-    QTableView,
     QVBoxLayout,
     QWidget,
 )
-from qfluentwidgets import FluentIcon, InfoBar, TransparentToolButton
+from qfluentwidgets import CardWidget, FluentIcon, IconWidget, InfoBar, ScrollArea, TableView, TransparentToolButton
 
 from ..styled_theme import ThemeManager
 from ..table_models import ObjectTableModel
@@ -68,7 +65,7 @@ class DashboardPage(BasePage):
         title_layout.addWidget(refresh_btn)
         outer_layout.addWidget(title_widget)
 
-        scroll = QScrollArea()
+        scroll = ScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         outer_layout.addWidget(scroll)
@@ -94,14 +91,14 @@ class DashboardPage(BasePage):
         grid = QGridLayout()
         grid.setSpacing(16)
         tiles = [
-            ("总荣誉数", "🗂", "violet"),
-            ("国家级", "🏅", "gold"),
-            ("省级", "🏆", "blue"),
-            ("校级", "🎖", "green"),
-            ("一等奖", "🥇", "cyan"),
-            ("二等奖", "🥈", "purple"),
-            ("三等奖", "🥉", "red"),
-            ("优秀奖", "⭐", "orange"),
+            ("总荣誉数", FluentIcon.CERTIFICATE, "violet"),
+            ("国家级", FluentIcon.FLAG, "gold"),
+            ("省级", FluentIcon.TAG, "blue"),
+            ("校级", FluentIcon.EDUCATION, "green"),
+            ("一等奖", FluentIcon.ACCEPT, "cyan"),
+            ("二等奖", FluentIcon.ACCEPT_MEDIUM, "purple"),
+            ("三等奖", FluentIcon.CHECKBOX, "red"),
+            ("优秀奖", FluentIcon.HEART, "orange"),
         ]
         for idx, (title, icon, accent) in enumerate(tiles):
             tile = self._create_metric_tile(title, icon, accent)
@@ -110,17 +107,18 @@ class DashboardPage(BasePage):
         card_layout.addLayout(grid)
         return card
 
-    def _create_metric_tile(self, title: str, icon: str, accent: str) -> QWidget:
-        frame = QFrame()
+    def _create_metric_tile(self, title: str, icon: FluentIcon, accent: str) -> QWidget:
+        frame = CardWidget()
         frame.setProperty("metricTile", True)
         frame.setProperty("accent", accent)
         layout = QVBoxLayout(frame)
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(6)
-        icon_label = QLabel(icon)
-        icon_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        icon_label.setStyleSheet("font-size: 24px;")
-        layout.addWidget(icon_label)
+        icon_widget = IconWidget()
+        icon_widget.setProperty("metricIcon", True)
+        icon_widget.setFixedSize(24, 24)
+        icon_widget.setIcon(icon)
+        layout.addWidget(icon_widget)
         value = QLabel("0")
         value.setProperty("metricValue", True)
         layout.addWidget(value)
@@ -173,7 +171,7 @@ class DashboardPage(BasePage):
         left = QVBoxLayout()
         left.addWidget(make_section_title("级别汇总"))
         self.level_model = ObjectTableModel(["级别", "数量"], [lambda r: r[0], lambda r: r[1]], self)
-        self.level_table = QTableView()
+        self.level_table = TableView()
         self.level_table.setModel(self.level_model)
         apply_table_style(self.level_table)
         self.level_table.setMinimumHeight(220)
@@ -183,7 +181,7 @@ class DashboardPage(BasePage):
         right = QVBoxLayout()
         right.addWidget(make_section_title("等级汇总"))
         self.rank_model = ObjectTableModel(["等级", "数量"], [lambda r: r[0], lambda r: r[1]], self)
-        self.rank_table = QTableView()
+        self.rank_table = TableView()
         self.rank_table.setModel(self.rank_model)
         apply_table_style(self.rank_table)
         self.rank_table.setMinimumHeight(220)
@@ -204,7 +202,7 @@ class DashboardPage(BasePage):
             lambda a: ", ".join(a.member_names),
         ]
         self.recent_model = ObjectTableModel(headers, accessors, self)
-        self.recent_table = QTableView()
+        self.recent_table = TableView()
         self.recent_table.setModel(self.recent_model)
         apply_table_style(self.recent_table)
         self.recent_table.setMinimumHeight(220)

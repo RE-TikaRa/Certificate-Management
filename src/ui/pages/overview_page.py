@@ -8,12 +8,12 @@ from pathlib import Path
 from typing import Any, cast
 
 from PySide6.QtCore import QDate, QPoint, QRect, Qt, QTimer, Slot
-from PySide6.QtGui import QColor, QFont, QPalette
+from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QAbstractSpinBox,
     QApplication,
     QFileDialog,
-    QFrame,
     QGraphicsEffect,
     QGridLayout,
     QHBoxLayout,
@@ -22,24 +22,25 @@ from PySide6.QtWidgets import (
     QLayout,
     QLineEdit,
     QProgressDialog,
-    QScrollArea,
-    QTableView,
     QVBoxLayout,
     QWidget,
 )
 from qfluentwidgets import (
     BodyLabel,
     CaptionLabel,
+    CardWidget,
     CheckBox,
     ComboBox,
     DateEdit,
     FluentIcon,
+    IconWidget,
     InfoBar,
     LineEdit,
     MaskDialogBase,
     MessageBox,
     PrimaryPushButton,
     PushButton,
+    ScrollArea,
     SpinBox,
     TitleLabel,
     TransparentToolButton,
@@ -125,7 +126,7 @@ class OverviewPage(BasePage):
         title_layout.addWidget(create_page_header("所有荣誉项目", "查看和管理已输入的所有荣誉信息"))
         outer_layout.addWidget(title_widget)
 
-        self.scrollArea = QScrollArea()
+        self.scrollArea = ScrollArea()
         self.scrollArea.setWidgetResizable(True)
         self.scrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         outer_layout.addWidget(self.scrollArea)
@@ -149,28 +150,34 @@ class OverviewPage(BasePage):
 
         # 标题和刷新按钮
         header_layout = QHBoxLayout()
+        header_layout.setSpacing(12)
+        header_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
         header_layout.addWidget(make_section_title("荣誉列表"))
         header_layout.addStretch()
         from qfluentwidgets import FluentIcon, TransparentToolButton
+
+        header_tools = QHBoxLayout()
+        header_tools.setContentsMargins(0, 0, 0, 0)
+        header_tools.setSpacing(8)
 
         # 批量选择操作按钮
         self.select_all_btn = PushButton("全选")
         self.select_all_btn.setFixedWidth(72)
         self.select_all_btn.setVisible(False)
         self.select_all_btn.clicked.connect(self._select_all_awards)
-        header_layout.addWidget(self.select_all_btn)
+        header_tools.addWidget(self.select_all_btn)
 
         self.invert_selection_btn = PushButton("反选")
         self.invert_selection_btn.setFixedWidth(72)
         self.invert_selection_btn.setVisible(False)
         self.invert_selection_btn.clicked.connect(self._invert_selection)
-        header_layout.addWidget(self.invert_selection_btn)
+        header_tools.addWidget(self.invert_selection_btn)
 
         self.clear_selection_btn = PushButton("全不选")
         self.clear_selection_btn.setFixedWidth(72)
         self.clear_selection_btn.setVisible(False)
         self.clear_selection_btn.clicked.connect(self._clear_selection)
-        header_layout.addWidget(self.clear_selection_btn)
+        header_tools.addWidget(self.clear_selection_btn)
 
         # 批量删除按钮
         self.batch_delete_btn = TransparentToolButton(FluentIcon.DELETE, self)
@@ -178,19 +185,20 @@ class OverviewPage(BasePage):
         self.batch_delete_btn.clicked.connect(self._batch_delete_awards)
         self.batch_delete_btn.setEnabled(False)
         self.batch_delete_btn.hide()
-        header_layout.addWidget(self.batch_delete_btn)
+        header_tools.addWidget(self.batch_delete_btn)
 
         # 批量管理按钮
         self.batch_mode_btn = TransparentToolButton(FluentIcon.EDIT, self)
         self.batch_mode_btn.setToolTip("批量管理")
         self.batch_mode_btn.setCheckable(True)
         self.batch_mode_btn.toggled.connect(self._toggle_batch_mode)
-        header_layout.addWidget(self.batch_mode_btn)
+        header_tools.addWidget(self.batch_mode_btn)
 
         refresh_btn = TransparentToolButton(FluentIcon.SYNC)
         refresh_btn.setToolTip("刷新数据")
         refresh_btn.clicked.connect(self.refresh)
-        header_layout.addWidget(refresh_btn)
+        header_tools.addWidget(refresh_btn)
+        header_layout.addLayout(header_tools)
         card_layout.addLayout(header_layout)
 
         # 荣誉项目容器
@@ -205,6 +213,7 @@ class OverviewPage(BasePage):
         layout.addStretch()
 
         self._cached_award_signature: tuple[int, str] | None = None
+        self._refresh_seq = 0
 
         # 自动刷新定时器（每5秒检查一次数据）
         self.refresh_timer = QTimer(self)
@@ -521,51 +530,65 @@ class OverviewPage(BasePage):
                 self._rebuild_flag_filters()
 
             self._clear_awards_layout()
+            self.awards_list = []
+            self.total_awards = 0
 
             level = None if self.filter_level == "全部" else self.filter_level
             rank = None if self.filter_rank == "全部" else self.filter_rank
-            filtered_awards = self.ctx.awards.search_awards(
-                query=self.filter_keyword,
-                level=level,
-                rank=rank,
-                date_from=self.filter_start_date,
-                date_to=self.filter_end_date,
-                limit=5000,
-            )
+            sort_by = self.sort_by
+            keyword = self.filter_keyword
+            date_from = self.filter_start_date
+            date_to = self.filter_end_date
+            flag_filters = dict(self.flag_filters)
 
-            # 预取 flag 值
-            if self.flag_defs:
-                award_ids = [a.id for a in filtered_awards]
-                self.award_flag_values = self.ctx.flags.get_flags_for_awards(award_ids)
-            else:
-                self.award_flag_values = {}
+            self._refresh_seq += 1
+            seq = self._refresh_seq
 
-            # 本地筛选（自定义开关等）
-            filtered_awards = self._apply_filters(filtered_awards)
+            def build():
+                return self.ctx.awards.list_awards_overview(
+                    query=keyword,
+                    level=level,
+                    rank=rank,
+                    date_from=date_from,
+                    date_to=date_to,
+                    sort_by=sort_by,
+                    flag_filters=flag_filters,
+                    limit=5000,
+                )
 
-            # 应用排序
-            self.awards_list = self._apply_sorting(filtered_awards)
-            self.total_awards = len(self.awards_list)
-            self._prune_selection()
+            def on_done(result: tuple[list, dict] | Exception) -> None:
+                if seq != self._refresh_seq:
+                    return
+                if isinstance(result, Exception):
+                    logger.error(f"刷新失败: {result}", exc_info=True)
+                    InfoBar.error("错误", f"刷新失败: {result}", parent=self.window())
+                    return
 
-            if not self.awards_list:
-                self._show_empty_state()
+                awards, flag_values = result
+                self.award_flag_values = flag_values or {}
+                self.awards_list = list(awards)
+                self.total_awards = len(self.awards_list)
+                self._prune_selection()
+
+                if not self.awards_list:
+                    self._show_empty_state()
+                    self._update_batch_actions_state()
+                    self._cached_award_signature = self._get_award_signature()
+                    return
+
+                self.current_page = 0
+                self._load_more_awards()
+
+                if self.total_awards > self.PAGE_SIZE:
+                    self._add_load_more_button()
+                else:
+                    self.awards_layout.addStretch()
+
+                logger.debug(f"已加载 {min(self.PAGE_SIZE, self.total_awards)}/{self.total_awards} 个荣誉项目")
                 self._update_batch_actions_state()
                 self._cached_award_signature = self._get_award_signature()
-                return
 
-            # 首次只加载 20 条
-            self.current_page = 0
-            self._load_more_awards()
-
-            if self.total_awards > self.PAGE_SIZE:
-                self._add_load_more_button()
-            else:
-                self.awards_layout.addStretch()
-
-            logger.debug(f"已加载 {min(self.PAGE_SIZE, self.total_awards)}/{self.total_awards} 个荣誉项目")
-            self._update_batch_actions_state()
-            self._cached_award_signature = self._get_award_signature()
+            run_in_thread_guarded(build, on_done, guard=self)
         except Exception as e:
             logger.error(f"刷新失败: {e}", exc_info=True)
 
@@ -605,16 +628,17 @@ class OverviewPage(BasePage):
         empty_layout.setSpacing(12)
         empty_layout.addStretch()
 
-        empty_icon = QLabel("📋")
-        icon_font = QFont()
-        icon_font.setPointSize(48)  # 减小字体大小避免负值警告
-        empty_icon.setFont(icon_font)
+        empty_icon = IconWidget()
+        empty_icon.setIcon(FluentIcon.DOCUMENT)
+        empty_icon.setFixedSize(40, 40)
         empty_layout.addWidget(empty_icon, alignment=Qt.AlignmentFlag.AlignCenter)
 
         empty_text = BodyLabel("暂无项目数据")
+        empty_text.setProperty("emptyStateTitle", True)
         empty_layout.addWidget(empty_text, alignment=Qt.AlignmentFlag.AlignCenter)
 
         empty_hint = CaptionLabel("点击「录入」页添加新项目")
+        empty_hint.setProperty("emptyStateHint", True)
         empty_layout.addWidget(empty_hint, alignment=Qt.AlignmentFlag.AlignCenter)
 
         empty_layout.addStretch()
@@ -685,7 +709,7 @@ class OverviewPage(BasePage):
 
     def _create_award_card(self, award) -> QWidget:
         """创建单个荣誉卡片"""
-        card = QFrame()
+        card = CardWidget()
         card.setProperty("card", True)
         card.setMinimumHeight(100)
 
@@ -757,7 +781,7 @@ class OverviewPage(BasePage):
                 val = values.get(flag.key, self.flag_defaults.get(flag.key, False))
                 pill = QLabel(f"{flag.label}: {'是' if val else '否'}")
                 pill.setStyleSheet(
-                    "padding:4px 8px; border-radius:6px; font-size:11px;"
+                    "padding:4px 8px; border-radius:8px; font-size:11px;"
                     f"background-color: {'#e6f4ff' if val else '#f0f0f0'};"
                     f"color: {'#1890ff' if val else '#666'};"
                 )
@@ -1036,7 +1060,7 @@ class AwardDetailDialog(MaskDialogBase):
         layout.setSpacing(16)
 
         # 滚动区域
-        scroll = QScrollArea()
+        scroll = ScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
@@ -1198,6 +1222,8 @@ class AwardDetailDialog(MaskDialogBase):
 
         # 标题和添加按钮
         attach_header = QHBoxLayout()
+        attach_header.setSpacing(12)
+        attach_header.setAlignment(Qt.AlignmentFlag.AlignVCenter)
         attach_header.addWidget(make_section_title("附件"))
         attach_header.addStretch()
         attach_btn = PrimaryPushButton("添加文件")
@@ -1216,8 +1242,8 @@ class AwardDetailDialog(MaskDialogBase):
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
         self.attach_table.verticalHeader().setVisible(False)
-        self.attach_table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
-        self.attach_table.setSelectionMode(QTableView.SelectionMode.SingleSelection)
+        self.attach_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.attach_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         from ..theme import apply_table_style
 
         apply_table_style(self.attach_table)
@@ -1332,8 +1358,8 @@ class AwardDetailDialog(MaskDialogBase):
 
     def _add_member_card(self, assoc=None):
         """添加成员卡片"""
-        # 使用 QFrame 并设置 card 属性以使用 QSS 定义的样式
-        member_card = QFrame()
+        # 使用 CardWidget 并设置 card 属性以使用 QSS 定义的样式
+        member_card = CardWidget()
         member_card.setProperty("card", True)
 
         # 获取当前样式用于标签
@@ -1505,7 +1531,7 @@ class AwardDetailDialog(MaskDialogBase):
         """添加空白成员卡片"""
         self._add_member_card()
 
-    def _apply_member_card_style(self, card: QFrame) -> None:
+    def _apply_member_card_style(self, card: CardWidget) -> None:
         """刷新成员卡片的样式以匹配当前主题"""
         card.setProperty("memberCard", True)
         card.style().unpolish(card)
@@ -1634,7 +1660,7 @@ class AwardDetailDialog(MaskDialogBase):
 
         # 创建美化的进度对话框（适配主题）
         progress = QProgressDialog(self.window())
-        progress.setWindowTitle("📄 导入成员信息")
+        progress.setWindowTitle("导入成员信息")
 
         # 根据主题设置文本颜色
         is_dark = self.theme_manager.is_dark
@@ -1649,9 +1675,9 @@ class AwardDetailDialog(MaskDialogBase):
 
         progress.setLabelText(
             f"<div style='padding: 10px;'>"
-            f"<p style='font-size: 14px; margin-bottom: 8px; color: {text_color};'><b>🔄 正在处理文档...</b></p>"
+            f"<p style='font-size: 14px; margin-bottom: 8px; color: {text_color};'><b>正在处理文档...</b></p>"
             f"<p style='font-size: 12px; color: {desc_color};'>正在打开 Word 文档并提取成员信息</p>"
-            f"<p style='font-size: 12px; color: {hint_color};'>这可能需要几秒钟，请耐心等待 ☕</p>"
+            f"<p style='font-size: 12px; color: {hint_color};'>这可能需要几秒钟，请耐心等待</p>"
             "</div>"
         )
         progress.setRange(0, 0)  # 不确定进度，显示滚动条
@@ -1664,7 +1690,8 @@ class AwardDetailDialog(MaskDialogBase):
         if is_dark:
             progress.setStyleSheet("""
                 QProgressDialog {
-                    background-color: #2b2b2b;
+                    background-color: #1f1f1f;
+                    border: 1px solid #3a3a3a;
                     border-radius: 8px;
                 }
                 QLabel {
@@ -1672,8 +1699,8 @@ class AwardDetailDialog(MaskDialogBase):
                     padding: 15px;
                 }
                 QProgressBar {
-                    border: 2px solid #3a3a3a;
-                    border-radius: 5px;
+                    border: 1px solid #3a3a3a;
+                    border-radius: 8px;
                     text-align: center;
                     background-color: #1e1e1e;
                     color: #e0e0e0;
@@ -1681,14 +1708,15 @@ class AwardDetailDialog(MaskDialogBase):
                 }
                 QProgressBar::chunk {
                     background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                        stop:0 #4a90e2, stop:0.5 #5fa3ef, stop:1 #4a90e2);
-                    border-radius: 3px;
+                        stop:0 #2899f5, stop:0.5 #3aa0f6, stop:1 #2899f5);
+                    border-radius: 8px;
                 }
             """)
         else:
             progress.setStyleSheet("""
                 QProgressDialog {
                     background-color: white;
+                    border: 1px solid #e5e5e5;
                     border-radius: 8px;
                 }
                 QLabel {
@@ -1696,16 +1724,16 @@ class AwardDetailDialog(MaskDialogBase):
                     padding: 15px;
                 }
                 QProgressBar {
-                    border: 2px solid #e0e0e0;
-                    border-radius: 5px;
+                    border: 1px solid #e1e1e1;
+                    border-radius: 8px;
                     text-align: center;
-                    background-color: #f5f5f5;
+                    background-color: #f3f3f3;
                     height: 20px;
                 }
                 QProgressBar::chunk {
                     background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                        stop:0 #4a90e2, stop:0.5 #5fa3ef, stop:1 #4a90e2);
-                    border-radius: 3px;
+                        stop:0 #0f6cbd, stop:0.5 #2899f5, stop:1 #0f6cbd);
+                    border-radius: 8px;
                 }
             """)
 
@@ -2072,10 +2100,10 @@ class AwardDetailDialog(MaskDialogBase):
     def _highlight_field_error(self, field_widget: QLineEdit) -> None:
         field_widget.setStyleSheet("""
             QLineEdit {
-                border: 2px solid #ff6b6b;
-                border-radius: 4px;
+                border: 2px solid #d13438;
+                border-radius: 8px;
                 padding: 4px;
-                background-color: rgba(255, 107, 107, 0.1);
+                background-color: rgba(209, 52, 56, 0.08);
             }
         """)
         QTimer.singleShot(3000, lambda: field_widget.setStyleSheet(""))
@@ -2084,8 +2112,8 @@ class AwardDetailDialog(MaskDialogBase):
         if 0 <= member_index < len(self.members_data):
             member_card = self.members_data[member_index]["card"]
             member_card.setStyleSheet("""
-                QFrame {
-                    border: 2px solid #ff6b6b;
+                CardWidget {
+                    border: 2px solid #d13438;
                     border-radius: 8px;
                 }
             """)
@@ -2148,7 +2176,7 @@ class AwardDetailDialog(MaskDialogBase):
         self.setStyleSheet(f"""
             #centerWidget {{
                 background-color: {bg_color};
-                border-radius: 12px;
+                border-radius: 8px;
                 border: 1px solid {border_color};
             }}
             QDialog {{
@@ -2160,21 +2188,21 @@ class AwardDetailDialog(MaskDialogBase):
             }}
             QLineEdit {{
                 border: 1px solid {border_color};
-                border-radius: 4px;
+                border-radius: 8px;
                 padding: 6px;
                 background-color: {input_bg};
                 color: {text_color};
             }}
             QComboBox {{
                 border: 1px solid {border_color};
-                border-radius: 4px;
+                border-radius: 8px;
                 padding: 6px;
                 background-color: {input_bg};
                 color: {text_color};
             }}
             QSpinBox {{
                 border: 1px solid {border_color};
-                border-radius: 4px;
+                border-radius: 8px;
                 padding: 6px;
                 background-color: {input_bg};
                 color: {text_color};
@@ -2182,7 +2210,7 @@ class AwardDetailDialog(MaskDialogBase):
             QGroupBox {{
                 color: {text_color};
                 border: 1px solid {border_color};
-                border-radius: 4px;
+                border-radius: 8px;
                 margin-top: 10px;
                 padding-top: 10px;
             }}
