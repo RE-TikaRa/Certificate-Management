@@ -1558,6 +1558,14 @@ class SettingsPage(BasePage):
             max_bytes_text = self.mcp_max_bytes.text().strip() or "1048576"
             max_bytes_value = max(1024, int(max_bytes_text))
             host = self.ctx.settings.get("mcp_host", "127.0.0.1")
+            if self.mcp_allow_write.isChecked():
+                box = MessageBox(
+                    "MCP 写入提示",
+                    "开启写入将允许 MCP 修改本地数据库与文件。请确认仅在可信客户端、本机环境中使用。",
+                    self.window(),
+                )
+                if not box.exec():
+                    return
             self._mcp_runtime.start_mcp_sse(
                 host=host,
                 port=port_value,
@@ -1602,6 +1610,13 @@ class SettingsPage(BasePage):
         try:
             host = self.mcp_web_host.text().strip() or "127.0.0.1"
             port = self.mcp_web_port.text().strip() or "7860"
+            box = MessageBox(
+                "MCP Web 提示",
+                "Web 控制台仅用于本机调试，且无登录保护。请勿暴露到公网或转发端口。",
+                self.window(),
+            )
+            if not box.exec():
+                return
             self._mcp_runtime.start_web(host=host, port=int(port))
         except Exception as exc:
             InfoBar.error("MCP Web", f"启动失败：{exc}", parent=self.window())
@@ -1971,7 +1986,9 @@ class SettingsPage(BasePage):
             if auto_backup.isChecked():
                 new_backup = self.ctx.backup.perform_backup()
                 InfoBar.success("已备份当前数据", str(new_backup), duration=2000, parent=self.window())
-            self.ctx.backup.restore_backup(info.path)
+                self.ctx.backup.restore_backup(info.path, safety_backup=False)
+            else:
+                self.ctx.backup.restore_backup(info.path)
             InfoBar.success("已恢复", f"已从 {info.path.name} 恢复数据", parent=self.window())
         except Exception as exc:
             self.logger.exception("Restore backup failed: %s", exc)

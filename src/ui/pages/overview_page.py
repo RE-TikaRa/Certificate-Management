@@ -84,6 +84,8 @@ def clean_input_text(line_edit: QLineEdit) -> None:
 class OverviewPage(BasePage):
     """总览页面 - 显示所有已输入的荣誉项目"""
 
+    MAX_OVERVIEW_ITEMS = 5000
+
     def __init__(self, ctx, theme_manager: ThemeManager):
         super().__init__(ctx, theme_manager)
         self.awards_list = []
@@ -95,6 +97,9 @@ class OverviewPage(BasePage):
         self.current_page = 0
         self.total_awards = 0
         self.load_more_btn = None  # 保存加载更多按钮引用
+        self._load_more_container: QWidget | None = None
+        self._loaded_count = 0
+        self._loading_more = False
 
         # 筛选条件
         self.filter_level = "全部"  # 等级筛选
@@ -532,6 +537,10 @@ class OverviewPage(BasePage):
             self._clear_awards_layout()
             self.awards_list = []
             self.total_awards = 0
+            self._loaded_count = 0
+            self._loading_more = False
+            self._load_more_container = None
+            self.load_more_btn = None
 
             level = None if self.filter_level == "全部" else self.filter_level
             rank = None if self.filter_rank == "全部" else self.filter_rank
@@ -553,10 +562,11 @@ class OverviewPage(BasePage):
                     date_to=date_to,
                     sort_by=sort_by,
                     flag_filters=flag_filters,
-                    limit=5000,
+                    offset=0,
+                    limit=self.PAGE_SIZE,
                 )
 
-            def on_done(result: tuple[list, dict] | Exception) -> None:
+            def on_done(result: tuple[list, dict, int] | Exception) -> None:
                 if seq != self._refresh_seq:
                     return
                 if isinstance(result, Exception):
@@ -564,27 +574,35 @@ class OverviewPage(BasePage):
                     InfoBar.error("错误", f"刷新失败: {result}", parent=self.window())
                     return
 
-                awards, flag_values = result
+                awards, flag_values, total = result
                 self.award_flag_values = flag_values or {}
                 self.awards_list = list(awards)
-                self.total_awards = len(self.awards_list)
+                total = int(total or 0)
+                if total >= self.MAX_OVERVIEW_ITEMS:
+                    InfoBar.warning(
+                        "结果过多",
+                        f"为避免卡顿，已限制显示前 {self.MAX_OVERVIEW_ITEMS} 条结果，建议进一步筛选。",
+                        parent=self.window(),
+                    )
+                self.total_awards = min(total, self.MAX_OVERVIEW_ITEMS)
+                self._loaded_count = len(awards)
                 self._prune_selection()
 
-                if not self.awards_list:
+                if not awards:
                     self._show_empty_state()
                     self._update_batch_actions_state()
                     self._cached_award_signature = self._get_award_signature()
                     return
 
-                self.current_page = 0
-                self._load_more_awards()
+                self.current_page = 1
+                self._append_awards(awards)
 
-                if self.total_awards > self.PAGE_SIZE:
+                if self._loaded_count < self.total_awards:
                     self._add_load_more_button()
                 else:
                     self.awards_layout.addStretch()
 
-                logger.debug(f"已加载 {min(self.PAGE_SIZE, self.total_awards)}/{self.total_awards} 个荣誉项目")
+                logger.debug(f"已加载 {self._loaded_count}/{self.total_awards} 个荣誉项目")
                 self._update_batch_actions_state()
                 self._cached_award_signature = self._get_award_signature()
 
@@ -645,67 +663,111 @@ class OverviewPage(BasePage):
         self.awards_layout.addWidget(empty_container)
         self.awards_layout.addStretch()
 
-    def _load_more_awards(self) -> None:
-        """分批加载荣誉卡片"""
-        start_idx = self.current_page * self.PAGE_SIZE
-        end_idx = min(start_idx + self.PAGE_SIZE, self.total_awards)
-
-        # 批量创建卡片
-        for award in self.awards_list[start_idx:end_idx]:
+    def _append_awards(self, awards: list) -> None:
+        """追加荣誉卡片到列表"""
+        for award in awards:
             card = self._create_award_card(award)
-            insert_pos = self.awards_layout.count()
-            if insert_pos > 0 and self.awards_layout.itemAt(insert_pos - 1).spacerItem():
-                insert_pos -= 1
-            self.awards_layout.insertWidget(insert_pos, card)
+            self._insert_award_card(card)
 
-        self.current_page += 1
-        logger.debug(f"当前已加载 {end_idx}/{self.total_awards} 条")
+    def _insert_award_card(self, card: QWidget) -> None:
+        if self._load_more_container is None:
+            self.awards_layout.addWidget(card)
+            return
+        index = self.awards_layout.indexOf(self._load_more_container)
+        if index < 0:
+            self.awards_layout.addWidget(card)
+            return
+        self.awards_layout.insertWidget(index, card)
 
     def _add_load_more_button(self) -> None:
         """添加加载更多按钮"""
-        self.awards_layout.addStretch()
+        if self._load_more_container is None:
+            btn_container = QWidget()
+            btn_layout = QHBoxLayout(btn_container)
+            btn_layout.setContentsMargins(0, 16, 0, 16)
 
-        btn_container = QWidget()
-        btn_layout = QHBoxLayout(btn_container)
-        btn_layout.setContentsMargins(0, 16, 0, 16)
+            self.load_more_btn = PrimaryPushButton("加载更多")
+            self.load_more_btn.setFixedWidth(160)
+            self.load_more_btn.clicked.connect(self._on_load_more_clicked)
+            btn_layout.addStretch()
+            btn_layout.addWidget(self.load_more_btn)
+            btn_layout.addStretch()
+            self._load_more_container = btn_container
 
-        self.load_more_btn = PrimaryPushButton("加载更多")
-        self.load_more_btn.setFixedWidth(160)
-        self.load_more_btn.clicked.connect(self._on_load_more_clicked)
-        btn_layout.addStretch()
-        btn_layout.addWidget(self.load_more_btn)
-        btn_layout.addStretch()
+        if self._load_more_container.parent() is None:
+            self.awards_layout.addWidget(self._load_more_container)
 
-        self.awards_layout.addWidget(btn_container)
-        self.awards_layout.addStretch()
+    def _remove_load_more_button(self) -> None:
+        if self._load_more_container is None:
+            return
+        self.awards_layout.removeWidget(self._load_more_container)
+        self._load_more_container.deleteLater()
+        self._load_more_container = None
+        self.load_more_btn = None
 
     def _on_load_more_clicked(self) -> None:
         """加载更多数据"""
-        try:
-            # 移除"加载更多"按钮和stretch
-            for _ in range(3):
-                if self.awards_layout.count() > 0:
-                    item = self.awards_layout.takeAt(self.awards_layout.count() - 1)
-                    widget = item.widget()
-                    if widget:
-                        widget.deleteLater()
+        if self._loading_more:
+            return
+        self._loading_more = True
+        if self.load_more_btn is not None:
+            self.load_more_btn.setEnabled(False)
 
-            # 加载下一批
-            self._load_more_awards()
+        level = None if self.filter_level == "全部" else self.filter_level
+        rank = None if self.filter_rank == "全部" else self.filter_rank
+        sort_by = self.sort_by
+        keyword = self.filter_keyword
+        date_from = self.filter_start_date
+        date_to = self.filter_end_date
+        flag_filters = dict(self.flag_filters)
+        offset = self._loaded_count
+        seq = self._refresh_seq
 
-            # 检查是否还有更多
-            if self.current_page * self.PAGE_SIZE < self.total_awards:
-                self._add_load_more_button()
+        def build():
+            return self.ctx.awards.list_awards_overview(
+                query=keyword,
+                level=level,
+                rank=rank,
+                date_from=date_from,
+                date_to=date_to,
+                sort_by=sort_by,
+                flag_filters=flag_filters,
+                offset=offset,
+                limit=self.PAGE_SIZE,
+            )
+
+        def on_done(result):
+            if seq != self._refresh_seq:
+                return
+            self._loading_more = False
+            if self.load_more_btn is not None:
+                self.load_more_btn.setEnabled(True)
+            if isinstance(result, Exception):
+                logger.exception("加载更多失败: %s", result)
+                InfoBar.error("错误", f"加载失败: {result!s}", parent=self.window())
+                return
+
+            awards, flag_values, total = result
+            total = int(total or 0)
+            if total >= self.MAX_OVERVIEW_ITEMS:
+                total = self.MAX_OVERVIEW_ITEMS
+            self.total_awards = total
+            if flag_values:
+                self.award_flag_values.update(flag_values)
+            if awards:
+                self._append_awards(awards)
+                self.awards_list.extend(awards)
+                self._loaded_count += len(awards)
+                self.current_page += 1
+                logger.debug(f"当前已加载 {self._loaded_count}/{self.total_awards} 条")
+
+            if self._loaded_count >= self.total_awards:
+                self._remove_load_more_button()
+                self.awards_layout.addStretch()
             else:
-                # 全部加载完成
-                self.awards_layout.addStretch()
-                done_label = CaptionLabel(f"✓ 已加载全部 {self.total_awards} 条记录")
-                done_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                self.awards_layout.addWidget(done_label)
-                self.awards_layout.addStretch()
-        except Exception as e:
-            logger.exception(f"加载更多失败: {e}")
-            InfoBar.error("错误", f"加载失败: {e!s}", parent=self.window())
+                self._add_load_more_button()
+
+        run_in_thread_guarded(build, on_done, guard=self)
 
     def _create_award_card(self, award) -> QWidget:
         """创建单个荣誉卡片"""

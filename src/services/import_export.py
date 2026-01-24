@@ -28,6 +28,7 @@ TEMPLATE_HEADERS = [
     "成员",
     "附件路径",
 ]
+RELATIVE_ATTACHMENT_HEADER = "附件相对路径"
 
 
 @dataclass
@@ -96,6 +97,11 @@ class ImportExportService:
                 for att in attachment_items
                 if isinstance(att.relative_path, str) and att.relative_path
             ]
+            relative_paths = [
+                str(att.relative_path)
+                for att in attachment_items
+                if isinstance(att.relative_path, str) and att.relative_path
+            ]
             row: dict[str, object] = {
                 "比赛名称": src_award.competition_name,
                 "获奖日期": src_award.award_date.isoformat(),
@@ -105,6 +111,7 @@ class ImportExportService:
                 "备注": src_award.remarks,
                 "成员": members,
                 "附件路径": ";".join(attachment_paths),
+                RELATIVE_ATTACHMENT_HEADER: ";".join(relative_paths),
                 "附件数量": len(attachment_paths),
             }
             if flag_defs:
@@ -116,7 +123,7 @@ class ImportExportService:
 
         if export_path.suffix.lower() == ".csv":
             flag_headers = [f"{flag.label} ({flag.key})" for flag in flag_defs]
-            headers = [*TEMPLATE_HEADERS, "附件数量", *flag_headers]
+            headers = [*TEMPLATE_HEADERS, RELATIVE_ATTACHMENT_HEADER, "附件数量", *flag_headers]
             with export_path.open("w", encoding="utf-8-sig", newline="") as f:
                 writer = csv.DictWriter(f, fieldnames=headers, extrasaction="ignore")
                 writer.writeheader()
@@ -270,7 +277,8 @@ class ImportExportService:
                 session.add_all(values)
 
             attachment_paths = self._parse_items(clean_cell(row.get("附件路径", "")), sep=";")
-            files = [Path(path) for path in attachment_paths if path]
+            relative_paths = self._parse_items(clean_cell(row.get(RELATIVE_ATTACHMENT_HEADER, "")), sep=";")
+            files = self._resolve_attachment_paths(attachment_paths, relative_paths)
             if files and not dry_run:
                 self.attachments.save_attachments(award.id, award.competition_name, files, session=session)
 
@@ -338,6 +346,45 @@ class ImportExportService:
                 seen.add(cleaned.lower())
                 unique.append(cleaned)
         return unique
+
+    def _resolve_attachment_paths(self, absolute_paths: list[str], relative_paths: list[str]) -> list[Path]:
+        root = self.attachments.ensure_root()
+        resolved: list[Path] = []
+        seen: set[str] = set()
+
+        def add_path(path: Path) -> None:
+            key = str(path.resolve()).lower() if path.exists() else str(path).lower()
+            if key in seen:
+                return
+            seen.add(key)
+            resolved.append(path)
+
+        for raw in absolute_paths:
+            if not raw:
+                continue
+            candidate = Path(raw)
+            if candidate.exists():
+                add_path(candidate)
+                continue
+            if not candidate.is_absolute():
+                fallback = root / candidate
+                if fallback.exists():
+                    add_path(fallback)
+                    continue
+            if candidate.is_absolute():
+                rel_candidate = Path(*candidate.parts[1:]) if candidate.drive else Path(str(candidate).lstrip("/\\"))
+                fallback = root / rel_candidate
+                if fallback.exists():
+                    add_path(fallback)
+
+        for raw in relative_paths:
+            if not raw:
+                continue
+            candidate = root / Path(raw)
+            if candidate.exists():
+                add_path(candidate)
+
+        return resolved
 
     def _parse_flag_value(self, value, default: bool) -> bool:
         if value is None or (isinstance(value, float) and pd.isna(value)):

@@ -340,31 +340,16 @@ def search_awards(
         limit = max(1, min(limit, 200))
         start: date | None = date.fromisoformat(start_date) if start_date else None
         end: date | None = date.fromisoformat(end_date) if end_date else None
-        ids = app.db.search_awards_fts(query, limit=limit)
-        if not ids:
-            return {"items": [], "count": 0}
-        id_rank = {award_id: idx for idx, award_id in enumerate(ids)}
-        with app.db.session_scope() as session:
-            stmt = (
-                select(Award)
-                .where(Award.id.in_(ids))
-                .options(
-                    selectinload(Award.award_members).selectinload(AwardMember.member),
-                )
-            )
-            if not include_deleted:
-                stmt = stmt.where(Award.deleted.is_(False))
-            if level:
-                stmt = stmt.where(Award.level == level)
-            if rank:
-                stmt = stmt.where(Award.rank == rank)
-            if start:
-                stmt = stmt.where(Award.award_date >= start)
-            if end:
-                stmt = stmt.where(Award.award_date <= end)
-            awards = session.scalars(stmt).all()
-            ordered = sorted(awards, key=lambda a: id_rank.get(a.id, 10**9))
-            return {"items": [_serialize_award(a) for a in ordered], "count": len(ordered)}
+        awards = app.awards.search_awards(
+            query=query,
+            level=level,
+            rank=rank,
+            date_from=start,
+            date_to=end,
+            limit=limit,
+            include_deleted=include_deleted,
+        )
+        return {"items": [_serialize_award(a) for a in awards], "count": len(awards)}
     except Exception as exc:
         return _handle_tool_error(exc)
 

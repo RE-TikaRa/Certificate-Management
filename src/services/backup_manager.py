@@ -147,28 +147,41 @@ class BackupManager:
             finally:
                 src_conn.close()
 
-    def restore_backup(self, backup_path: Path, *, restore_attachments: bool = True, restore_logs: bool = True) -> None:
+    def restore_backup(
+        self,
+        backup_path: Path,
+        *,
+        restore_attachments: bool = True,
+        restore_logs: bool = True,
+        safety_backup: bool = True,
+        require_safety: bool = True,
+    ) -> None:
         """
         Restore data from a backup zip.
 
         Overwrites current database file and optionally attachments/logs.
         """
-        safety_backup: Path | None = None
-        try:
-            safety_backup = self.perform_backup(include_attachments=restore_attachments, include_logs=restore_logs)
-        except Exception as exc:
-            logger.warning("Safety backup before restore failed: %s", exc)
+        safety_backup_path: Path | None = None
+        if safety_backup:
+            try:
+                safety_backup_path = self.perform_backup(
+                    include_attachments=restore_attachments, include_logs=restore_logs
+                )
+            except Exception as exc:
+                logger.warning("Safety backup before restore failed: %s", exc)
+                if require_safety:
+                    raise RuntimeError("安全备份失败，已取消恢复") from exc
 
         try:
             self._restore_backup_internal(
                 backup_path, restore_attachments=restore_attachments, restore_logs=restore_logs
             )
         except Exception:
-            if safety_backup is not None:
+            if safety_backup_path is not None:
                 try:
-                    logger.warning("Restore failed, rolling back from safety backup: %s", safety_backup)
+                    logger.warning("Restore failed, rolling back from safety backup: %s", safety_backup_path)
                     self._restore_backup_internal(
-                        safety_backup, restore_attachments=restore_attachments, restore_logs=restore_logs
+                        safety_backup_path, restore_attachments=restore_attachments, restore_logs=restore_logs
                     )
                 except Exception:
                     logger.exception("Rollback from safety backup failed")
@@ -331,14 +344,34 @@ class BackupManager:
                     cursor = conn.cursor()
                     cursor.execute("PRAGMA integrity_check;")
                     result = cursor.fetchone()
-                    conn.close()
-
                     if result[0] != "ok":
+                        conn.close()
                         return False, f"数据库完整性检查失败: {result[0]}"
 
-                    return True, ""
+                    cursor.execute("SELECT relative_path FROM attachments")
+                    attachment_rows = [row[0] for row in cursor.fetchall() if row and row[0]]
+                    conn.close()
                 finally:
                     tmp_path.unlink(missing_ok=True)
+
+                attachment_entries = {
+                    name
+                    for name in zip_ref.namelist()
+                    if name and name.startswith("attachments/") and not name.endswith("/")
+                }
+                if attachment_entries and attachment_rows:
+                    missing = []
+                    for rel_path in attachment_rows:
+                        normalized = str(rel_path).replace("\\", "/").lstrip("/")
+                        key = f"attachments/{normalized}"
+                        if key not in attachment_entries:
+                            missing.append(normalized)
+                            if len(missing) >= 5:
+                                break
+                    if missing:
+                        return False, f"备份附件缺失（示例 {len(missing)} 项）：{', '.join(missing)}"
+
+                return True, ""
 
         except Exception as exc:
             return False, f"验证失败: {exc!s}"

@@ -20,6 +20,7 @@ DEFAULT_SETTINGS: Final[dict[str, str]] = {
     "backup_retention": "5",
     "email_suffix": "@st.gsau.edu.cn",  # 默认邮箱后缀
     "ai_enabled": "false",
+    "ai_confirmed": "false",
     "ai_active_provider_id": "",
     "ai_api_base": "",
     "ai_api_key": "",

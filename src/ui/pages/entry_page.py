@@ -34,6 +34,7 @@ from qfluentwidgets import (
     InfoBar,
     LineEdit,
     MaskDialogBase,
+    MessageBox,
     PlainTextEdit,
     PrimaryPushButton,
     PushButton,
@@ -416,6 +417,15 @@ class EntryPage(BasePage):
         if self.ctx.settings.get("ai_enabled", "false") != "true":
             InfoBar.warning("AI", "请先在“系统设置 → AI 证书识别”启用并填写配置", parent=self.window())
             return
+        if self.ctx.settings.get("ai_confirmed", "false") != "true":
+            box = MessageBox(
+                "AI 识别提示",
+                "将把证书图片或 PDF 发送到你配置的 API 服务进行识别。请确认你已了解并允许此行为。",
+                self.window(),
+            )
+            if not box.exec():
+                return
+            self.ctx.settings.set("ai_confirmed", "true")
 
         file_path, _ = QFileDialog.getOpenFileName(
             self,
@@ -1223,6 +1233,7 @@ class EntryPage(BasePage):
 
             self.selected_files = []
             self._selected_file_keys.clear()
+            missing_paths: list[str] = []
             with self.ctx.db.session_scope() as session:
                 award = session.query(Award).options(joinedload(Award.attachments)).filter(Award.id == award_id).first()
                 if not award:
@@ -1233,6 +1244,7 @@ class EntryPage(BasePage):
                         continue
                     file_path = (root / attachment.relative_path).resolve()
                     if not file_path.exists():
+                        missing_paths.append(str(file_path))
                         continue
                     key = self._to_file_key(file_path)
                     if key in self._selected_file_keys:
@@ -1241,6 +1253,12 @@ class EntryPage(BasePage):
                     self._selected_file_keys.add(key)
             self._attachments_loaded_for_edit = True
             self._update_attachment_table()
+            if missing_paths:
+                InfoBar.warning(
+                    "附件缺失",
+                    f"有 {len(missing_paths)} 个附件文件未找到，将保留记录但不显示在列表中。",
+                    parent=self.window(),
+                )
         except Exception as exc:
             logger.warning("加载附件失败: %s", exc, exc_info=True)
             self._attachments_loaded_for_edit = False

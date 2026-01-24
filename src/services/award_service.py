@@ -3,13 +3,13 @@ from collections.abc import Sequence
 from datetime import date, datetime
 from pathlib import Path
 
-from sqlalchemy import and_, case, or_, select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.exc import ArgumentError
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.elements import ColumnElement
 
 from ..data.database import Database
-from ..data.models import Award, AwardMember, TeamMember
+from ..data.models import Award, AwardFlagValue, AwardMember, TeamMember
 from .attachment_manager import AttachmentManager
 
 logger = logging.getLogger(__name__)
@@ -263,8 +263,13 @@ class AwardService:
                 root = self.attachments.ensure_root()
                 existing = [a for a in award.attachments if not a.deleted]
                 existing_by_path: dict[Path, int] = {}
+                missing_paths: list[str] = []
                 for attachment in existing:
-                    existing_by_path[(root / attachment.relative_path).resolve()] = attachment.id
+                    src = root / attachment.relative_path
+                    if not src.exists():
+                        missing_paths.append(str(src))
+                        continue
+                    existing_by_path[src.resolve()] = attachment.id
 
                 desired_paths: set[Path] = set()
                 new_files: list[Path] = []
@@ -285,6 +290,13 @@ class AwardService:
                         new_files,
                         session=session,
                     )
+                if missing_paths:
+                    logger.warning(
+                        "Skipped deleting %s missing attachments for award %s: %s",
+                        len(missing_paths),
+                        award.id,
+                        ", ".join(missing_paths[:3]),
+                    )
             if flag_values is not None and self.flags:
                 self.flags.set_award_flags(award.id, flag_values, session=session)
 
@@ -303,6 +315,7 @@ class AwardService:
         date_from: date | None = None,
         date_to: date | None = None,
         limit: int = 100,
+        include_deleted: bool = False,
     ) -> list[Award]:
         """
         Search and filter awards by multiple criteria.
@@ -319,16 +332,18 @@ class AwardService:
             List of matching Award objects
         """
         with self.db.session_scope() as session:
-            fts_ids: list[int] = []
+            merged_ids: list[int] = []
             if query:
-                fts_ids = self.db.search_awards_fts(query, limit)
+                merged_ids = self._resolve_search_ids(session, query, limit=limit, include_deleted=include_deleted)
 
             q = select(Award).options(selectinload(Award.award_members).selectinload(AwardMember.member))
-            conditions: list[ColumnElement[bool]] = [Award.deleted.is_(False)]
+            conditions: list[ColumnElement[bool]] = []
+            if not include_deleted:
+                conditions.append(Award.deleted.is_(False))
 
             if query:
-                if fts_ids:
-                    conditions.append(Award.id.in_(fts_ids))
+                if merged_ids:
+                    conditions.append(Award.id.in_(merged_ids))
                 else:
                     conditions.append(
                         or_(
@@ -351,8 +366,8 @@ class AwardService:
             q = q.order_by(Award.award_date.desc()).limit(limit)
             results = list(session.scalars(q).all())
 
-            if fts_ids:
-                order = {id_: idx for idx, id_ in enumerate(fts_ids)}
+            if merged_ids:
+                order = {id_: idx for idx, id_ in enumerate(merged_ids)}
                 results = sorted(results, key=lambda a: order.get(a.id, len(order)))
             return results
 
@@ -366,11 +381,10 @@ class AwardService:
         date_to: date | None = None,
         sort_by: str = "日期降序",
         flag_filters: dict[str, str] | None = None,
+        offset: int = 0,
         limit: int = 5000,
-    ) -> tuple[list[Award], dict[int, dict[str, bool]]]:
-        fts_ids: list[int] = []
-        if query:
-            fts_ids = self.db.search_awards_fts(query, limit)
+    ) -> tuple[list[Award], dict[int, dict[str, bool]], int]:
+        merged_ids: list[int] = []
 
         level_priority = case(
             (Award.level == "国家级", 3),
@@ -397,13 +411,18 @@ class AwardService:
         }
         order_by = sort_map.get(sort_by, Award.award_date.desc())
 
+        offset = max(0, int(offset))
+        limit = max(1, int(limit))
+        max_ids = max(limit, 5000)
+
         with self.db.session_scope() as session:
             q = select(Award).options(selectinload(Award.award_members).selectinload(AwardMember.member))
             conditions: list[ColumnElement[bool]] = [Award.deleted.is_(False)]
 
             if query:
-                if fts_ids:
-                    conditions.append(Award.id.in_(fts_ids))
+                merged_ids = self._resolve_search_ids(session, query, limit=max_ids)
+                if merged_ids:
+                    conditions.append(Award.id.in_(merged_ids))
                 else:
                     conditions.append(
                         or_(
@@ -419,40 +438,60 @@ class AwardService:
                 conditions.append(Award.award_date >= date_from)
             if date_to:
                 conditions.append(Award.award_date <= date_to)
+            if flag_filters:
+                conditions.extend(self._build_flag_conditions(flag_filters))
             if conditions:
                 q = q.where(and_(*conditions))
 
-            q = q.order_by(order_by).limit(max(1, limit))
+            total = session.scalar(select(func.count(Award.id)).where(and_(*conditions))) if conditions else 0
+            total = int(total or 0)
+
+            q = q.order_by(order_by).offset(offset).limit(limit)
             awards = list(session.scalars(q).all())
 
         award_flag_values: dict[int, dict[str, bool]] = {}
-        if self.flags:
+        if self.flags and awards:
             award_ids = [a.id for a in awards]
-            if award_ids:
-                award_flag_values = self.flags.get_flags_for_awards(award_ids)
-            if flag_filters:
-                defaults = self.flags.get_defaults(enabled_only=True)
-                filtered: list[Award] = []
-                for award in awards:
-                    values = award_flag_values.get(award.id)
-                    if values is None:
-                        values = defaults
-                    matched = True
-                    for key, choice in flag_filters.items():
-                        if choice == "全部":
-                            continue
-                        expect = choice == "是"
-                        if values.get(key, defaults.get(key, False)) != expect:
-                            matched = False
-                            break
-                    if matched:
-                        filtered.append(award)
-                awards = filtered
-                if awards:
-                    keep = {award.id for award in awards}
-                    award_flag_values = {aid: vals for aid, vals in award_flag_values.items() if aid in keep}
+            award_flag_values = self.flags.get_flags_for_awards(award_ids)
 
-        return awards, award_flag_values
+        return awards, award_flag_values, total
+
+    def _resolve_search_ids(
+        self,
+        session,
+        query: str,
+        *,
+        limit: int,
+        include_deleted: bool = False,
+    ) -> list[int]:
+        fts_ids = self.db.search_awards_fts(query, limit)
+        pattern = f"%{query}%"
+        stmt = (
+            select(Award.id)
+            .outerjoin(AwardMember, AwardMember.award_id == Award.id)
+            .where(
+                or_(
+                    Award.competition_name.ilike(pattern),
+                    Award.certificate_code.ilike(pattern),
+                    AwardMember.member_name.ilike(pattern),
+                )
+            )
+            .distinct()
+            .limit(max(1, limit))
+        )
+        if not include_deleted:
+            stmt = stmt.where(Award.deleted.is_(False))
+        fallback_ids = [int(row[0]) for row in session.execute(stmt).all()]
+        merged: list[int] = []
+        seen: set[int] = set()
+        for award_id in [*fts_ids, *fallback_ids]:
+            if award_id in seen:
+                continue
+            seen.add(award_id)
+            merged.append(int(award_id))
+            if len(merged) >= max(1, limit):
+                break
+        return merged
 
     def _refresh_award_fts(self, award: Award, members: Sequence[str], *, session=None) -> None:
         member_names = " ".join(members)
@@ -463,6 +502,26 @@ class AwardService:
             member_names,
             session=session,
         )
+
+    def _build_flag_conditions(self, flag_filters: dict[str, str]) -> list[ColumnElement[bool]]:
+        if not self.flags:
+            return []
+        defaults = self.flags.get_defaults(enabled_only=True)
+        conditions: list[ColumnElement[bool]] = []
+        for key, choice in flag_filters.items():
+            if choice == "全部" or key not in defaults:
+                continue
+            expect = choice == "是"
+            default_value = bool(defaults.get(key, False))
+            any_subq = select(AwardFlagValue.award_id).where(AwardFlagValue.flag_key == key)
+            value_subq = select(AwardFlagValue.award_id).where(
+                AwardFlagValue.flag_key == key, AwardFlagValue.value.is_(expect)
+            )
+            if expect == default_value:
+                conditions.append(or_(Award.id.in_(value_subq), ~Award.id.in_(any_subq)))
+            else:
+                conditions.append(Award.id.in_(value_subq))
+        return conditions
 
     def batch_delete_awards(self, award_ids: list[int]) -> int:
         """

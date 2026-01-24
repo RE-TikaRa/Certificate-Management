@@ -31,13 +31,12 @@ class MemberService:
             return self.list_members()
 
         fts_ids = self.db.search_members_fts(query, limit)
+        merged_ids: list[int] = []
         with self.db.session_scope() as session:
-            stmt = select(TeamMember)
-            if fts_ids:
-                stmt = stmt.where(TeamMember.id.in_(fts_ids))
-            else:
-                pattern = f"%{query}%"
-                stmt = stmt.where(
+            pattern = f"%{query}%"
+            fallback_stmt = (
+                select(TeamMember.id)
+                .where(
                     or_(
                         TeamMember.name.like(pattern),
                         TeamMember.pinyin.like(pattern.lower()),
@@ -48,10 +47,25 @@ class MemberService:
                         TeamMember.major.like(pattern),
                     )
                 )
+                .limit(limit)
+            )
+            fallback_ids = [int(row[0]) for row in session.execute(fallback_stmt).all()]
+            seen: set[int] = set()
+            for member_id in [*fts_ids, *fallback_ids]:
+                if member_id in seen:
+                    continue
+                seen.add(member_id)
+                merged_ids.append(int(member_id))
+                if len(merged_ids) >= max(1, limit):
+                    break
+
+            stmt = select(TeamMember)
+            if merged_ids:
+                stmt = stmt.where(TeamMember.id.in_(merged_ids))
             stmt = stmt.limit(limit)
             results = list(session.scalars(stmt).all())
-            if fts_ids:
-                order = {mid: idx for idx, mid in enumerate(fts_ids)}
+            if merged_ids:
+                order = {mid: idx for idx, mid in enumerate(merged_ids)}
                 results.sort(key=lambda m: order.get(m.id, len(order)))
             return results
 
