@@ -72,6 +72,7 @@
 - [🔐 数据安全与备份](#-数据安全与备份)
 - [🎨 主题系统](#-主题系统)
 - [🛠️ 开发指南](#-开发指南)
+- [✅ 待办事项](#-待办事项)
 - [🧰 故障排查](#-故障排查)
 - [📝 更新日志](#-更新日志)
   - [v1.4.0 (2025-12-18)](#v140-2025-12-18)
@@ -642,6 +643,100 @@ flowchart TD
 3. **数据库变更**: 修改 `models.py`，目前使用自动建表，生产环境建议引入 Alembic。
 4. **代码规范**: 提交前请运行 `ruff check` 和 `pyright`。
 5. **版本与文档**: 版本号统一来自 `pyproject.toml`（运行时由 `src/version.py` 读取）；升级版本时请同步更新 README 顶部/更新日志与应用“关于”页文案。
+
+---
+
+## ✅ 待办事项
+
+> 说明：以下为“深度待办”，给出最小可落地范围（MVP）、依赖与影响模块，便于分阶段推进。
+
+<details>
+<summary><strong>状态流转（草稿/已提交/已归档/撤回）</strong></summary>
+
+- MVP: 新增 `status` 字段，列表筛选与批量切换状态，详情页显示状态
+- 依赖/风险: 数据库结构变更；历史数据迁移策略
+- 影响模块: `models.py` / `award_service.py` / `overview_page.py` / `entry_page.py`
+</details>
+
+<details>
+<summary><strong>批量变更（等级/奖项/日期/自定义开关/标签）</strong></summary>
+
+- MVP: 总览页批量操作面板，支持等级/奖项/日期/开关批量更新
+- 依赖/风险: 需要服务层批量更新接口，注意事务与校验
+- 影响模块: `overview_page.py` / `award_service.py`
+</details>
+
+<details>
+<summary><strong>高级搜索（成员字段/备注/证书号/附件名；保存条件）</strong></summary>
+
+- MVP: 搜索条件面板 + 可保存条件；支持成员/备注/证书号/附件名组合检索
+- 依赖/风险: FTS 与普通查询合并逻辑；性能与分页兼容
+- 影响模块: `overview_page.py` / `award_service.py` / `database.py`
+</details>
+
+<details>
+<summary><strong>统计扩展（学院/专业/年级/赛事维度）</strong></summary>
+
+- MVP: 新增 2-3 维度统计卡与图表，支持导出统计明细
+- 依赖/风险: 维度字段完整性与历史数据缺失处理
+- 影响模块: `statistics_service.py` / `dashboard_page.py` / `overview_page.py`
+</details>
+
+<details>
+<summary><strong>批量识别队列（AI 识别任务队列/暂停/重试）</strong></summary>
+
+- MVP: 识别队列表（任务/状态/重试次数）；支持暂停与失败重试
+- 依赖/风险: 后台任务调度与并发控制；失败回退策略
+- 影响模块: `ai_certificate_service.py` / `entry_page.py` / `settings_page.py`
+</details>
+
+<details>
+<summary><strong>导出模板增强（含图片/二维码/PDF 汇总）</strong></summary>
+
+- MVP: PDF 汇总导出（含附件缩略图与二维码）；模板字段可配置
+- 依赖/风险: 文档渲染与排版稳定性；大批量导出性能
+- 影响模块: `import_export.py` / `settings_page.py` / `resources/templates`
+</details>
+
+<details>
+<summary><strong>MCP 工具扩展（批量导入/导出/统计查询指令）</strong></summary>
+
+- MVP: MCP 增加批量导入/导出/统计查询工具
+- 依赖/风险: 写入权限控制；PII 脱敏规则
+- 影响模块: `mcp/server.py` / `mcp/helpers.py` / `services/*`
+</details>
+
+<details>
+<summary><strong>权限/多用户（角色/审计）</strong></summary>
+
+- MVP: 基础账号与角色（只读/录入/管理员）+ 操作日志
+- 依赖/风险: 登录与会话管理；本地单机兼容
+- 影响模块: `models.py` / `settings_page.py` / `main_window.py`
+</details>
+
+<details>
+<summary><strong>备份策略（增量/云盘路径/自动轮转）</strong></summary>
+
+- MVP: 备份轮转与保留策略；支持指定云盘目录
+- 依赖/风险: 文件锁与权限；恢复流程一致性
+- 影响模块: `backup_manager.py` / `settings_page.py`
+</details>
+
+<details>
+<summary><strong>快捷录入（历史复用/常用成员组合）</strong></summary>
+
+- MVP: 最近一次录入复用；常用成员组合一键填充
+- 依赖/风险: 成员快照与入库逻辑一致性
+- 影响模块: `entry_page.py` / `member_service.py`
+</details>
+
+<details>
+<summary><strong>附件预览（PDF/图片预览与基础编辑）</strong></summary>
+
+- MVP: 预览窗口（PDF/图片）；基础旋转/缩放
+- 依赖/风险: 渲染性能；大文件内存占用
+- 影响模块: `overview_page.py` / `attachment_manager.py` / `ui/widgets`
+</details>
 
 ---
 
