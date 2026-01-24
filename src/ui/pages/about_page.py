@@ -66,7 +66,7 @@ class AboutPage(BasePage):
         header_layout.addWidget(subtitle)
 
         # 版本信息
-        version = BodyLabel(f"Version {get_app_version()}")
+        version = BodyLabel(f"Commit {get_app_version()}")
         version.setAlignment(Qt.AlignmentFlag.AlignCenter)
         version_font = QFont()
         version_font.setPointSize(12)

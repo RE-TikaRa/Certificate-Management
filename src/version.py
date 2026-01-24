@@ -1,18 +1,44 @@
 from __future__ import annotations
 
-import tomllib
+from pathlib import Path
 
 from .config import BASE_DIR
 
 
+def _resolve_git_dir(base_dir: Path) -> Path | None:
+    git_dir = base_dir / ".git"
+    if git_dir.is_dir():
+        return git_dir
+    if git_dir.is_file():
+        try:
+            content = git_dir.read_text(encoding="utf-8").strip()
+        except Exception:
+            return None
+        if content.startswith("gitdir:"):
+            return (base_dir / content.removeprefix("gitdir:").strip()).resolve()
+    return None
+
+
 def get_app_version() -> str:
-    pyproject_path = BASE_DIR / "pyproject.toml"
+    git_dir = _resolve_git_dir(BASE_DIR)
+    if not git_dir:
+        return "unknown"
+
+    head_path = git_dir / "HEAD"
     try:
-        data = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
+        head = head_path.read_text(encoding="utf-8").strip()
     except Exception:
         return "unknown"
 
-    version = data.get("project", {}).get("version")
-    if isinstance(version, str) and version.strip():
-        return version.strip()
+    if head.startswith("ref:"):
+        ref_path = git_dir / head.split(" ", 1)[1].strip()
+        try:
+            sha = ref_path.read_text(encoding="utf-8").strip()
+        except Exception:
+            return "unknown"
+    else:
+        sha = head
+
+    if sha:
+        return sha[:8]
     return "unknown"

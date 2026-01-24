@@ -44,7 +44,7 @@ class MainWindow(FluentWindow):
         super().__init__()
         self.ctx = ctx
         self.theme_manager = theme_manager
-        self.setWindowTitle(f"证书管理系统 v{get_app_version()}")
+        self.setWindowTitle(f"证书管理系统 @{get_app_version()}")
         self.setMinimumSize(1200, 800)
 
         # 将窗口设置在屏幕中心
