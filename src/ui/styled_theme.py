@@ -97,7 +97,7 @@ class ThemeManager(QObject):
         q_theme = Theme.DARK if self._is_dark else Theme.LIGHT
         setTheme(q_theme, lazy=True)
         qconfig.themeMode.value = q_theme
-        accent = QColor("#2899f5") if self._is_dark else QColor("#0f6cbd")
+        accent = QColor("#3b82f6") if self._is_dark else QColor("#2563eb")
         setThemeColor(accent, save=False, lazy=True)
 
         # 发出主题变化信号
@@ -108,7 +108,7 @@ class ThemeManager(QObject):
         This combines FluentWindow background override with page styles.
         """
         # Window background color
-        bg_color = "#1c1f2e" if self._is_dark else "#f4f6fb"
+        bg_color = "#161b2b" if self._is_dark else "#f8fafc"
         window_style = f"FluentWindow, AcrylicWindow {{ background-color: {bg_color}; }}\n\n"
 
         # Page styles from QSS file

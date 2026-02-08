@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLabel,
     QLayout,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -233,45 +234,44 @@ class OverviewPage(BasePage):
 
         # 第一行：等级、奖项、关键词搜索
         row1 = QHBoxLayout()
-        row1.setSpacing(16)
+        row1.setSpacing(10)
 
         # 等级筛选
         level_label = BodyLabel("等级:")
-        level_label.setFixedWidth(60)
+        level_label.setMinimumWidth(44)
         row1.addWidget(level_label)
 
         self.level_combo = ComboBox()
         self.level_combo.addItems(["全部", "国家级", "省级", "校级"])
         self.level_combo.setCurrentText(self.filter_level)
         self.level_combo.currentTextChanged.connect(self._on_filter_changed)
-        self.level_combo.setFixedWidth(150)
+        self.level_combo.setMinimumWidth(96)
+        self.level_combo.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         row1.addWidget(self.level_combo)
-
-        row1.addSpacing(20)
 
         # 奖项筛选
         rank_label = BodyLabel("奖项:")
-        rank_label.setFixedWidth(60)
+        rank_label.setMinimumWidth(44)
         row1.addWidget(rank_label)
 
         self.rank_combo = ComboBox()
         self.rank_combo.addItems(["全部", "一等奖", "二等奖", "三等奖", "优秀奖"])
         self.rank_combo.setCurrentText(self.filter_rank)
         self.rank_combo.currentTextChanged.connect(self._on_filter_changed)
-        self.rank_combo.setFixedWidth(150)
+        self.rank_combo.setMinimumWidth(96)
+        self.rank_combo.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         row1.addWidget(self.rank_combo)
-
-        row1.addSpacing(20)
 
         # 关键词搜索
         keyword_label = BodyLabel("关键词:")
-        keyword_label.setFixedWidth(60)
+        keyword_label.setMinimumWidth(44)
         row1.addWidget(keyword_label)
 
         self.keyword_input = LineEdit()
         self.keyword_input.setPlaceholderText("输入竞赛名称或证书编号...")
         self.keyword_input.textChanged.connect(self._on_keyword_changed)
-        self.keyword_input.setFixedWidth(250)
+        self.keyword_input.setMinimumWidth(120)
+        self.keyword_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         row1.addWidget(self.keyword_input)
 
         row1.addStretch()
@@ -281,41 +281,39 @@ class OverviewPage(BasePage):
 
         # 第二行：日期范围
         row2 = QHBoxLayout()
-        row2.setSpacing(16)
+        row2.setSpacing(10)
 
         # 开始日期
         start_label = BodyLabel("开始日期:")
-        start_label.setFixedWidth(60)
+        start_label.setMinimumWidth(44)
         row2.addWidget(start_label)
 
         self.start_date_edit = DateEdit()
         self.start_date_edit.setDate(QDate(2020, 1, 1))  # 默认起始日期
         self.start_date_edit.dateChanged.connect(self._on_filter_changed)
-        self.start_date_edit.setFixedWidth(150)
+        self.start_date_edit.setMinimumWidth(96)
+        self.start_date_edit.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         self.start_date_edit.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
         self.start_date_edit.setSymbolVisible(False)
         row2.addWidget(self.start_date_edit)
 
-        row2.addSpacing(20)
-
         # 结束日期
         end_label = BodyLabel("结束日期:")
-        end_label.setFixedWidth(60)
+        end_label.setMinimumWidth(44)
         row2.addWidget(end_label)
 
         self.end_date_edit = DateEdit()
         self.end_date_edit.setDate(QDate.currentDate())  # 默认当前日期
         self.end_date_edit.dateChanged.connect(self._on_filter_changed)
-        self.end_date_edit.setFixedWidth(150)
+        self.end_date_edit.setMinimumWidth(96)
+        self.end_date_edit.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         self.end_date_edit.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
         self.end_date_edit.setSymbolVisible(False)
         row2.addWidget(self.end_date_edit)
 
-        row2.addSpacing(20)
-
         # 排序方式
         sort_label = BodyLabel("排序:")
-        sort_label.setFixedWidth(60)
+        sort_label.setMinimumWidth(44)
         row2.addWidget(sort_label)
 
         self.sort_combo = ComboBox()
@@ -333,16 +331,16 @@ class OverviewPage(BasePage):
         )
         self.sort_combo.setCurrentText(self.sort_by)
         self.sort_combo.currentTextChanged.connect(self._on_sort_changed)
-        self.sort_combo.setFixedWidth(150)
+        self.sort_combo.setMinimumWidth(96)
+        self.sort_combo.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         row2.addWidget(self.sort_combo)
-
-        row2.addSpacing(20)
 
         # 重置按钮
         reset_btn = PushButton("重置筛选")
         reset_btn.setIcon(FluentIcon.ERASE_TOOL)
         reset_btn.clicked.connect(self._reset_filters)
-        reset_btn.setFixedWidth(120)
+        reset_btn.setMinimumWidth(88)
+        reset_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         row2.addWidget(reset_btn)
 
         row2.addStretch()
@@ -427,19 +425,22 @@ class OverviewPage(BasePage):
         title.setStyleSheet("color: #666;")
         self.flag_filter_container.addWidget(title)
 
-        row = QHBoxLayout()
-        row.setSpacing(12)
         for flag in self.flag_defs:
+            row = QHBoxLayout()
+            row.setSpacing(10)
+            label = BodyLabel(flag.label)
+            label.setMinimumWidth(72)
             combo = ComboBox()
             combo.addItems(["全部", "是", "否"])
             combo.setCurrentText(self.flag_filters.get(flag.key, "全部"))
             combo.currentTextChanged.connect(lambda text, k=flag.key: self._on_flag_filter_changed(k, text))
-            combo.setFixedWidth(110)
-            row.addWidget(QLabel(flag.label))
+            combo.setMinimumWidth(96)
+            combo.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+            row.addWidget(label)
             row.addWidget(combo)
+            row.addStretch()
             self.flag_filter_widgets[flag.key] = combo
-        row.addStretch()
-        self.flag_filter_container.addLayout(row)
+            self.flag_filter_container.addLayout(row)
 
     def _on_flag_filter_changed(self, key: str, value: str) -> None:
         self.flag_filters[key] = value
@@ -1104,33 +1105,23 @@ class OverviewPage(BasePage):
 
     def _apply_theme(self) -> None:
         """应用主题到滚动区域"""
-        is_dark = self.theme_manager.is_dark
-        scroll_bg = "#232635" if is_dark else "#f4f6fb"
-
-        scroll_stylesheet = f"""
-            QScrollArea {{
+        scroll_stylesheet = """
+            QScrollArea {
                 border: none;
-                background-color: {scroll_bg};
-            }}
-            QScrollArea > QWidget {{
-                background-color: {scroll_bg};
-            }}
-            QWidget#scrollContent {{
-                background-color: {scroll_bg};
-            }}
+                background: transparent;
+            }
+            QScrollArea > QWidget {
+                background: transparent;
+            }
+            QWidget#scrollContent {
+                background: transparent;
+            }
         """
         self.scrollArea.setStyleSheet(scroll_stylesheet)
-        # 确保内部容器也有正确的背景色
         scroll_widget = self.scrollArea.widget()
         if scroll_widget:
             scroll_widget.setObjectName("scrollContent")
-            scroll_widget.setAutoFillBackground(True)
-            palette = scroll_widget.palette()
-            palette.setColor(
-                palette.ColorRole.Window,
-                {"#232635": QColor(35, 38, 53), "#f4f6fb": QColor(244, 246, 251)}[scroll_bg],
-            )
-            scroll_widget.setPalette(palette)
+            scroll_widget.setAutoFillBackground(False)
 
     @Slot()
     def _on_theme_changed(self) -> None:
