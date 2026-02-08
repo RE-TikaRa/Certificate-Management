@@ -18,11 +18,8 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QHeaderView,
-    QInputDialog,
     QLabel,
     QLayout,
-    QLineEdit,
-    QProgressDialog,
     QVBoxLayout,
     QWidget,
 )
@@ -53,6 +50,7 @@ from ..theme import create_card, create_page_header, make_section_title
 from ..utils.async_utils import run_in_thread_guarded
 from ..widgets.attachment_preview_dialog import AttachmentPreviewDialog
 from ..widgets.attachment_table_view import AttachmentTableView
+from ..widgets.fluent_dialogs import FluentProgressDialog, TextInputDialog
 from ..widgets.major_search import MajorSearchWidget
 from ..widgets.school_search import SchoolSearchWidget
 from .base_page import BasePage
@@ -150,7 +148,7 @@ class AICertificatePreviewDialog(MaskDialogBase):
         self.close()
 
 
-def clean_input_text(line_edit: QLineEdit) -> None:
+def clean_input_text(line_edit: LineEdit) -> None:
     """为输入框添加自动清理空白字符功能"""
     import re
 
@@ -179,7 +177,7 @@ class EntryPage(BasePage):
         self.flag_checkboxes: dict[str, CheckBox] = {}
         self.flag_defs: list = []
         self._ai_busy = False
-        self._ai_progress: QProgressDialog | None = None
+        self._ai_progress: FluentProgressDialog | None = None
         self._member_presets: list[dict] = []
 
         # 连接主题变化信号
@@ -465,7 +463,7 @@ class EntryPage(BasePage):
 
         self._ai_busy = True
         self.ai_cert_btn.setEnabled(False)
-        self._ai_progress = QProgressDialog("正在识别证书…", "取消", 0, 0, self)
+        self._ai_progress = FluentProgressDialog("正在识别证书…", "取消", 0, 0, self)
         self._ai_progress.setCancelButton(None)
         self._ai_progress.setWindowModality(Qt.WindowModality.ApplicationModal)
         self._ai_progress.setAutoClose(True)
@@ -771,7 +769,7 @@ class EntryPage(BasePage):
         if isinstance(school_widget, SchoolSearchWidget):
             school_widget.schoolSelected.connect(partial(self._on_school_selected, member_fields))
 
-        if isinstance(school_code_widget, QLineEdit):
+        if isinstance(school_code_widget, LineEdit):
             school_code_widget.textChanged.connect(partial(self._on_school_code_changed, member_fields))
 
         if isinstance(major_widget, MajorSearchWidget):
@@ -783,7 +781,7 @@ class EntryPage(BasePage):
         major_code_widget = member_fields.get("major_code")
         college_widget = member_fields.get("college")
 
-        if isinstance(school_code_widget, QLineEdit):
+        if isinstance(school_code_widget, LineEdit):
             school_code_widget.blockSignals(True)
             school_code_widget.setText(code or "")
             school_code_widget.blockSignals(False)
@@ -792,9 +790,9 @@ class EntryPage(BasePage):
             major_widget.set_school_filter(name=name, code=code or None)
             major_widget.clear()
 
-        if isinstance(major_code_widget, QLineEdit):
+        if isinstance(major_code_widget, LineEdit):
             major_code_widget.clear()
-        if isinstance(college_widget, QLineEdit):
+        if isinstance(college_widget, LineEdit):
             college_widget.clear()
 
     def _on_school_code_changed(self, member_fields: dict, code: str) -> None:
@@ -807,9 +805,9 @@ class EntryPage(BasePage):
     def _on_major_selected(self, member_fields: dict, name: str, code: str, college: str) -> None:
         major_code_widget = member_fields.get("major_code")
         college_widget = member_fields.get("college")
-        if isinstance(major_code_widget, QLineEdit):
+        if isinstance(major_code_widget, LineEdit):
             major_code_widget.setText(code or "")
-        if isinstance(college_widget, QLineEdit) and college:
+        if isinstance(college_widget, LineEdit) and college:
             college_widget.setText(college)
 
     def _select_from_history(self, member_fields: dict, join_checkbox: CheckBox) -> None:
@@ -844,11 +842,11 @@ class EntryPage(BasePage):
                     school_widget.set_school(selected_member.school or "", selected_member.school_code)
                 else:
                     widget = member_fields.get("school")
-                    if isinstance(widget, QLineEdit):
+                    if isinstance(widget, LineEdit):
                         widget.setText(selected_member.school or "")
 
                 school_code_widget = member_fields.get("school_code")
-                if isinstance(school_code_widget, QLineEdit):
+                if isinstance(school_code_widget, LineEdit):
                     school_code_widget.setText(selected_member.school_code or "")
 
                 major_widget = member_fields["major"]
@@ -858,7 +856,7 @@ class EntryPage(BasePage):
                     major_widget.setText(selected_member.major or "")
 
                 major_code_widget = member_fields.get("major_code")
-                if isinstance(major_code_widget, QLineEdit):
+                if isinstance(major_code_widget, LineEdit):
                     major_code_widget.setText(selected_member.major_code or "")
 
                 member_fields["class_name"].setText(selected_member.class_name)
@@ -878,7 +876,7 @@ class EntryPage(BasePage):
             return
 
         # 创建美化的进度对话框（适配主题）
-        progress = QProgressDialog(self.window())
+        progress = FluentProgressDialog(parent=self.window())
         progress.setWindowTitle("导入成员信息")
 
         # 根据主题设置文本颜色
@@ -904,57 +902,6 @@ class EntryPage(BasePage):
         progress.setMinimumHeight(150)
         progress.setCancelButton(None)  # 不可取消
         progress.setWindowModality(Qt.WindowModality.WindowModal)
-
-        # 根据主题应用美化样式
-        if is_dark:
-            progress.setStyleSheet("""
-                QProgressDialog {
-                    background-color: #1f1f1f;
-                    border: 1px solid #3a3a3a;
-                    border-radius: 8px;
-                }
-                QLabel {
-                    color: #e0e0e0;
-                    padding: 15px;
-                }
-                QProgressBar {
-                    border: 1px solid #3a3a3a;
-                    border-radius: 8px;
-                    text-align: center;
-                    background-color: #1e1e1e;
-                    color: #e0e0e0;
-                    height: 20px;
-                }
-                QProgressBar::chunk {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                        stop:0 #2899f5, stop:0.5 #3aa0f6, stop:1 #2899f5);
-                    border-radius: 8px;
-                }
-            """)
-        else:
-            progress.setStyleSheet("""
-                QProgressDialog {
-                    background-color: white;
-                    border: 1px solid #e5e5e5;
-                    border-radius: 8px;
-                }
-                QLabel {
-                    color: #333;
-                    padding: 15px;
-                }
-                QProgressBar {
-                    border: 1px solid #e1e1e1;
-                    border-radius: 8px;
-                    text-align: center;
-                    background-color: #f3f3f3;
-                    height: 20px;
-                }
-                QProgressBar::chunk {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                        stop:0 #0f6cbd, stop:0.5 #2899f5, stop:1 #0f6cbd);
-                    border-radius: 8px;
-                }
-            """)
 
         progress.show()
         QApplication.processEvents()  # 强制显示对话框
@@ -1054,7 +1001,7 @@ class EntryPage(BasePage):
 
             # 获取姓名，如果有则表示成员有效
             name_widget = member_fields.get("name")
-            if isinstance(name_widget, QLineEdit):
+            if isinstance(name_widget, LineEdit):
                 name = name_widget.text().strip()
                 if name:  # 只记录有姓名的成员
                     member_info = {"name": name, "join_member_library": join_member_library}
@@ -1063,7 +1010,7 @@ class EntryPage(BasePage):
                         # 收集其他字段
                         for field_name in field_names[1:]:
                             widget = member_fields.get(field_name)
-                            if isinstance(widget, (MajorSearchWidget, SchoolSearchWidget, QLineEdit)):
+                            if isinstance(widget, (MajorSearchWidget, SchoolSearchWidget, LineEdit)):
                                 value = widget.text().strip()
                             else:
                                 value = ""
@@ -1133,7 +1080,7 @@ class EntryPage(BasePage):
         if not members:
             InfoBar.warning("提示", "当前没有可保存的成员信息", parent=self.window())
             return
-        name, ok = QInputDialog.getText(self.window(), "保存为组合", "组合名称")
+        name, ok = TextInputDialog.get_text(self.window(), "保存为组合", "组合名称")
         if not ok:
             return
         name = name.strip()
@@ -1196,7 +1143,7 @@ class EntryPage(BasePage):
     def _fill_member_fields(self, member_fields: dict, member: dict, join_member_library: bool) -> None:
         name = str(member.get("name", "")).strip()
         name_widget = member_fields.get("name")
-        if isinstance(name_widget, QLineEdit):
+        if isinstance(name_widget, LineEdit):
             name_widget.setText(name)
 
         if not join_member_library:
@@ -1207,10 +1154,10 @@ class EntryPage(BasePage):
         school_widget = member_fields.get("school")
         if isinstance(school_widget, SchoolSearchWidget):
             school_widget.set_school(school_name, school_code or None)
-        elif isinstance(school_widget, QLineEdit):
+        elif isinstance(school_widget, LineEdit):
             school_widget.setText(school_name)
         school_code_widget = member_fields.get("school_code")
-        if isinstance(school_code_widget, QLineEdit):
+        if isinstance(school_code_widget, LineEdit):
             school_code_widget.setText(school_code)
 
         major_name = str(member.get("major", "")).strip()
@@ -1218,10 +1165,10 @@ class EntryPage(BasePage):
         if isinstance(major_widget, MajorSearchWidget):
             major_widget.set_school_filter(name=school_name or None, code=school_code or None)
             major_widget.set_text(major_name)
-        elif isinstance(major_widget, QLineEdit):
+        elif isinstance(major_widget, LineEdit):
             major_widget.setText(major_name)
         major_code_widget = member_fields.get("major_code")
-        if isinstance(major_code_widget, QLineEdit):
+        if isinstance(major_code_widget, LineEdit):
             major_code_widget.setText(str(member.get("major_code", "")).strip())
 
         value_map = {
@@ -1235,7 +1182,7 @@ class EntryPage(BasePage):
         }
         for field_name, key in value_map.items():
             widget = member_fields.get(field_name)
-            if isinstance(widget, QLineEdit):
+            if isinstance(widget, LineEdit):
                 widget.setText(str(member.get(key, "") or ""))
 
     def _get_flag_values(self) -> dict[str, bool]:
@@ -1662,10 +1609,10 @@ class EntryPage(BasePage):
 
         return issues
 
-    def _highlight_field_error(self, field_widget: QLineEdit) -> None:
+    def _highlight_field_error(self, field_widget: LineEdit) -> None:
         """高亮出错的字段"""
         field_widget.setStyleSheet("""
-            QLineEdit {
+            LineEdit {
                 border: 2px solid #d13438;
                 border-radius: 8px;
                 padding: 4px;

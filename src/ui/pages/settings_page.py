@@ -17,9 +17,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
-    QLineEdit,
     QListWidgetItem,
-    QProgressDialog,
     QSizePolicy,
     QTableWidgetItem,
     QVBoxLayout,
@@ -52,6 +50,7 @@ from src.services.school_importer import read_school_list
 from ..styled_theme import ThemeManager
 from ..theme import create_card, create_page_header, make_section_title
 from ..utils.async_utils import run_in_thread_guarded
+from ..widgets.fluent_dialogs import FluentProgressDialog
 from .base_page import BasePage
 
 
@@ -93,13 +92,13 @@ def _mask_key(key: str) -> str:
     return f"{k[:6]}…{k[-4:]}"
 
 
-def clean_input_text(line_edit: QLineEdit) -> None:
+def clean_input_text(line_edit: LineEdit) -> None:
     """
-    为 QLineEdit 添加自动清理空白字符功能
+    为 LineEdit 添加自动清理空白字符功能
     自动删除用户输入中的所有空格、制表符、换行符等空白字符
 
     Args:
-        line_edit: 要应用清理功能的 QLineEdit 组件
+        line_edit: 要应用清理功能的 LineEdit 组件
     """
     import re
 
@@ -117,7 +116,7 @@ def clean_input_text(line_edit: QLineEdit) -> None:
     line_edit.textChanged.connect(on_text_changed)
 
 
-def replace_whitespace_with_underscore(line_edit: QLineEdit) -> None:
+def replace_whitespace_with_underscore(line_edit: LineEdit) -> None:
     import re
 
     def on_text_changed(text: str) -> None:
@@ -476,7 +475,7 @@ class AIKeyEditDialog(MaskDialogBase):
         form.addRow("名称", self.name)
 
         self.key = LineEdit()
-        self.key.setEchoMode(QLineEdit.EchoMode.Password)
+        self.key.setEchoMode(LineEdit.EchoMode.Password)
         self.key.setPlaceholderText("sk-... 或你的提供商 token（支持任意字符串）")
         self.key.setText(self._initial_key)
         form.addRow("API Key", self.key)
@@ -704,7 +703,7 @@ class SettingsPage(BasePage):
         self.import_log_list = ListWidget()
         self.rebuild_fts_btn: PrimaryPushButton | None = None
         self._import_busy = False
-        self._progress_dialog: QProgressDialog | None = None
+        self._progress_dialog: FluentProgressDialog | None = None
         self.flag_rows: list[dict] = []
         self.mcp_allow_write = CheckBox("允许写操作（需重启 MCP 进程，谨慎开启）")
         self.mcp_redact_pii = CheckBox("成员敏感信息脱敏（建议开启）")
@@ -2518,7 +2517,7 @@ class SettingsPage(BasePage):
             self.award_dry_run.setDisabled(busy)
         if busy:
             if self._progress_dialog is None:
-                self._progress_dialog = QProgressDialog("正在导入数据…", "", 0, 0, self)
+                self._progress_dialog = FluentProgressDialog("正在导入数据…", "", 0, 0, self)
                 self._progress_dialog.setWindowTitle("处理中")
                 self._progress_dialog.setCancelButton(None)
                 self._progress_dialog.setMinimumWidth(360)

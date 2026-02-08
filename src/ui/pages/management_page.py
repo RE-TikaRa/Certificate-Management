@@ -9,7 +9,6 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
     QVBoxLayout,
     QWidget,
 )
@@ -41,13 +40,13 @@ from .base_page import BasePage
 logger = logging.getLogger(__name__)
 
 
-def clean_input_text(line_edit: QLineEdit) -> None:
+def clean_input_text(line_edit: LineEdit) -> None:
     """
-    为 QLineEdit 添加自动清理空白字符功能
+    为 LineEdit 添加自动清理空白字符功能
     自动删除用户输入中的所有空格、制表符、换行符等空白字符
 
     Args:
-        line_edit: 要应用清理功能的 QLineEdit 组件
+        line_edit: 要应用清理功能的 LineEdit 组件
     """
     import re
 
@@ -251,7 +250,7 @@ class MemberDetailDialog(MaskDialogBase):
         self.original_data = self._get_member_data()
         self.is_editing = False
         self.field_widgets = {}  # 存储字段 widget
-        self.input_field_cache = {}  # 缓存所有 QLineEdit 实例
+        self.input_field_cache = {}  # 缓存所有 LineEdit 实例
         self.member_deleted = False  # 标记成员是否被删除
 
         self.setWindowTitle(f"成员详情 - {member.name}")
@@ -627,7 +626,7 @@ class MemberDetailDialog(MaskDialogBase):
 
         # 应用输入框样式
         input_stylesheet = f"""
-            QLineEdit#memberDetailInput {{
+            LineEdit#memberDetailInput {{
                 border: 1px solid {input_border};
                 border-radius: 8px;
                 padding: 4px 6px;
@@ -636,7 +635,7 @@ class MemberDetailDialog(MaskDialogBase):
                 selection-background-color: #4a90e2;
                 font-size: 12px;
             }}
-            QLineEdit#memberDetailInput:focus {{
+            LineEdit#memberDetailInput:focus {{
                 border: 2px solid #4a90e2;
             }}
         """

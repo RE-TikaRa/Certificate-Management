@@ -19,8 +19,6 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLabel,
     QLayout,
-    QLineEdit,
-    QProgressDialog,
     QVBoxLayout,
     QWidget,
 )
@@ -53,6 +51,7 @@ from ..theme import create_card, create_page_header, make_section_title
 from ..utils.async_utils import run_in_thread_guarded
 from ..widgets.attachment_preview_dialog import AttachmentPreviewDialog
 from ..widgets.attachment_table_view import AttachmentTableView
+from ..widgets.fluent_dialogs import FluentProgressDialog
 from ..widgets.major_search import MajorSearchWidget
 from ..widgets.school_search import SchoolSearchWidget
 from .base_page import BasePage
@@ -60,13 +59,13 @@ from .base_page import BasePage
 logger = logging.getLogger(__name__)
 
 
-def clean_input_text(line_edit: QLineEdit) -> None:
+def clean_input_text(line_edit: LineEdit) -> None:
     """
-    为 QLineEdit 添加自动清理空白字符功能
+    为 LineEdit 添加自动清理空白字符功能
     自动删除用户输入中的所有空格、制表符、换行符等空白字符
 
     Args:
-        line_edit: 要应用清理功能的 QLineEdit 组件
+        line_edit: 要应用清理功能的 LineEdit 组件
     """
     import re
 
@@ -1686,7 +1685,7 @@ class AwardDetailDialog(MaskDialogBase):
         if isinstance(school_widget, SchoolSearchWidget):
             school_widget.schoolSelected.connect(partial(self._on_school_selected, member_fields))
 
-        if isinstance(school_code_widget, QLineEdit):
+        if isinstance(school_code_widget, LineEdit):
             school_code_widget.textChanged.connect(partial(self._on_school_code_changed, member_fields))
 
         if isinstance(major_widget, MajorSearchWidget):
@@ -1702,7 +1701,7 @@ class AwardDetailDialog(MaskDialogBase):
 
         school_name = school_widget.text() if isinstance(school_widget, SchoolSearchWidget) else None
         school_code: str | None = None
-        if isinstance(school_code_widget, QLineEdit):
+        if isinstance(school_code_widget, LineEdit):
             school_code = school_code_widget.text().strip() or None
         if school_code is None and isinstance(school_widget, SchoolSearchWidget):
             school_code = school_widget.selected_code()
@@ -1715,7 +1714,7 @@ class AwardDetailDialog(MaskDialogBase):
         major_code_widget = member_fields.get("major_code")
         college_widget = member_fields.get("college")
 
-        if isinstance(school_code_widget, QLineEdit):
+        if isinstance(school_code_widget, LineEdit):
             school_code_widget.blockSignals(True)
             school_code_widget.setText(code or "")
             school_code_widget.blockSignals(False)
@@ -1724,9 +1723,9 @@ class AwardDetailDialog(MaskDialogBase):
             major_widget.set_school_filter(name=name, code=code or None)
             major_widget.clear()
 
-        if isinstance(major_code_widget, QLineEdit):
+        if isinstance(major_code_widget, LineEdit):
             major_code_widget.clear()
-        if isinstance(college_widget, QLineEdit):
+        if isinstance(college_widget, LineEdit):
             college_widget.clear()
 
     def _on_school_code_changed(self, member_fields: dict, code: str) -> None:
@@ -1739,9 +1738,9 @@ class AwardDetailDialog(MaskDialogBase):
     def _on_major_selected(self, member_fields: dict, name: str, code: str, college: str) -> None:
         major_code_widget = member_fields.get("major_code")
         college_widget = member_fields.get("college")
-        if isinstance(major_code_widget, QLineEdit):
+        if isinstance(major_code_widget, LineEdit):
             major_code_widget.setText(code or "")
-        if isinstance(college_widget, QLineEdit) and college:
+        if isinstance(college_widget, LineEdit) and college:
             college_widget.setText(college)
 
     def _move_member_up(self, member_card: QWidget) -> None:
@@ -1780,7 +1779,7 @@ class AwardDetailDialog(MaskDialogBase):
             return
 
         # 创建美化的进度对话框（适配主题）
-        progress = QProgressDialog(self.window())
+        progress = FluentProgressDialog(parent=self.window())
         progress.setWindowTitle("导入成员信息")
 
         # 根据主题设置文本颜色
@@ -1806,57 +1805,6 @@ class AwardDetailDialog(MaskDialogBase):
         progress.setMinimumHeight(150)
         progress.setCancelButton(None)  # 不可取消
         progress.setWindowModality(Qt.WindowModality.WindowModal)
-
-        # 根据主题应用美化样式
-        if is_dark:
-            progress.setStyleSheet("""
-                QProgressDialog {
-                    background-color: #1f1f1f;
-                    border: 1px solid #3a3a3a;
-                    border-radius: 8px;
-                }
-                QLabel {
-                    color: #e0e0e0;
-                    padding: 15px;
-                }
-                QProgressBar {
-                    border: 1px solid #3a3a3a;
-                    border-radius: 8px;
-                    text-align: center;
-                    background-color: #1e1e1e;
-                    color: #e0e0e0;
-                    height: 20px;
-                }
-                QProgressBar::chunk {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                        stop:0 #2899f5, stop:0.5 #3aa0f6, stop:1 #2899f5);
-                    border-radius: 8px;
-                }
-            """)
-        else:
-            progress.setStyleSheet("""
-                QProgressDialog {
-                    background-color: white;
-                    border: 1px solid #e5e5e5;
-                    border-radius: 8px;
-                }
-                QLabel {
-                    color: #333;
-                    padding: 15px;
-                }
-                QProgressBar {
-                    border: 1px solid #e1e1e1;
-                    border-radius: 8px;
-                    text-align: center;
-                    background-color: #f3f3f3;
-                    height: 20px;
-                }
-                QProgressBar::chunk {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                        stop:0 #0f6cbd, stop:0.5 #2899f5, stop:1 #0f6cbd);
-                    border-radius: 8px;
-                }
-            """)
 
         progress.show()
         QApplication.processEvents()  # 强制显示对话框
@@ -1960,11 +1908,11 @@ class AwardDetailDialog(MaskDialogBase):
                     school_widget.set_school(selected_member.school or "", selected_member.school_code)
                 else:
                     widget = member_fields.get("school")
-                    if isinstance(widget, QLineEdit):
+                    if isinstance(widget, LineEdit):
                         widget.setText(selected_member.school or "")
 
                 school_code_widget = member_fields.get("school_code")
-                if isinstance(school_code_widget, QLineEdit):
+                if isinstance(school_code_widget, LineEdit):
                     school_code_widget.setText(selected_member.school_code or "")
 
                 # 专业字段特殊处理
@@ -1975,7 +1923,7 @@ class AwardDetailDialog(MaskDialogBase):
                     major_widget.setText(selected_member.major or "")
 
                 major_code_widget = member_fields.get("major_code")
-                if isinstance(major_code_widget, QLineEdit):
+                if isinstance(major_code_widget, LineEdit):
                     major_code_widget.setText(selected_member.major_code or "")
 
                 member_fields["class_name"].setText(selected_member.class_name or "")
@@ -2244,9 +2192,9 @@ class AwardDetailDialog(MaskDialogBase):
 
         return issues
 
-    def _highlight_field_error(self, field_widget: QLineEdit) -> None:
+    def _highlight_field_error(self, field_widget: LineEdit) -> None:
         field_widget.setStyleSheet("""
-            QLineEdit {
+            LineEdit {
                 border: 2px solid #d13438;
                 border-radius: 8px;
                 padding: 4px;
@@ -2289,14 +2237,14 @@ class AwardDetailDialog(MaskDialogBase):
             join_checkbox = member_data.get("join_checkbox")
             join_member_library = bool(join_checkbox.isChecked()) if isinstance(join_checkbox, CheckBox) else True
             name_widget = member_fields.get("name")
-            if isinstance(name_widget, QLineEdit):
+            if isinstance(name_widget, LineEdit):
                 name = name_widget.text().strip()
                 if name:
                     member_info = {"name": name, "join_member_library": join_member_library}
                     if join_member_library:
                         for field_name in field_names[1:]:
                             widget = member_fields.get(field_name)
-                            if isinstance(widget, (MajorSearchWidget, SchoolSearchWidget, QLineEdit)):
+                            if isinstance(widget, (MajorSearchWidget, SchoolSearchWidget, LineEdit)):
                                 value = widget.text().strip()
                             else:
                                 value = ""
@@ -2333,7 +2281,7 @@ class AwardDetailDialog(MaskDialogBase):
             QLabel {{
                 color: {text_color};
             }}
-            QLineEdit {{
+            LineEdit {{
                 border: 1px solid {border_color};
                 border-radius: 8px;
                 padding: 6px;
