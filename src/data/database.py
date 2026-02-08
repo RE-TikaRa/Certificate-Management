@@ -40,6 +40,7 @@ class Database:
     def initialize(self) -> None:
         Base.metadata.create_all(self.engine)
         self._apply_migrations()
+        self._ensure_indexes()
         self._ensure_fts()
         self._rebuild_fts_if_empty()
 
@@ -108,6 +109,22 @@ class Database:
                 self._ensure_column(connection, "schools", "region", "TEXT")
             if "award_members" in tables:
                 self._migrate_award_members_to_snapshot(connection, inspector)
+
+    def _ensure_indexes(self) -> None:
+        statements = [
+            "CREATE INDEX IF NOT EXISTS ix_awards_deleted_date ON awards (deleted, award_date)",
+            "CREATE INDEX IF NOT EXISTS ix_awards_level ON awards (level)",
+            "CREATE INDEX IF NOT EXISTS ix_awards_rank ON awards (rank)",
+            "CREATE INDEX IF NOT EXISTS ix_awards_certificate_code ON awards (certificate_code)",
+            "CREATE INDEX IF NOT EXISTS ix_awards_deleted_at ON awards (deleted_at)",
+            "CREATE INDEX IF NOT EXISTS ix_award_members_member_name ON award_members (member_name)",
+        ]
+        try:
+            with self.engine.begin() as connection:
+                for stmt in statements:
+                    connection.execute(text(stmt))
+        except Exception:
+            logging.getLogger(__name__).warning("Ensure indexes failed", exc_info=True)
 
     def _migrate_award_members_to_snapshot(self, connection, inspector) -> None:
         cols = {c["name"] for c in inspector.get_columns("award_members")}

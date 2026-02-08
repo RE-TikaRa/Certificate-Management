@@ -2,6 +2,7 @@ import contextlib
 import hashlib
 import logging
 import shutil
+from collections import OrderedDict
 from collections.abc import Iterable, Sequence
 from datetime import datetime
 from pathlib import Path
@@ -21,7 +22,7 @@ class AttachmentManager:
     def __init__(self, db: Database, settings: SettingsService):
         self.db = db
         self.settings = settings
-        self._md5_cache: dict[tuple[str, int, int], str] = {}
+        self._md5_cache: OrderedDict[tuple[str, int, int], str] = OrderedDict()
 
     @property
     def root(self) -> Path:
@@ -81,16 +82,37 @@ class AttachmentManager:
                 md5_hash.update(chunk)
         return md5_hash.hexdigest()
 
+    def _md5_cache_limit(self) -> int:
+        try:
+            limit = int(self.settings.get("attachment_md5_cache_size", "2048"))
+        except Exception:
+            return 2048
+        return max(0, limit)
+
     def _calculate_md5_cached(self, file_path: Path, stat=None) -> str:
         if stat is None:
             stat = file_path.stat()
         key = (str(file_path.resolve()).lower(), int(stat.st_mtime_ns), int(stat.st_size))
+        limit = self._md5_cache_limit()
+        if limit <= 0:
+            return self._calculate_md5(file_path)
         cached = self._md5_cache.get(key)
         if cached:
+            self._md5_cache.move_to_end(key)
             return cached
         value = self._calculate_md5(file_path)
         self._md5_cache[key] = value
+        self._md5_cache.move_to_end(key)
+        while len(self._md5_cache) > limit:
+            self._md5_cache.popitem(last=False)
         return value
+
+    def calculate_md5(self, file_path: Path) -> str:
+        try:
+            stat = file_path.stat()
+        except OSError:
+            return self._calculate_md5(file_path)
+        return self._calculate_md5_cached(file_path, stat)
 
     def find_duplicates(
         self,

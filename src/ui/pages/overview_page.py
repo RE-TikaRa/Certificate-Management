@@ -1,4 +1,3 @@
-import hashlib
 import logging
 from collections.abc import Iterable
 from contextlib import suppress
@@ -52,6 +51,7 @@ from ..styled_theme import ThemeManager
 from ..table_models import AttachmentTableModel
 from ..theme import create_card, create_page_header, make_section_title
 from ..utils.async_utils import run_in_thread_guarded
+from ..widgets.attachment_preview_dialog import AttachmentPreviewDialog
 from ..widgets.attachment_table_view import AttachmentTableView
 from ..widgets.major_search import MajorSearchWidget
 from ..widgets.school_search import SchoolSearchWidget
@@ -855,6 +855,16 @@ class OverviewPage(BasePage):
         action_layout = QHBoxLayout()
         action_layout.addStretch()
 
+        export_pdf_btn = PushButton("导出PDF")
+        export_pdf_btn.setFixedWidth(80)
+        export_pdf_btn.setFixedHeight(28)
+        export_pdf_btn.clicked.connect(lambda: self._export_award_pdf(award))
+
+        export_qr_btn = PushButton("二维码")
+        export_qr_btn.setFixedWidth(60)
+        export_qr_btn.setFixedHeight(28)
+        export_qr_btn.clicked.connect(lambda: self._export_award_qr(award))
+
         edit_btn = PrimaryPushButton("编辑")
         edit_btn.setFixedWidth(60)
         edit_btn.setFixedHeight(28)
@@ -867,9 +877,15 @@ class OverviewPage(BasePage):
 
         # 批量模式下隐藏单个操作按钮
         if self.is_batch_mode:
+            export_pdf_btn.hide()
+            export_qr_btn.hide()
             edit_btn.hide()
             delete_btn.hide()
 
+        action_layout.addWidget(export_pdf_btn)
+        action_layout.addSpacing(6)
+        action_layout.addWidget(export_qr_btn)
+        action_layout.addSpacing(6)
         action_layout.addWidget(edit_btn)
         action_layout.addSpacing(6)
         action_layout.addWidget(delete_btn)
@@ -1027,6 +1043,48 @@ class OverviewPage(BasePage):
             except Exception as e:
                 logger.exception(f"删除失败: {e}")
                 InfoBar.error("错误", f"删除失败: {e!s}", parent=self.window())
+
+    def _safe_filename(self, name: str, suffix: str) -> str:
+        invalid = '<>:"/\\|?*'
+        cleaned = "".join("_" if c in invalid else c for c in (name or "").strip())
+        cleaned = cleaned.strip().rstrip(".")
+        if not cleaned:
+            cleaned = "award"
+        return f"{cleaned}{suffix}"
+
+    def _export_award_pdf(self, award) -> None:
+        default_name = self._safe_filename(award.competition_name, ".pdf")
+        path, _ = QFileDialog.getSaveFileName(self, "导出 PDF", default_name, "PDF (*.pdf)")
+        if not path:
+            return
+
+        def task():
+            return self.ctx.importer.export_award_pdf(award.id, Path(path))
+
+        def on_done(result) -> None:
+            if isinstance(result, Exception):
+                InfoBar.error("导出失败", str(result), parent=self.window())
+                return
+            InfoBar.success("导出成功", str(result), parent=self.window())
+
+        run_in_thread_guarded(task, on_done, guard=self)
+
+    def _export_award_qr(self, award) -> None:
+        default_name = self._safe_filename(f"{award.competition_name}_二维码", ".png")
+        path, _ = QFileDialog.getSaveFileName(self, "导出二维码", default_name, "PNG (*.png)")
+        if not path:
+            return
+
+        def task():
+            return self.ctx.importer.export_award_qr(award.id, Path(path))
+
+        def on_done(result) -> None:
+            if isinstance(result, Exception):
+                InfoBar.error("导出失败", str(result), parent=self.window())
+                return
+            InfoBar.success("导出成功", str(result), parent=self.window())
+
+        run_in_thread_guarded(task, on_done, guard=self)
 
     def closeEvent(self, event):
         """页面关闭时停止定时器"""
@@ -1310,6 +1368,7 @@ class AwardDetailDialog(MaskDialogBase):
 
         apply_table_style(self.attach_table)
         self.attach_table.fileDropped.connect(self._on_files_dropped)
+        self.attach_table.doubleClicked.connect(self._on_attachment_double_clicked)
         attachment_layout.addWidget(self.attach_table)
         content_layout.addWidget(attachment_card)
         self._resize_attachment_table(0)
@@ -2028,12 +2087,17 @@ class AwardDetailDialog(MaskDialogBase):
             return
         self.attach_model.set_objects(rows)
         for row_idx, _ in enumerate(rows):
+            preview_btn = PushButton("预览")
+            preview_btn.setFixedHeight(26)
+            preview_btn.setFixedWidth(56)
+            preview_btn.clicked.connect(lambda checked=False, r=row_idx: self._preview_attachment_row(r))
             delete_btn = TransparentToolButton(FluentIcon.DELETE)
             delete_btn.setToolTip("删除此附件")
             delete_btn.clicked.connect(lambda checked, r=row_idx: self._remove_attachment(r))
             btn_widget = QWidget()
             btn_layout = QHBoxLayout(btn_widget)
             btn_layout.setContentsMargins(4, 0, 4, 0)
+            btn_layout.addWidget(preview_btn)
             btn_layout.addWidget(delete_btn)
             btn_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
             index = self.attach_model.index(row_idx, 4)
@@ -2043,11 +2107,7 @@ class AwardDetailDialog(MaskDialogBase):
     def _calculate_md5(self, file_path: Path) -> str:
         """计算文件MD5值"""
         try:
-            md5_hash = hashlib.md5()
-            with file_path.open("rb") as f:
-                for chunk in iter(lambda: f.read(4096), b""):
-                    md5_hash.update(chunk)
-            return md5_hash.hexdigest()
+            return self.ctx.attachments.calculate_md5(file_path)
         except Exception:
             return "无法计算"
 
@@ -2066,6 +2126,31 @@ class AwardDetailDialog(MaskDialogBase):
             removed = self.selected_files.pop(row)
             self._selected_file_keys.discard(self._to_file_key(removed))
             self._update_attachment_table()
+
+    def _on_attachment_double_clicked(self, index) -> None:
+        if not index.isValid():
+            return
+        self._preview_attachment_row(index.row())
+
+    def _preview_attachment_row(self, row: int) -> None:
+        try:
+            data = self.attach_model.object_at(row)
+        except Exception:
+            return
+        if not isinstance(data, dict):
+            return
+        path = data.get("path")
+        if isinstance(path, Path):
+            file_path = path
+        elif path:
+            file_path = Path(str(path))
+        else:
+            return
+        if not file_path.exists():
+            InfoBar.warning("附件预览", "文件不存在，无法预览", parent=self.window())
+            return
+        dialog = AttachmentPreviewDialog(self.window(), path=file_path)
+        dialog.show()
 
     def _save(self):
         """保存编辑"""

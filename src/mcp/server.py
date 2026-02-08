@@ -7,9 +7,12 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 import mimetypes
 import os
 import sys
+import threading
+import time
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -48,10 +51,22 @@ def _parse_max_bytes(raw: str | None, fallback: int) -> int:
         return fallback
 
 
+def _parse_idle_minutes(raw: str | None, fallback: int) -> int:
+    if raw is None:
+        return fallback
+    try:
+        return max(0, int(raw))
+    except Exception:
+        return fallback
+
+
 MAX_BYTES = _parse_max_bytes(
     os.getenv("CERT_MCP_MAX_BYTES"),
     _parse_max_bytes(app.settings.get("mcp_max_bytes", "1048576"), 1_048_576),
 )
+
+IDLE_MINUTES = _parse_idle_minutes(os.getenv("CERT_MCP_IDLE_MINUTES"), 0)
+_LAST_ACTIVITY = time.time()
 
 TRANSPORT: Transport = parse_transport(os.getenv("CERT_MCP_TRANSPORT"))
 MCP_HOST = (os.getenv("CERT_MCP_HOST") or app.settings.get("mcp_host", "127.0.0.1")).strip()
@@ -72,6 +87,30 @@ if MCP_HOST == "localhost":
     MCP_HOST = "127.0.0.1"
 
 mcp = FastMCP("certificate-management", host=MCP_HOST, port=MCP_PORT)
+
+
+def _touch_activity() -> None:
+    global _LAST_ACTIVITY
+    _LAST_ACTIVITY = time.time()
+
+
+def _start_idle_watch() -> None:
+    if TRANSPORT == "stdio" or IDLE_MINUTES <= 0:
+        return
+
+    def _watch() -> None:
+        logger = logging.getLogger(__name__)
+        interval = max(5, min(60, IDLE_MINUTES * 10))
+        while True:
+            time.sleep(interval)
+            if time.time() - _LAST_ACTIVITY >= IDLE_MINUTES * 60:
+                logger.info("MCP idle timeout reached, shutting down")
+                os._exit(0)
+
+    threading.Thread(target=_watch, daemon=True).start()
+
+
+_start_idle_watch()
 
 
 def _iso(value) -> str | None:
@@ -208,12 +247,14 @@ def _safe_attachment_path(relative_path: str) -> Path:
 
 @mcp.resource("docs://readme")
 def read_readme() -> str:
+    _touch_activity()
     path = BASE_DIR / "README.md"
     return path.read_text(encoding="utf-8")
 
 
 @mcp.resource("docs://agents")
 def read_agents() -> str:
+    _touch_activity()
     path = BASE_DIR / "AGENTS.md"
     return path.read_text(encoding="utf-8")
 
@@ -221,6 +262,7 @@ def read_agents() -> str:
 @mcp.resource("schema://models")
 def schema_models() -> str:
     """返回 SQLAlchemy 模型字段摘要（JSON）。"""
+    _touch_activity()
     models: dict[str, Any] = {}
     for mapper in Base.registry.mappers:
         cls = mapper.class_
@@ -245,6 +287,7 @@ def schema_models() -> str:
 @mcp.resource("templates://awards_csv")
 def template_awards_csv() -> str:
     """返回导入模板 CSV 内容。"""
+    _touch_activity()
     path = TEMPLATES_DIR / "awards_template.csv"
     return path.read_text(encoding="utf-8")
 
@@ -261,6 +304,7 @@ def list_awards(
     order_by: str = "award_date_desc",
 ) -> dict[str, Any]:
     """分页列出荣誉记录（默认排除回收站）。"""
+    _touch_activity()
     try:
         limit = max(1, min(limit, 200))
         offset = max(0, offset)
@@ -306,6 +350,7 @@ def list_awards(
 @mcp.tool()
 def get_award(award_id: int, include_deleted: bool = False) -> dict[str, Any]:
     """获取指定荣誉详情，含成员与附件元数据。"""
+    _touch_activity()
     try:
         with app.db.session_scope() as session:
             award = session.get(
@@ -334,6 +379,7 @@ def search_awards(
     end_date: str | None = None,
 ) -> dict[str, Any]:
     """使用 FTS5 搜索比赛名/证书号/成员姓名。"""
+    _touch_activity()
     try:
         if not query.strip():
             return {"items": [], "count": 0}
@@ -357,6 +403,7 @@ def search_awards(
 @mcp.tool()
 def list_members(limit: int = 50, offset: int = 0, active_only: bool = True) -> dict[str, Any]:
     """成员列表。"""
+    _touch_activity()
     try:
         limit = max(1, min(limit, 200))
         offset = max(0, offset)
@@ -373,6 +420,7 @@ def list_members(limit: int = 50, offset: int = 0, active_only: bool = True) -> 
 @mcp.tool()
 def get_member(member_id: int) -> dict[str, Any]:
     """成员详情。"""
+    _touch_activity()
     try:
         with app.db.session_scope() as session:
             member = session.get(TeamMember, member_id)
@@ -386,6 +434,7 @@ def get_member(member_id: int) -> dict[str, Any]:
 @mcp.tool()
 def list_majors(limit: int = 50, offset: int = 0, keyword: str | None = None) -> dict[str, Any]:
     """专业列表，支持简单关键词过滤（名称/代码/拼音）。"""
+    _touch_activity()
     from sqlalchemy import or_
 
     try:
@@ -425,6 +474,7 @@ def list_majors(limit: int = 50, offset: int = 0, keyword: str | None = None) ->
 @mcp.tool()
 def list_schools(limit: int = 50, offset: int = 0, keyword: str | None = None) -> dict[str, Any]:
     """学校列表，支持名称/代码模糊。"""
+    _touch_activity()
     from sqlalchemy import or_
 
     try:
@@ -454,6 +504,7 @@ def list_schools(limit: int = 50, offset: int = 0, keyword: str | None = None) -
 @mcp.tool()
 def stats_summary() -> dict[str, Any]:
     """汇总统计与最近荣誉（最多 10 条）。"""
+    _touch_activity()
     try:
         summary = app.statistics.get_overview()
         latest = [_serialize_award(a) for a in summary.pop("latest_awards", [])]
@@ -465,6 +516,7 @@ def stats_summary() -> dict[str, Any]:
 @mcp.tool()
 def read_attachment(relative_path: str, offset: int = 0, length: int = MAX_BYTES) -> dict[str, Any]:
     """读取附件内容（Base64），默认最多 1MB。"""
+    _touch_activity()
     try:
         if not relative_path:
             raise ValueError("relative_path required")
@@ -496,6 +548,7 @@ def read_attachment(relative_path: str, offset: int = 0, length: int = MAX_BYTES
 @mcp.tool()
 def rebuild_fts() -> dict[str, int]:
     """重建全文索引（只读模式下返回 forbidden）。"""
+    _touch_activity()
     try:
         if not ALLOW_WRITE:
             raise PermissionError("write operations are disabled; set CERT_MCP_ALLOW_WRITE=1 to enable")
@@ -508,6 +561,7 @@ def rebuild_fts() -> dict[str, int]:
 @mcp.tool()
 def health() -> dict[str, Any]:
     """返回 MCP 运行状态与关键配置。"""
+    _touch_activity()
     try:
         fts_available = False
         fts_error: str | None = None

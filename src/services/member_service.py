@@ -2,6 +2,8 @@ from sqlalchemy import or_, select
 
 from ..data.database import Database
 from ..data.models import AwardMember, TeamMember
+from .audit_logger import EntityType, OperationType, get_audit_logger
+from .pinyin_utils import build_pinyin
 from .settings_service import SettingsService
 
 
@@ -76,6 +78,8 @@ class MemberService:
         with self.db.session_scope() as session:
             # 合并到 session
             merged = session.merge(member)
+            if not (merged.pinyin or "").strip():
+                merged.pinyin = build_pinyin(merged.name)
             session.add(merged)
             session.flush()
             if update_snapshot:
@@ -98,6 +102,8 @@ class MemberService:
                 session=session,
             )
         self._reindex_awards(award_ids)
+        audit = get_audit_logger()
+        audit.log_operation(OperationType.UPDATE, EntityType.MEMBER, merged.id)
         return merged
 
     def delete_member(self, member_id: int) -> None:
@@ -117,6 +123,8 @@ class MemberService:
                 session.flush()
                 self.db.delete_member_fts(member_id, session=session)
         self._reindex_awards(award_ids)
+        audit = get_audit_logger()
+        audit.log_operation(OperationType.DELETE, EntityType.MEMBER, member_id)
 
     def delete_members(self, member_ids: list[int]) -> int:
         """批量删除成员"""
@@ -138,6 +146,8 @@ class MemberService:
         for member_id in member_ids:
             self.db.delete_member_fts(member_id)
         self._reindex_awards(award_ids)
+        audit = get_audit_logger()
+        audit.log_bulk_operation(OperationType.DELETE, EntityType.MEMBER, count)
         return count
 
     def list_members(self) -> list[TeamMember]:

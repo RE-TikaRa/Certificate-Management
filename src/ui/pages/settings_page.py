@@ -638,6 +638,10 @@ class SettingsPage(BasePage):
         self.email_suffix = LineEdit()
         clean_input_text(self.email_suffix)
         self.email_suffix.setPlaceholderText("例如: @st.gsau.edu.cn")
+        self.member_snapshot_update = CheckBox("成员资料变更时同步历史荣誉成员快照")
+        self.attachment_md5_cache_size = LineEdit()
+        self.attachment_md5_cache_size.setPlaceholderText("默认 2048（0 表示不缓存）")
+        self.attachment_md5_cache_size.setValidator(QIntValidator(0, 1_000_000, self))
         self.ai_enabled = CheckBox("启用 AI 证书识别（将把证书图片发送到你配置的 API）")
         self.ai_provider = ComboBox()
         self.ai_provider_add_btn = PushButton("新增提供商")
@@ -717,6 +721,12 @@ class SettingsPage(BasePage):
         self.mcp_web_port = LineEdit()
         self.mcp_web_port.setPlaceholderText("默认 7860")
         self.mcp_web_port.setValidator(QIntValidator(1, 65535, self))
+        self.mcp_idle_minutes = LineEdit()
+        self.mcp_idle_minutes.setPlaceholderText("0 表示不自动关闭")
+        self.mcp_idle_minutes.setValidator(QIntValidator(0, 1440, self))
+        self.mcp_web_idle_minutes = LineEdit()
+        self.mcp_web_idle_minutes.setPlaceholderText("0 表示不自动关闭")
+        self.mcp_web_idle_minutes.setValidator(QIntValidator(0, 1440, self))
         self._mcp_web_install_btn = PushButton("安装/更新 Web 依赖（uv）")
         self._mcp_web_install_dialog: UvSyncDialog | None = None
 
@@ -794,6 +804,8 @@ class SettingsPage(BasePage):
         form.addRow(self.include_logs)
         form.addRow("主题模式", self.theme_mode)
         form.addRow("默认邮箱后缀", self.email_suffix)
+        form.addRow(self.member_snapshot_update)
+        form.addRow("附件 MD5 缓存上限", self.attachment_md5_cache_size)
         settings_layout.addLayout(form)
 
         action_row = QHBoxLayout()
@@ -846,6 +858,10 @@ class SettingsPage(BasePage):
         # Load email suffix
         email_suffix = self.ctx.settings.get("email_suffix", "@st.gsau.edu.cn")
         self.email_suffix.setText(email_suffix)
+        self.member_snapshot_update.setChecked(
+            self.ctx.settings.get("member_snapshot_update_on_profile_change", "false") == "true"
+        )
+        self.attachment_md5_cache_size.setText(self.ctx.settings.get("attachment_md5_cache_size", "2048"))
         # AI
         self._ai_refreshing = True
         try:
@@ -863,9 +879,11 @@ class SettingsPage(BasePage):
             self.mcp_max_bytes.setText(self.ctx.settings.get("mcp_max_bytes", "1048576"))
             self.mcp_auto_start.setChecked(self.ctx.settings.get("mcp_auto_start", "false") == "true")
             self.mcp_port.setText(self.ctx.settings.get("mcp_port", "8000"))
+            self.mcp_idle_minutes.setText(self.ctx.settings.get("mcp_idle_minutes", "0"))
             self.mcp_web_auto_start.setChecked(self.ctx.settings.get("mcp_web_auto_start", "false") == "true")
             self.mcp_web_host.setText(self.ctx.settings.get("mcp_web_host", "127.0.0.1"))
             self.mcp_web_port.setText(self.ctx.settings.get("mcp_web_port", "7860"))
+            self.mcp_web_idle_minutes.setText(self.ctx.settings.get("mcp_web_idle_minutes", "0"))
         finally:
             self._mcp_refreshing = False
         self._refresh_process_status()
@@ -885,8 +903,10 @@ class SettingsPage(BasePage):
         for le in (
             self.mcp_max_bytes,
             self.mcp_port,
+            self.mcp_idle_minutes,
             self.mcp_web_host,
             self.mcp_web_port,
+            self.mcp_web_idle_minutes,
         ):
             le.editingFinished.connect(lambda: self._save_mcp_settings(silent=True))
 
@@ -1333,6 +1353,12 @@ class SettingsPage(BasePage):
             except ValueError:
                 mcp_port_value = 8000
             self.ctx.settings.set("mcp_port", str(mcp_port_value))
+            idle_text = self.mcp_idle_minutes.text().strip() or "0"
+            try:
+                idle_value = max(0, int(idle_text))
+            except ValueError:
+                idle_value = 0
+            self.ctx.settings.set("mcp_idle_minutes", str(idle_value))
 
             self.ctx.settings.set("mcp_web_auto_start", str(self.mcp_web_auto_start.isChecked()).lower())
             self.ctx.settings.set("mcp_web_host", self.mcp_web_host.text().strip() or "127.0.0.1")
@@ -1342,6 +1368,12 @@ class SettingsPage(BasePage):
             except ValueError:
                 web_port_value = 7860
             self.ctx.settings.set("mcp_web_port", str(web_port_value))
+            web_idle_text = self.mcp_web_idle_minutes.text().strip() or "0"
+            try:
+                web_idle_value = max(0, int(web_idle_text))
+            except ValueError:
+                web_idle_value = 0
+            self.ctx.settings.set("mcp_web_idle_minutes", str(web_idle_value))
 
             if not silent:
                 InfoBar.success("MCP", "MCP 设置已保存", parent=self.window())
@@ -1380,6 +1412,16 @@ class SettingsPage(BasePage):
             if not email_suffix:
                 email_suffix = "@st.gsau.edu.cn"  # 默认值
             self.ctx.settings.set("email_suffix", email_suffix)
+            self.ctx.settings.set(
+                "member_snapshot_update_on_profile_change",
+                str(self.member_snapshot_update.isChecked()).lower(),
+            )
+            cache_text = self.attachment_md5_cache_size.text().strip() or "2048"
+            try:
+                cache_value = max(0, int(cache_text))
+            except ValueError:
+                cache_value = 2048
+            self.ctx.settings.set("attachment_md5_cache_size", str(cache_value))
 
             # Convert display text back to theme value
             display_text = self.theme_mode.currentText()
@@ -1493,9 +1535,11 @@ class SettingsPage(BasePage):
         form.addRow("附件读取上限（字节）", self.mcp_max_bytes)
         form.addRow(self.mcp_auto_start)
         form.addRow("MCP 端口（本地）", self.mcp_port)
+        form.addRow("闲置自动关闭（分钟）", self.mcp_idle_minutes)
         form.addRow(self.mcp_web_auto_start)
         form.addRow("Web Host", self.mcp_web_host)
         form.addRow("Web Port", self.mcp_web_port)
+        form.addRow("Web 闲置自动关闭（分钟）", self.mcp_web_idle_minutes)
         form.addRow(self._mcp_web_install_btn)
         card_layout.addLayout(form)
 
@@ -1557,6 +1601,11 @@ class SettingsPage(BasePage):
             port_value = max(1, min(65535, int(port_text)))
             max_bytes_text = self.mcp_max_bytes.text().strip() or "1048576"
             max_bytes_value = max(1024, int(max_bytes_text))
+            idle_text = self.mcp_idle_minutes.text().strip() or "0"
+            try:
+                idle_minutes = max(0, int(idle_text))
+            except ValueError:
+                idle_minutes = 0
             host = self.ctx.settings.get("mcp_host", "127.0.0.1")
             if self.mcp_allow_write.isChecked():
                 box = MessageBox(
@@ -1571,6 +1620,7 @@ class SettingsPage(BasePage):
                 port=port_value,
                 allow_write=self.mcp_allow_write.isChecked(),
                 max_bytes=max_bytes_value,
+                idle_minutes=idle_minutes,
             )
         except Exception as exc:
             InfoBar.error("MCP", f"启动失败：{exc}", parent=self.window())
@@ -1610,6 +1660,11 @@ class SettingsPage(BasePage):
         try:
             host = self.mcp_web_host.text().strip() or "127.0.0.1"
             port = self.mcp_web_port.text().strip() or "7860"
+            idle_text = self.mcp_web_idle_minutes.text().strip() or "0"
+            try:
+                idle_minutes = max(0, int(idle_text))
+            except ValueError:
+                idle_minutes = 0
             box = MessageBox(
                 "MCP Web 提示",
                 "Web 控制台仅用于本机调试，且无登录保护。请勿暴露到公网或转发端口。",
@@ -1617,7 +1672,7 @@ class SettingsPage(BasePage):
             )
             if not box.exec():
                 return
-            self._mcp_runtime.start_web(host=host, port=int(port))
+            self._mcp_runtime.start_web(host=host, port=int(port), idle_minutes=idle_minutes)
         except Exception as exc:
             InfoBar.error("MCP Web", f"启动失败：{exc}", parent=self.window())
             return

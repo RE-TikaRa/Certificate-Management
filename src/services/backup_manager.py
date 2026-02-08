@@ -13,6 +13,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from ..config import ATTACHMENTS_DIR, BACKUP_DIR, DB_PATH, LOG_DIR
 from ..data.database import Database
 from ..data.models import BackupRecord
+from .audit_logger import EntityType, OperationType, get_audit_logger
 from .settings_service import SettingsService
 
 logger = logging.getLogger(__name__)
@@ -110,6 +111,15 @@ class BackupManager:
                         status="success",
                     )
                 )
+            audit = get_audit_logger()
+            size_mb = archive_path.stat().st_size / (1024 * 1024) if archive_path.exists() else 0
+            audit.log_backup(
+                str(archive_path),
+                size_mb,
+                include_attachments=include_attachments,
+                include_logs=include_logs,
+                success=True,
+            )
             logger.info("Backup created at %s", archive_path)
             self.settings.set("last_backup_time", datetime.utcnow().isoformat())
             self._cleanup_old_archives()
@@ -126,6 +136,15 @@ class BackupManager:
                         message=str(exc),
                     )
                 )
+            audit = get_audit_logger()
+            audit.log_backup(
+                str(archive_path),
+                0.0,
+                include_attachments=include_attachments,
+                include_logs=include_logs,
+                success=False,
+                error=str(exc),
+            )
             raise
         finally:
             shutil.rmtree(tmp_dir, ignore_errors=True)
@@ -175,6 +194,13 @@ class BackupManager:
         try:
             self._restore_backup_internal(
                 backup_path, restore_attachments=restore_attachments, restore_logs=restore_logs
+            )
+            audit = get_audit_logger()
+            audit.log_operation(
+                OperationType.RESTORE,
+                EntityType.BACKUP,
+                str(backup_path),
+                details={"attachments": restore_attachments, "logs": restore_logs},
             )
         except Exception:
             if safety_backup_path is not None:

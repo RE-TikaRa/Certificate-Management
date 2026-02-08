@@ -1,4 +1,4 @@
-import hashlib
+import json
 import logging
 from collections.abc import Iterable
 from contextlib import suppress
@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QHeaderView,
+    QInputDialog,
     QLabel,
     QLayout,
     QLineEdit,
@@ -50,6 +51,7 @@ from ..styled_theme import ThemeManager
 from ..table_models import AttachmentTableModel
 from ..theme import create_card, create_page_header, make_section_title
 from ..utils.async_utils import run_in_thread_guarded
+from ..widgets.attachment_preview_dialog import AttachmentPreviewDialog
 from ..widgets.attachment_table_view import AttachmentTableView
 from ..widgets.major_search import MajorSearchWidget
 from ..widgets.school_search import SchoolSearchWidget
@@ -178,6 +180,7 @@ class EntryPage(BasePage):
         self.flag_defs: list = []
         self._ai_busy = False
         self._ai_progress: QProgressDialog | None = None
+        self._member_presets: list[dict] = []
 
         # 连接主题变化信号
         self.theme_manager.themeChanged.connect(self._on_theme_changed)
@@ -197,6 +200,10 @@ class EntryPage(BasePage):
         title_layout.addWidget(create_page_header("荣誉录入", "集中采集证书信息并同步团队"))
         title_layout.addStretch()
         from qfluentwidgets import FluentIcon, TransparentToolButton
+
+        self.reuse_btn = PushButton("复用上次")
+        self.reuse_btn.clicked.connect(self._apply_last_entry)
+        title_layout.addWidget(self.reuse_btn)
 
         self.ai_cert_btn = PushButton("AI 识别证书")
         self.ai_cert_btn.clicked.connect(self._ai_recognize_certificate)
@@ -337,6 +344,22 @@ class EntryPage(BasePage):
         members_card, members_layout = create_card()
         members_layout.addWidget(make_section_title("参与成员"))
 
+        preset_row = QHBoxLayout()
+        preset_row.setSpacing(8)
+        self.member_preset_combo = ComboBox()
+        self.member_preset_combo.setMinimumWidth(240)
+        apply_preset_btn = PushButton("应用组合")
+        save_preset_btn = PushButton("保存为组合")
+        delete_preset_btn = PushButton("删除组合")
+        apply_preset_btn.clicked.connect(self._apply_selected_preset)
+        save_preset_btn.clicked.connect(self._save_member_preset)
+        delete_preset_btn.clicked.connect(self._delete_member_preset)
+        preset_row.addWidget(self.member_preset_combo, 1)
+        preset_row.addWidget(apply_preset_btn)
+        preset_row.addWidget(save_preset_btn)
+        preset_row.addWidget(delete_preset_btn)
+        members_layout.addLayout(preset_row)
+
         # 成员列表容器 - 直接使用 QWidget，会自动扩展
         self.members_container = QWidget()
         self.members_container.setStyleSheet("QWidget { background-color: transparent; }")
@@ -389,6 +412,7 @@ class EntryPage(BasePage):
 
         apply_table_style(self.attach_table)
         self.attach_table.fileDropped.connect(self._on_files_dropped)
+        self.attach_table.doubleClicked.connect(self._on_attachment_double_clicked)
         attachment_layout.addWidget(self.attach_table)
         layout.addWidget(attachment_card)
         self._resize_attachment_table(0)
@@ -1050,6 +1074,170 @@ class EntryPage(BasePage):
                     members.append(member_info)
         return members
 
+    def _load_member_presets(self) -> None:
+        raw = self.ctx.settings.get("entry_member_presets", "[]")
+        try:
+            payload = json.loads(raw) if raw else []
+        except Exception:
+            payload = []
+        cleaned: list[dict] = []
+        if isinstance(payload, list):
+            for item in payload:
+                if not isinstance(item, dict):
+                    continue
+                name = str(item.get("name", "")).strip()
+                members = item.get("members", [])
+                if not name or not isinstance(members, list):
+                    continue
+                cleaned.append({"name": name, "members": members})
+        self._member_presets = cleaned
+        self._refresh_member_preset_combo()
+
+    def _refresh_member_preset_combo(self) -> None:
+        self.member_preset_combo.blockSignals(True)
+        try:
+            self.member_preset_combo.clear()
+            self.member_preset_combo.addItem("常用成员组合")
+            for idx, preset in enumerate(self._member_presets):
+                self.member_preset_combo.addItem(preset["name"])
+                self.member_preset_combo.setItemData(self.member_preset_combo.count() - 1, idx)
+        finally:
+            self.member_preset_combo.blockSignals(False)
+
+    def _selected_preset(self) -> dict | None:
+        data = self.member_preset_combo.currentData()
+        if isinstance(data, int) and 0 <= data < len(self._member_presets):
+            return self._member_presets[data]
+        index = self.member_preset_combo.currentIndex() - 1
+        if 0 <= index < len(self._member_presets):
+            return self._member_presets[index]
+        return None
+
+    def _persist_member_presets(self) -> None:
+        self.ctx.settings.set("entry_member_presets", json.dumps(self._member_presets, ensure_ascii=False))
+
+    def _apply_selected_preset(self) -> None:
+        preset = self._selected_preset()
+        if not preset:
+            InfoBar.info("提示", "请先选择要应用的组合", parent=self.window())
+            return
+        members = preset.get("members", [])
+        if not isinstance(members, list) or not members:
+            InfoBar.warning("提示", "当前组合没有成员数据", parent=self.window())
+            return
+        self._apply_members_payload(members)
+        InfoBar.success("成功", f"已应用组合：{preset.get('name', '')}", parent=self.window())
+
+    def _save_member_preset(self) -> None:
+        members = self._get_members_data()
+        if not members:
+            InfoBar.warning("提示", "当前没有可保存的成员信息", parent=self.window())
+            return
+        name, ok = QInputDialog.getText(self.window(), "保存为组合", "组合名称")
+        if not ok:
+            return
+        name = name.strip()
+        if not name:
+            InfoBar.warning("提示", "组合名称不能为空", parent=self.window())
+            return
+        existing_index = next((i for i, p in enumerate(self._member_presets) if p.get("name") == name), None)
+        if existing_index is not None:
+            box = MessageBox("覆盖组合", f"已存在“{name}”，是否覆盖？", self.window())
+            if not box.exec():
+                return
+            self._member_presets[existing_index] = {"name": name, "members": members}
+        else:
+            self._member_presets.append({"name": name, "members": members})
+        self._persist_member_presets()
+        self._refresh_member_preset_combo()
+        InfoBar.success("成功", f"已保存组合：{name}", parent=self.window())
+
+    def _delete_member_preset(self) -> None:
+        preset = self._selected_preset()
+        if not preset:
+            InfoBar.info("提示", "请先选择要删除的组合", parent=self.window())
+            return
+        name = preset.get("name", "")
+        box = MessageBox("删除组合", f"确定删除“{name}”吗？", self.window())
+        if not box.exec():
+            return
+        self._member_presets = [p for p in self._member_presets if p.get("name") != name]
+        self._persist_member_presets()
+        self._refresh_member_preset_combo()
+        InfoBar.success("成功", f"已删除组合：{name}", parent=self.window())
+
+    def _apply_members_payload(self, members: list[dict]) -> None:
+        for member_data in self.members_data[:]:
+            card = member_data.get("card")
+            if card is not None:
+                self.members_list_layout.removeWidget(card)
+                card.setParent(None)
+                card.deleteLater()
+        self.members_data.clear()
+
+        if not members:
+            self._add_member_row()
+            return
+
+        for member in members:
+            if not isinstance(member, dict):
+                continue
+            self._add_member_row()
+            data = self.members_data[-1]
+            fields = data.get("fields", {})
+            join_checkbox = data.get("join_checkbox")
+            join_member_library = bool(member.get("join_member_library", True))
+            if isinstance(join_checkbox, CheckBox):
+                join_checkbox.setChecked(join_member_library)
+            self._fill_member_fields(fields, member, join_member_library)
+
+        self._update_member_indices()
+
+    def _fill_member_fields(self, member_fields: dict, member: dict, join_member_library: bool) -> None:
+        name = str(member.get("name", "")).strip()
+        name_widget = member_fields.get("name")
+        if isinstance(name_widget, QLineEdit):
+            name_widget.setText(name)
+
+        if not join_member_library:
+            return
+
+        school_name = str(member.get("school", "")).strip()
+        school_code = str(member.get("school_code", "")).strip()
+        school_widget = member_fields.get("school")
+        if isinstance(school_widget, SchoolSearchWidget):
+            school_widget.set_school(school_name, school_code or None)
+        elif isinstance(school_widget, QLineEdit):
+            school_widget.setText(school_name)
+        school_code_widget = member_fields.get("school_code")
+        if isinstance(school_code_widget, QLineEdit):
+            school_code_widget.setText(school_code)
+
+        major_name = str(member.get("major", "")).strip()
+        major_widget = member_fields.get("major")
+        if isinstance(major_widget, MajorSearchWidget):
+            major_widget.set_school_filter(name=school_name or None, code=school_code or None)
+            major_widget.set_text(major_name)
+        elif isinstance(major_widget, QLineEdit):
+            major_widget.setText(major_name)
+        major_code_widget = member_fields.get("major_code")
+        if isinstance(major_code_widget, QLineEdit):
+            major_code_widget.setText(str(member.get("major_code", "")).strip())
+
+        value_map = {
+            "gender": "gender",
+            "id_card": "id_card",
+            "phone": "phone",
+            "student_id": "student_id",
+            "email": "email",
+            "class_name": "class_name",
+            "college": "college",
+        }
+        for field_name, key in value_map.items():
+            widget = member_fields.get(field_name)
+            if isinstance(widget, QLineEdit):
+                widget.setText(str(member.get(key, "") or ""))
+
     def _get_flag_values(self) -> dict[str, bool]:
         return {key: cb.isChecked() for key, cb in self.flag_checkboxes.items()}
 
@@ -1104,12 +1292,17 @@ class EntryPage(BasePage):
         self._resize_attachment_table(len(rows))
         # 设置操作按钮
         for row_idx, _row in enumerate(rows):
+            preview_btn = PushButton("预览")
+            preview_btn.setFixedHeight(26)
+            preview_btn.setFixedWidth(56)
+            preview_btn.clicked.connect(lambda checked=False, r=row_idx: self._preview_attachment_row(r))
             delete_btn = TransparentToolButton(FluentIcon.DELETE)
             delete_btn.setToolTip("删除")
             delete_btn.clicked.connect(lambda checked, r=row_idx: self._remove_attachment(r))
             btn_widget = QWidget()
             btn_layout = QHBoxLayout(btn_widget)
             btn_layout.setContentsMargins(4, 0, 4, 0)
+            btn_layout.addWidget(preview_btn)
             btn_layout.addWidget(delete_btn)
             btn_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
             index = self.attach_model.index(row_idx, 4)
@@ -1118,11 +1311,7 @@ class EntryPage(BasePage):
     def _calculate_md5(self, file_path: Path) -> str:
         """计算文件MD5值"""
         try:
-            md5_hash = hashlib.md5()
-            with file_path.open("rb") as f:
-                for chunk in iter(lambda: f.read(4096), b""):
-                    md5_hash.update(chunk)
-            return md5_hash.hexdigest()
+            return self.ctx.attachments.calculate_md5(file_path)
         except Exception:
             return "无法计算"
 
@@ -1141,6 +1330,31 @@ class EntryPage(BasePage):
             removed = self.selected_files.pop(row)
             self._selected_file_keys.discard(self._to_file_key(removed))
             self._update_attachment_table()
+
+    def _on_attachment_double_clicked(self, index) -> None:
+        if not index.isValid():
+            return
+        self._preview_attachment_row(index.row())
+
+    def _preview_attachment_row(self, row: int) -> None:
+        try:
+            data = self.attach_model.object_at(row)
+        except Exception:
+            return
+        if not isinstance(data, dict):
+            return
+        path = data.get("path")
+        if isinstance(path, Path):
+            file_path = path
+        elif path:
+            file_path = Path(str(path))
+        else:
+            return
+        if not file_path.exists():
+            InfoBar.warning("附件预览", "文件不存在，无法预览", parent=self.window())
+            return
+        dialog = AttachmentPreviewDialog(self.window(), path=file_path)
+        dialog.show()
 
     def load_award_for_editing(self, award) -> None:
         """加载荣誉信息用于编辑"""
@@ -1224,6 +1438,7 @@ class EntryPage(BasePage):
 
     def refresh(self) -> None:
         self._refresh_flag_section()
+        self._load_member_presets()
 
     def _load_existing_attachments(self, award_id: int) -> None:
         try:
@@ -1310,6 +1525,7 @@ class EntryPage(BasePage):
             )
             InfoBar.success("成功", f"已保存：{award.competition_name}", parent=self.window())
 
+        self._persist_last_entry(members_data, award_date)
         self._clear_form(silent=True)
         if should_back_to_overview:
             main_window = self.window()
@@ -1327,6 +1543,64 @@ class EntryPage(BasePage):
                 mw.navigate_to("overview")
 
             QTimer.singleShot(0, _go_back)
+
+    def _persist_last_entry(self, members_data: list[dict], award_date: date) -> None:
+        payload = {
+            "competition_name": self.name_input.text().strip(),
+            "award_date": award_date.isoformat(),
+            "level": self.level_input.currentText(),
+            "rank": self.rank_input.currentText(),
+            "certificate_code": self.certificate_input.text().strip() or None,
+            "remarks": self.remarks_input.text().strip() or None,
+            "members": members_data,
+            "flags": self._get_flag_values(),
+        }
+        self.ctx.settings.set("entry_last_payload", json.dumps(payload, ensure_ascii=False))
+
+    def _apply_last_entry(self) -> None:
+        raw = self.ctx.settings.get("entry_last_payload", "")
+        if not raw:
+            InfoBar.info("提示", "暂无可复用记录", parent=self.window())
+            return
+        try:
+            payload = json.loads(raw)
+        except Exception as exc:
+            InfoBar.error("提示", f"上次记录解析失败：{exc}", parent=self.window())
+            return
+        if not isinstance(payload, dict):
+            InfoBar.error("提示", "上次记录格式不正确", parent=self.window())
+            return
+
+        self._clear_form(silent=True)
+
+        self.name_input.setText(str(payload.get("competition_name", "") or ""))
+        self.certificate_input.setText(str(payload.get("certificate_code", "") or ""))
+        self.remarks_input.setText(str(payload.get("remarks", "") or ""))
+
+        level = str(payload.get("level", "") or "")
+        rank = str(payload.get("rank", "") or "")
+        if level in {"国家级", "省级", "校级"}:
+            self.level_input.setCurrentText(level)
+        if rank in {"一等奖", "二等奖", "三等奖", "优秀奖"}:
+            self.rank_input.setCurrentText(rank)
+
+        date_text = str(payload.get("award_date", "") or "")
+        with suppress(Exception):
+            parsed = date.fromisoformat(date_text)
+            self.year_input.setValue(parsed.year)
+            self.month_input.setValue(parsed.month)
+            self.day_input.setValue(parsed.day)
+
+        flags = payload.get("flags", {})
+        if isinstance(flags, dict):
+            for key, cb in self.flag_checkboxes.items():
+                if key in flags:
+                    cb.setChecked(bool(flags.get(key)))
+
+        members = payload.get("members", [])
+        if isinstance(members, list):
+            self._apply_members_payload(members)
+        InfoBar.success("成功", "已复用上次录入", parent=self.window())
 
     def _validate_form(self) -> list[str]:
         """验证荣誉表单，返回错误信息列表，空列表表示验证通过"""

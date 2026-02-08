@@ -11,6 +11,8 @@ from sqlalchemy.sql.elements import ColumnElement
 from ..data.database import Database
 from ..data.models import Award, AwardFlagValue, AwardMember, TeamMember
 from .attachment_manager import AttachmentManager
+from .audit_logger import EntityType, OperationType, get_audit_logger
+from .pinyin_utils import build_pinyin
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +59,17 @@ class AwardService:
             if flag_values and self.flags:
                 self.flags.set_award_flags(award.id, flag_values, session=session)
             self._refresh_award_fts(award, snapshot_names, session=session)
+            audit = get_audit_logger()
+            audit.log_operation(
+                OperationType.CREATE,
+                EntityType.AWARD,
+                award.id,
+                details={
+                    "members": len(snapshot_names),
+                    "attachments": len(attachment_files),
+                    "flags": bool(flag_values),
+                },
+            )
             return award
 
     def list_members(self) -> list[TeamMember]:
@@ -72,8 +85,10 @@ class AwardService:
     def _get_or_create_member(self, session, name: str) -> TeamMember:
         member = session.scalar(select(TeamMember).where(TeamMember.name == name))
         if member:
+            if not (member.pinyin or "").strip():
+                member.pinyin = build_pinyin(member.name)
             return member
-        member = TeamMember(name=name, pinyin=name)
+        member = TeamMember(name=name, pinyin=build_pinyin(name))
         session.add(member)
         session.flush()
         self.db.upsert_member_fts(
@@ -106,6 +121,8 @@ class AwardService:
             for key, value in member_info.items():
                 if key != "name" and value:
                     setattr(member, key, value)
+            if not (member.pinyin or "").strip():
+                member.pinyin = build_pinyin(member.name)
             session.flush()
             self.db.upsert_member_fts(
                 member.id,
@@ -121,7 +138,9 @@ class AwardService:
             return member
 
         # 创建新成员
-        member = TeamMember(name=name, pinyin=name, **{k: v for k, v in member_info.items() if k != "name"})
+        payload = {k: v for k, v in member_info.items() if k not in {"name", "pinyin"}}
+        pinyin = str(member_info.get("pinyin") or "").strip() or build_pinyin(name)
+        member = TeamMember(name=name, pinyin=pinyin, **payload)
         session.add(member)
         session.flush()
         self.db.upsert_member_fts(
@@ -193,6 +212,8 @@ class AwardService:
                 award.deleted_at = datetime.utcnow()
                 session.add(award)
                 self.db.delete_award_fts(award_id, session=session)
+        audit = get_audit_logger()
+        audit.log_operation(OperationType.DELETE, EntityType.AWARD, award_id, details={"soft": True})
 
     def update_award(
         self,
@@ -300,6 +321,28 @@ class AwardService:
             if flag_values is not None and self.flags:
                 self.flags.set_award_flags(award.id, flag_values, session=session)
 
+            changed_fields = [
+                name
+                for name, value in (
+                    ("competition_name", competition_name),
+                    ("award_date", award_date),
+                    ("level", level),
+                    ("rank", rank),
+                    ("certificate_code", certificate_code),
+                    ("remarks", remarks),
+                    ("member_names", member_names),
+                    ("attachment_files", attachment_files),
+                    ("flag_values", flag_values),
+                )
+                if value is not None
+            ]
+            audit = get_audit_logger()
+            audit.log_operation(
+                OperationType.UPDATE,
+                EntityType.AWARD,
+                award.id,
+                details={"fields": changed_fields},
+            )
             return award
 
     def get_award_by_id(self, award_id: int) -> Award | None:
@@ -541,6 +584,8 @@ class AwardService:
             )
         for award_id in award_ids:
             self.db.delete_award_fts(award_id)
+        audit = get_audit_logger()
+        audit.log_bulk_operation(OperationType.DELETE, EntityType.AWARD, count, details={"soft": True})
         return count
 
     def batch_update_level(self, award_ids: list[int], new_level: str) -> int:
@@ -604,6 +649,8 @@ class AwardService:
                 award.deleted_at = None
                 session.add(award)
                 self._refresh_award_fts(award, award.member_names, session=session)
+        audit = get_audit_logger()
+        audit.log_operation(OperationType.UPDATE, EntityType.AWARD, award_id, details={"restore": True})
 
     def permanently_delete_award(self, award_id: int) -> None:
         """彻底删除荣誉记录（不可恢复）"""
@@ -618,3 +665,5 @@ class AwardService:
             award = session.get(Award, award_id)
             if award:
                 session.delete(award)
+        audit = get_audit_logger()
+        audit.log_operation(OperationType.DELETE, EntityType.AWARD, award_id, details={"soft": False})

@@ -8,10 +8,48 @@ from __future__ import annotations
 
 import importlib
 import json
+import logging
 import os
+import threading
+import time
 from typing import Any
 
 from . import server as mcp_server
+
+logger = logging.getLogger(__name__)
+
+
+def _parse_idle_minutes(raw: str | None, fallback: int) -> int:
+    if raw is None:
+        return fallback
+    try:
+        return max(0, int(raw))
+    except Exception:
+        return fallback
+
+
+IDLE_MINUTES = _parse_idle_minutes(os.getenv("CERT_MCP_WEB_IDLE_MINUTES"), 0)
+_LAST_ACTIVITY = time.time()
+
+
+def _touch_activity() -> None:
+    global _LAST_ACTIVITY
+    _LAST_ACTIVITY = time.time()
+
+
+def _start_idle_watch() -> None:
+    if IDLE_MINUTES <= 0:
+        return
+
+    def _watch() -> None:
+        interval = max(5, min(60, IDLE_MINUTES * 10))
+        while True:
+            time.sleep(interval)
+            if time.time() - _LAST_ACTIVITY >= IDLE_MINUTES * 60:
+                logger.info("MCP Web idle timeout reached, shutting down")
+                os._exit(0)
+
+    threading.Thread(target=_watch, daemon=True).start()
 
 
 def _pretty(value: Any) -> str:
@@ -50,8 +88,10 @@ def main() -> None:
         raise ValueError("MCP Web is local-only; host must be 127.0.0.1/localhost/::1")
     port = int(os.getenv("CERT_MCP_WEB_PORT", "7860"))
     inbrowser = os.getenv("CERT_MCP_WEB_INBROWSER", "1") == "1"
+    _start_idle_watch()
 
     def health_json() -> str:
+        _touch_activity()
         return _pretty(mcp_server.health())
 
     def list_awards_json(
@@ -64,6 +104,7 @@ def main() -> None:
         end_date: str,
         order_by: str,
     ) -> str:
+        _touch_activity()
         level_v = level.strip() or None
         rank_v = rank.strip() or None
         start_v = start_date.strip() or None
@@ -90,6 +131,7 @@ def main() -> None:
         start_date: str,
         end_date: str,
     ) -> str:
+        _touch_activity()
         level_v = level.strip() or None
         rank_v = rank.strip() or None
         start_v = start_date.strip() or None
@@ -107,15 +149,19 @@ def main() -> None:
         )
 
     def get_award_json(award_id: int, include_deleted: bool) -> str:
+        _touch_activity()
         return _pretty(mcp_server.get_award(award_id=award_id, include_deleted=include_deleted))
 
     def list_members_json(limit: int, offset: int, active_only: bool) -> str:
+        _touch_activity()
         return _pretty(mcp_server.list_members(limit=limit, offset=offset, active_only=active_only))
 
     def get_member_json(member_id: int) -> str:
+        _touch_activity()
         return _pretty(mcp_server.get_member(member_id=member_id))
 
     def read_attachment_json(relative_path: str, offset: int, length: int) -> str:
+        _touch_activity()
         return _pretty(mcp_server.read_attachment(relative_path=relative_path, offset=offset, length=length))
 
     css = """

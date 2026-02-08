@@ -175,7 +175,15 @@ class McpRuntime:
             log_path=str(self._web_log),
         )
 
-    def start_mcp_sse(self, *, host: str, port: int, allow_write: bool, max_bytes: int) -> None:
+    def start_mcp_sse(
+        self,
+        *,
+        host: str,
+        port: int,
+        allow_write: bool,
+        max_bytes: int,
+        idle_minutes: int = 0,
+    ) -> None:
         if self._mcp_proc and self._mcp_proc.poll() is None:
             return
         host = (host or "").strip() or "127.0.0.1"
@@ -199,6 +207,8 @@ class McpRuntime:
         env["CERT_MCP_PORT"] = str(port)
         env["CERT_MCP_ALLOW_WRITE"] = "1" if allow_write else "0"
         env["CERT_MCP_MAX_BYTES"] = str(max_bytes)
+        if idle_minutes > 0:
+            env["CERT_MCP_IDLE_MINUTES"] = str(idle_minutes)
         cmd: list[str]
         python_exe = sys.executable
         if self._python_can_import(python_exe, "import mcp"):
@@ -237,7 +247,7 @@ class McpRuntime:
         self._close_log(self._mcp_log_fp)
         self._mcp_log_fp = None
 
-    def start_web(self, *, host: str, port: int) -> None:
+    def start_web(self, *, host: str, port: int, idle_minutes: int = 0) -> None:
         if self._web_proc and self._web_proc.poll() is None:
             return
         host = (host or "").strip() or "127.0.0.1"
@@ -272,6 +282,8 @@ class McpRuntime:
         env["CERT_MCP_WEB_HOST"] = host
         env["CERT_MCP_WEB_PORT"] = str(self._last_web_port)
         env["CERT_MCP_WEB_INBROWSER"] = "0"
+        if idle_minutes > 0:
+            env["CERT_MCP_WEB_IDLE_MINUTES"] = str(idle_minutes)
         self._web_proc = subprocess.Popen(
             cmd,
             cwd=str(BASE_DIR),

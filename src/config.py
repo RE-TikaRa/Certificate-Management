@@ -41,6 +41,11 @@ DEFAULT_SETTINGS: Final[dict[str, str]] = {
     "ai_retry_once": "true",
     "mcp_log_max_bytes": "5242880",
     "mcp_log_backups": "5",
+    "attachment_md5_cache_size": "2048",
+    "entry_last_payload": "",
+    "entry_member_presets": "[]",
+    "mcp_idle_minutes": "0",
+    "mcp_web_idle_minutes": "0",
 }
 
 
