@@ -43,35 +43,36 @@
 
 <!-- Table of Contents -->
 <details>
-  <summary><strong>📖 目录导航 (点击展开)</strong></summary>
+  <summary><strong>📖 目录 (点击展开)</strong></summary>
 
 - [✨ 核心特性](#-核心特性)
   - [🎯 功能详情](#-功能详情)
-- [🛠️ 技术栈](#-技术栈)
+- [🛠️ 技术栈](#️-技术栈)
 - [📸 界面预览](#-界面预览)
 - [🚀 快速开始](#-快速开始)
   - [📥 安装步骤](#-安装步骤)
-  - [🛠️ 常用命令](#-常用命令)
+  - [🛠️ 常用命令](#️-常用命令)
   - [🧾 AI 证书识别](#-ai-证书识别)
-    - [⚙️ 配置与模型](#-配置与模型)
+    - [⚙️ 配置与模型](#️-配置与模型)
     - [🧾 使用流程](#-使用流程)
+  - [📥 导入 / 导出（CSV/XLSX）](#-导入--导出csvxlsx)
   - [🤖 MCP 接入（本地）](#-mcp-接入本地)
     - [🔌 连接方式](#-连接方式)
-    - [🛡️ 权限与安全](#-权限与安全)
-    - [🛠️ 能力概览](#-能力概览)
-    - [⚙️ 常用环境变量](#-常用环境变量)
+    - [🛡️ 权限与安全](#️-权限与安全)
+    - [🛠️ 能力概览](#️-能力概览)
+    - [⚙️ 常用环境变量](#️-常用环境变量)
 - [📂 文件目录说明](#-文件目录说明)
-- [🏗️ 项目架构](#-项目架构)
+- [🏗️ 项目架构](#️-项目架构)
 - [💾 数据模型](#-数据模型)
   - [🏆 荣誉记录 (Awards)](#-荣誉记录-awards)
   - [🧩 荣誉成员快照 (AwardMembers)](#-荣誉成员快照-awardmembers)
   - [👤 参与成员 (TeamMembers)](#-参与成员-teammembers)
   - [🤖 AI 提供商 (AIProviders)](#-ai-提供商-aiproviders)
-  - [🏷️ 自定义开关 (CustomFlags/AwardFlagValues)](#-自定义开关-customflagsawardflagvalues)
+  - [🏷️ 自定义开关 (CustomFlags/AwardFlagValues)](#️-自定义开关-customflagsawardflagvalues)
   - [🎓 专业与学校 (Majors/Schools)](#-专业与学校-majorsschools)
 - [🔐 数据安全与备份](#-数据安全与备份)
 - [🎨 主题系统](#-主题系统)
-- [🛠️ 开发指南](#-开发指南)
+- [🛠️ 开发指南](#️-开发指南)
 - [✅ 待办事项](#-待办事项)
 - [🧰 故障排查](#-故障排查)
 - [📝 更新日志](#-更新日志)
@@ -218,7 +219,7 @@
    ```bash
    # 安装 uv (如果尚未安装)
    # pip install uv
-
+   
    # 同步环境
    uv sync
    ```
@@ -227,7 +228,7 @@
    ```bash
    # Windows 快捷启动
    ./main.bat
-
+   
    # 或使用 uv 启动
    uv run python -m src.main
    ```
@@ -799,7 +800,7 @@ flowchart TD
     <b>Author:</b> <a href="https://github.com/RE-TikaRa">RE-TikaRa</a> |
     <b>Powered by:</b> PySide6 & QFluentWidgets
   </p>
-  
+
   <p>
     <a href="https://github.com/RE-TikaRa/Certificate-Management/stargazers">
       <img src="https://img.shields.io/github/stars/RE-TikaRa/Certificate-Management?style=social" alt="GitHub stars" />
