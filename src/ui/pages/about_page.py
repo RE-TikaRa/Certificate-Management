@@ -139,7 +139,7 @@ class AboutPage(BasePage):
             "• 开发者: RE-TikaRa\n"
             "• 项目地址: https://github.com/RE-TikaRa/Certificate-Management\n"
             "• 最新构建: 2025-12-18\n"
-            "• 许可证: MIT License",
+            "• 许可证: Apache License 2.0",
         )
         layout.addWidget(dev_card)
 

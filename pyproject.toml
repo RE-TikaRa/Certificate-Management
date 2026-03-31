@@ -8,11 +8,11 @@ version = "0.0.0"
 description = "荣誉证书管理桌面应用"
 readme = "README.md"
 requires-python = ">=3.14"
-license = { text = "MIT" }
+license = { text = "Apache-2.0" }
 authors = [{ name = "RE-TikaRa" }]
 keywords = ["certificate", "management", "PySide6", "Qt", "desktop"]
 classifiers = [
-  "License :: OSI Approved :: MIT License",
+  "License :: OSI Approved :: Apache Software License",
   "Programming Language :: Python",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.14",

@@ -19,7 +19,7 @@
   <p>
     <img src="https://img.shields.io/badge/Python-3.14+-3776AB?style=for-the-badge&logo=python&logoColor=white" />
     <img src="https://img.shields.io/badge/PySide6-Latest-41CD52?style=for-the-badge&logo=qt&logoColor=white" />
-    <img src="https://img.shields.io/badge/License-MIT-orange?style=for-the-badge" />
+    <img src="https://img.shields.io/badge/License-Apache%202.0-orange?style=for-the-badge" />
     <img src="https://img.shields.io/badge/Platform-Win%20%7C%20Mac%20%7C%20Linux-lightgrey?style=for-the-badge&logo=linux&logoColor=black" />
   </p>
 
@@ -791,7 +791,7 @@ flowchart TD
 
 ## 📄 许可证
 
-本项目基于 [MIT License](LICENSE) 开源。
+本项目基于 [Apache License 2.0](LICENSE) 开源。
 
 ---
 
