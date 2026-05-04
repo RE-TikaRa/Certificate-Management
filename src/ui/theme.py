@@ -1,7 +1,7 @@
 from typing import Any, cast
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QPainter
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QGraphicsDropShadowEffect,
@@ -10,7 +10,26 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from qfluentwidgets import CardWidget, TableItemDelegate, TableView
+from qfluentwidgets import CardWidget, TableItemDelegate, TableView, isDarkTheme
+
+CARD_RADIUS = 12
+
+
+class StyledCardWidget(CardWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setBorderRadius(CARD_RADIUS)
+
+    def paintEvent(self, e):
+        painter = QPainter(self)
+        painter.setRenderHints(QPainter.RenderHint.Antialiasing)
+        if isDarkTheme():
+            painter.setPen(QColor(148, 163, 184, 46))
+        else:
+            painter.setPen(QColor(148, 163, 184, 89))
+        painter.setBrush(self.backgroundColor)
+        radius = self.getBorderRadius()
+        painter.drawRoundedRect(self.rect().adjusted(1, 1, -1, -1), radius, radius)
 
 
 class CenterAlignDelegate(TableItemDelegate):
@@ -41,8 +60,8 @@ def make_section_title(text: str) -> QLabel:
     return label
 
 
-def create_card(shadow: bool = False) -> tuple[CardWidget, QVBoxLayout]:
-    card = CardWidget()
+def create_card(shadow: bool = False) -> tuple[StyledCardWidget, QVBoxLayout]:
+    card = StyledCardWidget()
     card.setProperty("card", True)
     layout = QVBoxLayout(card)
     layout.setContentsMargins(16, 16, 16, 16)

@@ -13,7 +13,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 from qfluentwidgets import (
-    CardWidget,
     FluentIcon,
     HorizontalSeparator,
     InfoBar,
@@ -29,6 +28,8 @@ from qfluentwidgets import (
 from ..styled_theme import ThemeManager
 from ..table_models import MembersTableModel
 from ..theme import (
+    CARD_RADIUS,
+    StyledCardWidget,
     apply_table_style,
     create_card,
     create_page_header,
@@ -350,8 +351,9 @@ class MemberDetailDialog(MaskDialogBase):
 
     def _create_section(self, title: str, fields: list[tuple[str, str]]) -> QWidget:
         """创建信息分区卡片"""
-        section = CardWidget()
+        section = StyledCardWidget()
         section.setObjectName("memberDetailCard")
+        section.setBorderRadius(CARD_RADIUS)
 
         layout = QVBoxLayout(section)
         layout.setContentsMargins(12, 12, 12, 12)
@@ -580,7 +582,7 @@ class MemberDetailDialog(MaskDialogBase):
         card_stylesheet = f"""
             CardWidget#memberDetailCard {{
                 background-color: {card_bg};
-                border-radius: 8px;
+                border-radius: 12px;
                 border: 1px solid {card_border};
                 padding: 0px;
             }}

@@ -229,7 +229,7 @@ class AboutPage(BasePage):
             QWidget#infoCard {{
                 background-color: {card_bg};
                 border: 1px solid {card_border};
-                border-radius: 8px;
+                border-radius: 12px;
             }}
             QLabel#tagChip {{
                 background-color: {chip_bg};

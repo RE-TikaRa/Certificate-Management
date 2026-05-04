@@ -373,7 +373,7 @@ QWidget[awardCard="true"] CaptionLabel {
     color: #94a3b8;
 }
 CardWidget[metricTile="true"] {
-    border-radius: 8px;
+    border-radius: 12px;
     padding: 16px;
     color: #ffffff;
 }

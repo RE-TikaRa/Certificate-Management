@@ -19,11 +19,13 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from qfluentwidgets import CardWidget, FluentIcon, IconWidget, InfoBar, ScrollArea, TableView, TransparentToolButton
+from qfluentwidgets import FluentIcon, IconWidget, InfoBar, ScrollArea, TableView, TransparentToolButton
 
 from ..styled_theme import ThemeManager
 from ..table_models import ObjectTableModel
 from ..theme import (
+    CARD_RADIUS,
+    StyledCardWidget,
     apply_table_style,
     create_card,
     create_page_header,
@@ -108,9 +110,10 @@ class DashboardPage(BasePage):
         return card
 
     def _create_metric_tile(self, title: str, icon: FluentIcon, accent: str) -> QWidget:
-        frame = CardWidget()
+        frame = StyledCardWidget()
         frame.setProperty("metricTile", True)
         frame.setProperty("accent", accent)
+        frame.setBorderRadius(CARD_RADIUS)
         layout = QVBoxLayout(frame)
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(6)

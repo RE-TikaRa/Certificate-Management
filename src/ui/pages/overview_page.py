@@ -26,7 +26,6 @@ from PySide6.QtWidgets import (
 from qfluentwidgets import (
     BodyLabel,
     CaptionLabel,
-    CardWidget,
     CheckBox,
     ComboBox,
     DateEdit,
@@ -48,7 +47,7 @@ from ...services.doc_extractor import extract_member_info_from_doc
 from ...services.validators import FormValidator
 from ..styled_theme import ThemeManager
 from ..table_models import AttachmentTableModel
-from ..theme import create_card, create_page_header, make_section_title
+from ..theme import CARD_RADIUS, StyledCardWidget, create_card, create_page_header, make_section_title
 from ..utils.async_utils import run_in_thread_guarded
 from ..widgets.attachment_preview_dialog import AttachmentPreviewDialog
 from ..widgets.attachment_table_view import AttachmentTableView
@@ -714,8 +713,9 @@ class OverviewPage(BasePage):
 
     def _create_award_card(self, award) -> QWidget:
         """创建单个荣誉卡片"""
-        card = CardWidget()
+        card = StyledCardWidget()
         card.setProperty("card", True)
+        card.setBorderRadius(CARD_RADIUS)
         card.setMinimumHeight(100)
 
         card_layout = QVBoxLayout(card)
@@ -1413,8 +1413,9 @@ class AwardDetailDialog(MaskDialogBase):
     def _add_member_card(self, assoc=None):
         """添加成员卡片"""
         # 使用 CardWidget 并设置 card 属性以使用 QSS 定义的样式
-        member_card = CardWidget()
+        member_card = StyledCardWidget()
         member_card.setProperty("card", True)
+        member_card.setBorderRadius(CARD_RADIUS)
 
         # 获取当前样式用于标签
         is_dark = self.theme_manager.is_dark
@@ -1585,7 +1586,7 @@ class AwardDetailDialog(MaskDialogBase):
         """添加空白成员卡片"""
         self._add_member_card()
 
-    def _apply_member_card_style(self, card: CardWidget) -> None:
+    def _apply_member_card_style(self, card: StyledCardWidget) -> None:
         """刷新成员卡片的样式以匹配当前主题"""
         card.setProperty("memberCard", True)
         card.style().unpolish(card)
@@ -2143,7 +2144,7 @@ class AwardDetailDialog(MaskDialogBase):
             member_card.setStyleSheet("""
                 CardWidget {
                     border: 2px solid #d13438;
-                    border-radius: 8px;
+                    border-radius: 12px;
                 }
             """)
             QTimer.singleShot(3000, lambda: member_card.setStyleSheet(""))

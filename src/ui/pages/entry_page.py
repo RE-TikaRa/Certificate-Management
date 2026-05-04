@@ -24,7 +24,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 from qfluentwidgets import (
-    CardWidget,
     CheckBox,
     ComboBox,
     FluentIcon,
@@ -46,7 +45,7 @@ from ...services.doc_extractor import extract_member_info_from_doc
 from ...services.validators import FormValidator
 from ..styled_theme import ThemeManager
 from ..table_models import AttachmentTableModel
-from ..theme import create_card, create_page_header, make_section_title
+from ..theme import CARD_RADIUS, StyledCardWidget, create_card, create_page_header, make_section_title
 from ..utils.async_utils import run_in_thread_guarded
 from ..widgets.attachment_preview_dialog import AttachmentPreviewDialog
 from ..widgets.attachment_table_view import AttachmentTableView
@@ -531,8 +530,9 @@ class EntryPage(BasePage):
         logger = logging.getLogger(__name__)
 
         # 创建成员卡片 - 使用 CardWidget 并设置 card 属性以使用 QSS 定义的样式
-        member_card = CardWidget()
+        member_card = StyledCardWidget()
         member_card.setProperty("card", True)
+        member_card.setBorderRadius(CARD_RADIUS)
 
         # 获取当前样式用于标签
         is_dark = self.theme_manager.is_dark
@@ -1631,7 +1631,7 @@ class EntryPage(BasePage):
             member_card.setStyleSheet("""
                 CardWidget {
                     border: 2px solid #d13438;
-                    border-radius: 8px;
+                    border-radius: 12px;
                 }
             """)
             # 3 秒后移除高亮
@@ -1855,8 +1855,9 @@ class HistoryMemberDialog(MaskDialogBase):
         layout.addWidget(title_label)
 
         # === 搜索框区域 ===
-        search_card = CardWidget()
+        search_card = StyledCardWidget()
         search_card.setProperty("card", True)
+        search_card.setBorderRadius(CARD_RADIUS)
         search_layout = QHBoxLayout(search_card)
         search_layout.setContentsMargins(12, 12, 12, 12)
         search_layout.setSpacing(12)
@@ -1915,8 +1916,9 @@ class HistoryMemberDialog(MaskDialogBase):
 
     def _create_member_card(self, member) -> QWidget:
         """创建美化的成员卡片"""
-        card = CardWidget()
+        card = StyledCardWidget()
         card.setProperty("card", True)  # 使用 QSS 定义的 Fluent 卡片样式
+        card.setBorderRadius(CARD_RADIUS)
         card.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
 
         # 点击选择
@@ -2108,7 +2110,7 @@ class HistoryMemberDialog(MaskDialogBase):
             CardWidget[card="true"] {{
                 background-color: {card_bg};
                 border: 1px solid {border_color};
-                border-radius: 8px;
+                border-radius: 12px;
             }}
             CardWidget[card="true"]:hover {{
                 background-color: {card_hover};
