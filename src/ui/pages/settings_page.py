@@ -41,12 +41,11 @@ from qfluentwidgets import (
     TableWidget,
 )
 
-from src.config import BASE_DIR, LOG_DIR
-from src.mcp.runtime import get_mcp_runtime
-from src.services.import_export import ImportResult
-from src.services.major_importer import read_major_catalog_from_csv, read_majors_from_excel
-from src.services.school_importer import read_school_list
-
+from ...config import BASE_DIR, LOG_DIR
+from ...mcp.runtime import get_mcp_runtime
+from ...services.import_export import ImportResult
+from ...services.major_importer import read_major_catalog_from_csv, read_majors_from_excel
+from ...services.school_importer import read_school_list
 from ..styled_theme import ThemeManager
 from ..theme import create_card, create_page_header, make_section_title
 from ..utils.async_utils import run_in_thread_guarded

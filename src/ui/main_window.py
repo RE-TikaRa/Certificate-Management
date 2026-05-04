@@ -21,15 +21,8 @@ from qfluentwidgets import (
 
 from ..app_context import AppContext
 from ..version import get_app_version
-from .pages.about_page import AboutPage
-from .pages.dashboard_page import DashboardPage
-from .pages.entry_page import EntryPage
 from .pages.home_page import HomePage
 from .pages.lazy_page import LazyPage
-from .pages.management_page import ManagementPage
-from .pages.overview_page import OverviewPage
-from .pages.recycle_page import RecyclePage
-from .pages.settings_page import SettingsPage
 from .styled_theme import ThemeManager
 
 logger = logging.getLogger(__name__)
@@ -143,13 +136,13 @@ class MainWindow(FluentWindow):
         self.home_page = HomePage(self.ctx, self.theme_manager)
         logger.debug(f"HomePage initialized in {time.time() - page_start:.2f}s")
 
-        self.overview_page = LazyPage(lambda: OverviewPage(self.ctx, self.theme_manager))
-        self.entry_page = LazyPage(lambda: EntryPage(self.ctx, self.theme_manager))
-        self.management_page = LazyPage(lambda: ManagementPage(self.ctx, self.theme_manager))
-        self.dashboard_page = LazyPage(lambda: DashboardPage(self.ctx, self.theme_manager))
-        self.recycle_page = LazyPage(lambda: RecyclePage(self.ctx, self.theme_manager))
-        self.about_page = LazyPage(lambda: AboutPage(self.ctx, self.theme_manager))
-        self.settings_page = LazyPage(lambda: SettingsPage(self.ctx, self.theme_manager))
+        self.overview_page = LazyPage(self._create_overview_page)
+        self.entry_page = LazyPage(self._create_entry_page)
+        self.management_page = LazyPage(self._create_management_page)
+        self.dashboard_page = LazyPage(self._create_dashboard_page)
+        self.recycle_page = LazyPage(self._create_recycle_page)
+        self.about_page = LazyPage(self._create_about_page)
+        self.settings_page = LazyPage(self._create_settings_page)
 
         # 注册所有导航项
         self.route_keys: dict[str, Any] = {}
@@ -186,33 +179,42 @@ class MainWindow(FluentWindow):
             ani_info.deltaY = 100
 
         self.navigate_to("home")
-        self._warm_up_lazy_pages()
         self._register_shortcuts()
 
-    def _warm_up_lazy_pages(self) -> None:
-        """启动后后台预热懒加载页面，减少首次进入的等待。"""
-        pages: list[QWidget] = [
-            self.dashboard_page,
-            self.overview_page,
-            self.entry_page,
-            self.management_page,
-            self.recycle_page,
-            self.settings_page,
-            self.about_page,
-        ]
+    def _create_dashboard_page(self) -> QWidget:
+        from .pages.dashboard_page import DashboardPage
 
-        def _load_one(index: int) -> None:
-            if index >= len(pages):
-                return
-            page = pages[index]
-            if isinstance(page, LazyPage):
-                try:
-                    page.load()
-                except Exception as exc:
-                    logger.debug("LazyPage warmup failed: %s", exc, exc_info=True)
-            QTimer.singleShot(120, lambda: _load_one(index + 1))
+        return DashboardPage(self.ctx, self.theme_manager)
 
-        QTimer.singleShot(1500, lambda: _load_one(0))
+    def _create_overview_page(self) -> QWidget:
+        from .pages.overview_page import OverviewPage
+
+        return OverviewPage(self.ctx, self.theme_manager)
+
+    def _create_entry_page(self) -> QWidget:
+        from .pages.entry_page import EntryPage
+
+        return EntryPage(self.ctx, self.theme_manager)
+
+    def _create_management_page(self) -> QWidget:
+        from .pages.management_page import ManagementPage
+
+        return ManagementPage(self.ctx, self.theme_manager)
+
+    def _create_recycle_page(self) -> QWidget:
+        from .pages.recycle_page import RecyclePage
+
+        return RecyclePage(self.ctx, self.theme_manager)
+
+    def _create_about_page(self) -> QWidget:
+        from .pages.about_page import AboutPage
+
+        return AboutPage(self.ctx, self.theme_manager)
+
+    def _create_settings_page(self) -> QWidget:
+        from .pages.settings_page import SettingsPage
+
+        return SettingsPage(self.ctx, self.theme_manager)
 
     def _register_shortcuts(self) -> None:
         """绑定快捷键导航，避免在输入框时误触"""

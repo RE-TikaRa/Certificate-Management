@@ -10,8 +10,8 @@ from PySide6.QtWidgets import QListWidgetItem, QVBoxLayout, QWidget
 from qfluentwidgets import LineEdit, ListWidget
 from shiboken6 import isValid
 
-from src.services.major_service import MajorService
-from src.ui.utils.async_utils import run_in_thread
+from ...services.major_service import MajorService
+from ..utils.async_utils import run_in_thread
 
 
 class MajorSearchWidget(QWidget):

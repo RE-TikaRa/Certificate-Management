@@ -446,63 +446,6 @@ class OverviewPage(BasePage):
         self.flag_filters[key] = value
         self.refresh()
 
-    def _apply_filters(self, awards: list) -> list:
-        """应用筛选条件"""
-        filtered = awards
-
-        # 等级筛选
-        if self.filter_level != "全部":
-            filtered = [a for a in filtered if a.level == self.filter_level]
-
-        # 奖项筛选
-        if self.filter_rank != "全部":
-            filtered = [a for a in filtered if a.rank == self.filter_rank]
-
-        # 日期范围筛选
-        if self.filter_start_date and self.filter_end_date:
-            filtered = [a for a in filtered if self.filter_start_date <= a.award_date <= self.filter_end_date]
-
-        # 自定义开关筛选
-        for key, choice in self.flag_filters.items():
-            if choice == "全部":
-                continue
-            expect = choice == "是"
-            filtered = [
-                a
-                for a in filtered
-                if self.award_flag_values.get(a.id, {}).get(key, self.flag_defaults.get(key, False)) == expect
-            ]
-
-        return filtered
-
-    def _apply_sorting(self, awards: list) -> list:
-        """应用排序"""
-        if not awards:
-            return awards
-
-        # 等级优先级映射（用于排序）
-        level_priority = {"国家级": 3, "省级": 2, "校级": 1}
-        rank_priority = {"一等奖": 4, "二等奖": 3, "三等奖": 2, "优秀奖": 1}
-
-        if self.sort_by == "日期降序":
-            return sorted(awards, key=lambda a: a.award_date, reverse=True)
-        elif self.sort_by == "日期升序":
-            return sorted(awards, key=lambda a: a.award_date)
-        elif self.sort_by == "等级降序":
-            return sorted(awards, key=lambda a: level_priority.get(a.level, 0), reverse=True)
-        elif self.sort_by == "等级升序":
-            return sorted(awards, key=lambda a: level_priority.get(a.level, 0))
-        elif self.sort_by == "奖项降序":
-            return sorted(awards, key=lambda a: rank_priority.get(a.rank, 0), reverse=True)
-        elif self.sort_by == "奖项升序":
-            return sorted(awards, key=lambda a: rank_priority.get(a.rank, 0))
-        elif self.sort_by == "名称A-Z":
-            return sorted(awards, key=lambda a: a.competition_name or "")
-        elif self.sort_by == "名称Z-A":
-            return sorted(awards, key=lambda a: a.competition_name or "", reverse=True)
-
-        return awards
-
     def _auto_refresh(self) -> None:
         """检测数据变化并刷新"""
         if self.is_batch_mode:

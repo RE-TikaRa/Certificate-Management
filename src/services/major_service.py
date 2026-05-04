@@ -10,9 +10,9 @@ from dataclasses import dataclass
 from pypinyin import lazy_pinyin
 from sqlalchemy import and_, func, or_, select, text, tuple_
 
-from src.data.database import Database
-from src.data.models import Major, SchoolMajorMapping, TeamMember
-from src.services.academic_types import MajorCatalogInput, SchoolMajorMappingInput
+from ..data.database import Database
+from ..data.models import Major, SchoolMajorMapping, TeamMember
+from .academic_types import MajorCatalogInput, SchoolMajorMappingInput
 
 
 @dataclass(frozen=True)

@@ -153,7 +153,7 @@
 
 - **AI 证书识别**：OpenAI 兼容 API（Chat Completions/Responses）+ PyMuPDF（PDF 渲染）+ Pydantic（结构化解析）
 - **MCP**：`mcp`（FastMCP），支持 stdio/SSE；可选 `gradio` Web 控制台
-- **日志**：`loguru`（应用日志与 MCP 进程日志输出到 `logs/`）
+- **日志**：标准库 `logging`（应用日志与 MCP 进程日志输出到 `logs/`）
 - **类型检查**：`pyright`（标准模式）+ `ruff`（风格/未使用项）
 
 ---
@@ -242,7 +242,7 @@
 | **检查** | `uv run ruff check .` | 代码 Lint 检查 |
 | **格式化** | `uv run ruff format .` | 代码自动格式化 |
 | **类型检查** | `uv run python -m pyright` | Pyright 标准模式 |
-| **语法检查** | `uv run python -m py_compile src/` | 基础语法编译检查 |
+| **语法检查** | `uv run python -m compileall -q src` | 基础语法编译检查 |
 | **MCP 服务** | `uv run certificate-mcp` | 启动 MCP（默认 stdio，只读） |
 | **MCP SSE** | `CERT_MCP_TRANSPORT=sse uv run certificate-mcp` | 启动 SSE（默认 `http://127.0.0.1:8000/sse`；推荐用设置页随软件启动） |
 | **MCP Web** | `uv run certificate-mcp-web` | 启动本地 Web 控制台（需安装可选依赖；默认 `http://127.0.0.1:7860`） |
@@ -403,8 +403,6 @@ Certificate-Management/
 ├── 🔒 uv.lock                      # 依赖锁定
 ├── 🚀 main.bat                     # Windows 启动脚本
 ├── 🚫 .gitignore                   # Git 忽略规则
-├── 🧰 tools/                       # 开发辅助脚本（可选）
-│
 ├── 📦 src/                         # 源代码
 │   ├── 🏁 main.py                  # 入口文件
 │   ├── 🌍 app_context.py           # DI 容器

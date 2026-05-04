@@ -261,15 +261,14 @@ class DashboardPage(BasePage):
         self.refresh()
 
         # 查找主窗口并刷新其他页面
-        parent: Any = self.parent()
-        while parent:
-            if hasattr(parent, "overview_page") and parent.overview_page:
-                parent.overview_page.refresh()
-            if hasattr(parent, "entry_page") and parent.entry_page:
-                parent.entry_page.refresh() if hasattr(parent.entry_page, "refresh") else None
-            if hasattr(parent, "management_page") and parent.management_page:
-                parent.management_page.refresh()
-            break
+        window: Any = self.window()
+        for attr in ("overview_page", "entry_page", "management_page"):
+            lazy_page = getattr(window, attr, None)
+            loaded_page = getattr(lazy_page, "loaded_page", None)
+            page = loaded_page() if callable(loaded_page) else lazy_page
+            refresh = getattr(page, "refresh", None)
+            if callable(refresh):
+                refresh()
 
         # 显示刷新成功提示
         InfoBar.success(
@@ -314,7 +313,10 @@ class DashboardPage(BasePage):
 
         # 构建等级饼图
         level_series = QPieSeries()
-        for label, count in level_data.items():
+        level_items = [(label, count) for label, count in level_data.items() if count > 0]
+        if not level_items:
+            level_items = [("暂无数据", 1)]
+        for label, count in level_items:
             level_series.append(label, count)
 
         for slice in level_series.slices():
@@ -325,7 +327,7 @@ class DashboardPage(BasePage):
         level_chart.setTitle("按级别分布")
         level_chart.setTitleBrush(QBrush(text_color))
         level_chart.legend().setLabelColor(text_color)
-        level_chart.setAnimationOptions(QChart.AnimationOption.SeriesAnimations)
+        level_chart.setAnimationOptions(QChart.AnimationOption.NoAnimation)
         level_chart.setBackgroundBrush(QBrush(chart_bg_color))
         self.level_chart.setChart(level_chart)
 
@@ -333,7 +335,10 @@ class DashboardPage(BasePage):
         bar_series = QBarSeries()
         bar_set = QBarSet("数量")
         categories = []
-        for label, count in rank_data.items():
+        rank_items = [(label, count) for label, count in rank_data.items() if count > 0]
+        if not rank_items:
+            rank_items = [("暂无数据", 0)]
+        for label, count in rank_items:
             bar_set.append(count)
             categories.append(label)
         bar_series.append(bar_set)
@@ -347,7 +352,7 @@ class DashboardPage(BasePage):
         axis_x.setGridLineColor(grid_color)
 
         axis_y = QValueAxis()
-        axis_y.setRange(0, max(rank_data.values(), default=1))
+        axis_y.setRange(0, max((count for _, count in rank_items), default=1) or 1)
         axis_y.setLabelsColor(text_color)
         axis_y.setGridLineColor(grid_color)
 
@@ -359,7 +364,7 @@ class DashboardPage(BasePage):
         bar_chart.setTitle("按等级分布")
         bar_chart.setTitleBrush(QBrush(text_color))
         bar_chart.legend().setLabelColor(text_color)
-        bar_chart.setAnimationOptions(QChart.AnimationOption.SeriesAnimations)
+        bar_chart.setAnimationOptions(QChart.AnimationOption.NoAnimation)
         bar_chart.setBackgroundBrush(QBrush(chart_bg_color))
         self.rank_chart.setChart(bar_chart)
 

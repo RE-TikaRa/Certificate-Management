@@ -76,3 +76,4 @@ site/
 *.bak
 *.tmp
 .codemap/
+.omx/

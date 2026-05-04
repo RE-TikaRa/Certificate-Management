@@ -111,7 +111,7 @@ class AboutPage(BasePage):
             "• AI: OpenAI 兼容 Chat Completions/Responses（支持多 Provider、模型与 Key 轮换）\n"
             "• MCP: OpenAI MCP stdio/SSE + 可选 Gradio Web 控制台\n"
             "• 定时/任务: APScheduler\n"
-            "• 日志: loguru\n"
+            "• 日志: logging\n"
             "• 工具: uv / ruff / pyright\n"
             "• 表格: openpyxl（XLSX）\n"
             "• 文档: Windows Word COM（提取 .doc 文本）",

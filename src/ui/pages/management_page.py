@@ -444,7 +444,7 @@ class MemberDetailDialog(MaskDialogBase):
 
     def _save_changes(self):
         """保存数据到数据库"""
-        from src.services.member_service import MemberService
+        from ...services.member_service import MemberService
 
         try:
             service = MemberService()
@@ -488,7 +488,7 @@ class MemberDetailDialog(MaskDialogBase):
 
     def _delete_member(self):
         """删除成员"""
-        from src.services.member_service import MemberService
+        from ...services.member_service import MemberService
 
         try:
             service = MemberService()

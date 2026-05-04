@@ -31,7 +31,6 @@ dependencies = [
   "pypinyin",
   "APScheduler",
   "python-dateutil",
-  "loguru",
   "mcp",
   "pydantic",
   "qrcode",
@@ -61,7 +60,7 @@ src = ["resources/**/*"]
 line-length = 120
 indent-width = 4
 target-version = "py314"
-src = ["src", "tools"]
+src = ["src"]
 exclude = [
   ".git",
   ".venv",
@@ -118,7 +117,7 @@ docstring-code-line-length = "dynamic"
 [tool.pyright]
 pythonVersion = "3.14"
 pythonPlatform = "All"
-include = ["src", "tools"]
+include = ["src"]
 exclude = [
   ".git",
   ".venv",

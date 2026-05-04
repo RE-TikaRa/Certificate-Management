@@ -82,7 +82,7 @@
 - Ruff 配置：行宽 120、缩进 4、目标 py314、双引号；已豁免 Qt 命名/复杂度规则。运行 `uv run ruff check .` / `uv run ruff format .`。
 - Pyright 配置：standard 模式类型检查；与 ruff 分工——ruff 负责代码风格和 unused import/variable，pyright 负责类型检查。运行 `uv run pyright`。
 - 采用现代类型标注（`list[str]`, `| None`），无需强制 `__future__`；尽量添加 docstring。
-- 使用 loguru 日志，避免 `print`。
+- 使用标准库 `logging` 日志，避免 `print`。
 - 保持导入有序、移除未用依赖；少量必要注释，遵循现有风格。
 
 ## 开发/修改提示

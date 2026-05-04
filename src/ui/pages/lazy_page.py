@@ -69,6 +69,9 @@ class LazyPage(QWidget):
     def load(self) -> QWidget:
         return self._ensure_loaded()
 
+    def loaded_page(self) -> QWidget | None:
+        return self._page
+
     def refresh(self) -> None:
         page: Any = self._ensure_loaded()
         if hasattr(page, "refresh"):
