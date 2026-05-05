@@ -43,6 +43,7 @@ from qfluentwidgets import (
     TransparentToolButton,
 )
 
+from ...path_utils import resolve_app_path
 from ...services.doc_extractor import extract_member_info_from_doc
 from ...services.validators import FormValidator
 from ..styled_theme import ThemeManager
@@ -1385,7 +1386,7 @@ class AwardDetailDialog(MaskDialogBase):
 
                 if award and award.attachments:
                     # 获取附件根目录
-                    root = Path(self.ctx.settings.get("attachment_root", "attachments"))
+                    root = resolve_app_path(self.ctx.settings.get("attachment_root", "attachments"), "attachments")
 
                     # 将附件路径添加到 selected_files
                     for attachment in award.attachments:

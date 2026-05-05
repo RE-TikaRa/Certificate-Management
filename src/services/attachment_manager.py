@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from ..config import ATTACHMENTS_DIR
 from ..data.database import Database
 from ..data.models import Attachment
+from ..path_utils import resolve_app_path
 from .settings_service import SettingsService
 
 logger = logging.getLogger(__name__)
@@ -26,7 +27,7 @@ class AttachmentManager:
 
     @property
     def root(self) -> Path:
-        return Path(self.settings.get("attachment_root", str(ATTACHMENTS_DIR)))
+        return resolve_app_path(self.settings.get("attachment_root", "attachments"), ATTACHMENTS_DIR)
 
     def ensure_root(self) -> Path:
         root = self.root

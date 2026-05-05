@@ -243,9 +243,30 @@
 | **格式化** | `uv run ruff format .` | 代码自动格式化 |
 | **类型检查** | `uv run python -m pyright` | Pyright 标准模式 |
 | **语法检查** | `uv run python -m compileall -q src` | 基础语法编译检查 |
+| **CLI 工具** | `uv run certificate-cli --help` | 命令行备份/导出/状态查询 |
 | **MCP 服务** | `uv run certificate-mcp` | 启动 MCP（默认 stdio，只读） |
 | **MCP SSE** | `CERT_MCP_TRANSPORT=sse uv run certificate-mcp` | 启动 SSE（默认 `http://127.0.0.1:8000/sse`；推荐用设置页随软件启动） |
 | **MCP Web** | `uv run certificate-mcp-web` | 启动本地 Web 控制台（需安装可选依赖；默认 `http://127.0.0.1:7860`） |
+
+### 🖥️ CLI 功能
+
+```bash
+# 查看帮助
+uv run certificate-cli --help
+
+# 查看状态
+uv run certificate-cli status
+
+# 创建本地备份
+uv run certificate-cli backup create
+
+# 导出荣誉列表
+uv run certificate-cli export awards export.xlsx
+
+# GitHub 私有仓库备份
+uv run certificate-cli github-backup init C:\backup-repo --remote git@github.com:user/repo.git
+uv run certificate-cli github-backup push C:\backup-repo
+```
 
 ---
 

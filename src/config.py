@@ -11,13 +11,15 @@ TEMPLATES_DIR: Final[Path] = BASE_DIR / "src" / "resources" / "templates"
 DB_PATH: Final[Path] = DATA_DIR / "awards.db"
 
 DEFAULT_SETTINGS: Final[dict[str, str]] = {
-    "attachment_root": str(ATTACHMENTS_DIR),
-    "backup_root": str(BACKUP_DIR),
+    "attachment_root": "attachments",
+    "backup_root": "backups",
     "backup_frequency": "manual",
     "include_attachments": "true",
     "include_logs": "true",
     "theme_mode": "light",
     "backup_retention": "5",
+    "github_backup_repo": "",
+    "github_backup_remote": "",
     "email_suffix": "@st.gsau.edu.cn",  # 默认邮箱后缀
     "ai_enabled": "false",
     "ai_confirmed": "false",

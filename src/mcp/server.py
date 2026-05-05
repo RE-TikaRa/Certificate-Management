@@ -24,12 +24,13 @@ from sqlalchemy.orm import selectinload
 from ..app_context import AppContext, bootstrap
 from ..config import ATTACHMENTS_DIR, BASE_DIR, DB_PATH, TEMPLATES_DIR
 from ..data.models import Attachment, Award, AwardMember, Base, Major, School, TeamMember
+from ..path_utils import resolve_app_path
 from .helpers import Transport, parse_transport, safe_int, to_bool
 
 DEBUG = to_bool(os.getenv("CERT_MCP_DEBUG"), False)
 app: AppContext = bootstrap(debug=DEBUG, start_scheduler=False)
 
-ATTACHMENTS_ROOT = Path(app.settings.get("attachment_root", str(ATTACHMENTS_DIR))).expanduser().resolve()
+ATTACHMENTS_ROOT = resolve_app_path(app.settings.get("attachment_root", "attachments"), ATTACHMENTS_DIR).resolve()
 
 ALLOW_WRITE = to_bool(
     os.getenv("CERT_MCP_ALLOW_WRITE"),

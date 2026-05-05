@@ -2,6 +2,9 @@ import csv
 import itertools
 import json
 import logging
+import shutil
+import tempfile
+import time
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from datetime import date as py_date, datetime as py_datetime
@@ -9,12 +12,13 @@ from pathlib import Path
 from typing import Any, cast
 
 import pandas as pd
-from sqlalchemy import select
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import sessionmaker
 
 from ..config import TEMPLATES_DIR
 from ..data.database import Database
-from ..data.models import Attachment, Award, AwardFlagValue, AwardMember, CustomFlag, ImportJob
+from ..data.models import Attachment, Award, AwardFlagValue, AwardMember, Base, CustomFlag, ImportJob
 from .attachment_manager import AttachmentManager
 from .audit_logger import EntityType, get_audit_logger
 
@@ -216,8 +220,6 @@ class ImportExportService:
         errors: list[str] = []
         error_rows: list[dict] = []
 
-        import time
-
         start_time = time.time()
 
         # flag 列映射：优先匹配 "label (key)"，其次 label
@@ -336,15 +338,26 @@ class ImportExportService:
                     progress_callback(current, total, float(remaining))
 
         if dry_run:
-            # Strict dry-run: no DB writes, no attachment copy, no ImportJob, no error file.
-            with self.db.engine.connect() as connection:
-                transaction = connection.begin()
-                session = Session(bind=connection, expire_on_commit=False)
+            # Strict dry-run: validate on a temporary database file.
+            tmp_dir = Path(tempfile.mkdtemp(prefix="import-dryrun-"))
+            try:
+                temp_db_path = tmp_dir / "dryrun.db"
+                engine = create_engine(
+                    f"sqlite:///{temp_db_path}",
+                    echo=False,
+                    future=True,
+                    connect_args={"check_same_thread": False, "timeout": 30},
+                )
+                Base.metadata.create_all(engine)
+                temp_session_factory = sessionmaker(bind=engine, expire_on_commit=False)
+                session = temp_session_factory()
                 try:
                     process_rows(session)
                 finally:
                     session.close()
-                    transaction.rollback()
+                    engine.dispose()
+            finally:
+                shutil.rmtree(tmp_dir, ignore_errors=True)
         else:
             with self.db.session_scope() as session:
                 process_rows(session)

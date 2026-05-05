@@ -43,6 +43,8 @@ from qfluentwidgets import (
 
 from ...config import BASE_DIR, LOG_DIR
 from ...mcp.runtime import get_mcp_runtime
+from ...path_utils import display_app_path
+from ...services.github_backup_service import init_github_backup_repo, push_github_backup
 from ...services.import_export import ImportResult
 from ...services.major_importer import read_major_catalog_from_csv, read_majors_from_excel
 from ...services.school_importer import read_school_list
@@ -631,6 +633,16 @@ class SettingsPage(BasePage):
         self.backup_list.setTextElideMode(Qt.TextElideMode.ElideMiddle)
         self.restore_btn = PrimaryPushButton("恢复选中")
         self.verify_btn = PushButton("验证选中")
+        self.github_backup_repo = LineEdit()
+        self.github_backup_repo.setPlaceholderText("选择或填写本地 Git 备份仓库目录")
+        self.github_backup_remote = LineEdit()
+        self.github_backup_remote.setPlaceholderText("例如：git@github.com:user/private-backup.git")
+        self.github_backup_status = BodyLabel("GitHub 备份：未配置")
+        self.github_backup_status.setStyleSheet("color: #7a7a7a;")
+        self.github_backup_init_btn = PushButton("初始化/更新仓库")
+        self.github_backup_push_btn = PrimaryPushButton("备份并推送到 GitHub")
+        self.github_backup_open_btn = PushButton("打开仓库目录")
+        self._github_backup_busy = False
         self.frequency = ComboBox()
         self.frequency.addItems(list(self.FREQUENCY_OPTIONS.values()))
         self.include_attachments = CheckBox("包含附件")
@@ -840,6 +852,7 @@ class SettingsPage(BasePage):
         layout.addWidget(self._build_flags_card())
         layout.addWidget(self._build_award_import_card())
         layout.addWidget(self._build_backup_card())
+        layout.addWidget(self._build_github_backup_card())
         layout.addWidget(self._build_index_card())
         layout.addWidget(self._build_major_card())
         layout.addStretch()
@@ -875,8 +888,8 @@ class SettingsPage(BasePage):
                 widget.setSizePolicy(QSizePolicy.Policy.Expanding, size_policy.verticalPolicy())
 
     def refresh(self) -> None:
-        self.attach_dir.setText(self.ctx.attachments.root.as_posix())
-        self.backup_dir.setText(self.ctx.backup.backup_root.as_posix())
+        self.attach_dir.setText(display_app_path(self.ctx.attachments.root))
+        self.backup_dir.setText(display_app_path(self.ctx.backup.backup_root))
         self._refresh_backup_list()
 
         # Convert stored frequency value to display text
@@ -897,6 +910,9 @@ class SettingsPage(BasePage):
             self.ctx.settings.get("member_snapshot_update_on_profile_change", "false") == "true"
         )
         self.attachment_md5_cache_size.setText(self.ctx.settings.get("attachment_md5_cache_size", "2048"))
+        self.github_backup_repo.setText(self.ctx.settings.get("github_backup_repo", ""))
+        self.github_backup_remote.setText(self.ctx.settings.get("github_backup_remote", ""))
+        self._refresh_github_backup_status()
         # AI
         self._ai_refreshing = True
         try:
@@ -1419,17 +1435,18 @@ class SettingsPage(BasePage):
     def _choose_attach_dir(self) -> None:
         path = QFileDialog.getExistingDirectory(self, "选择附件目录", self.attach_dir.text())
         if path:
-            self.attach_dir.setText(path)
+            self.attach_dir.setText(display_app_path(Path(path)))
 
     def _choose_backup_dir(self) -> None:
         path = QFileDialog.getExistingDirectory(self, "选择备份目录", self.backup_dir.text())
         if path:
-            self.backup_dir.setText(path)
+            self.backup_dir.setText(display_app_path(Path(path)))
 
     def _save(self) -> None:
         try:
             self.ctx.settings.set("attachment_root", self.attach_dir.text())
             self.ctx.settings.set("backup_root", self.backup_dir.text())
+            self._save_github_backup_settings()
 
             # Convert display text back to frequency value
             display_frequency = self.frequency.currentText()
@@ -1484,6 +1501,14 @@ class SettingsPage(BasePage):
     def _backup_now(self) -> None:
         path = self.ctx.backup.perform_backup()
         InfoBar.success("备份完成", str(path), duration=2000, parent=self.window())
+
+    def _choose_github_backup_repo(self) -> None:
+        start = self.github_backup_repo.text().strip() or str(BASE_DIR)
+        path = QFileDialog.getExistingDirectory(self, "选择 GitHub 备份仓库目录", start)
+        if path:
+            self.github_backup_repo.setText(path)
+            self._save_github_backup_settings()
+            self._refresh_github_backup_status()
 
     def _build_ai_card(self) -> QWidget:
         card, card_layout = create_card()
@@ -1877,6 +1902,49 @@ class SettingsPage(BasePage):
         card_layout.addWidget(self.backup_list)
         return card
 
+    def _build_github_backup_card(self) -> QWidget:
+        card, card_layout = create_card()
+        card_layout.addWidget(make_section_title("GitHub 私有仓库备份"))
+
+        hint = BodyLabel(
+            "将本地 zip 备份复制到一个本地 Git 仓库的 backups/ 目录，然后自动 commit + push。\n"
+            "请先在 GitHub 创建私有仓库，并确保当前电脑已有可用的 Git 认证（SSH Key 或 Git 凭据）。"
+        )
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: #7a7a7a;")
+        card_layout.addWidget(hint)
+
+        form = QFormLayout()
+        form.setSpacing(12)
+        self._tune_form_layout(form)
+        repo_row = QWidget()
+        repo_layout = QHBoxLayout(repo_row)
+        repo_layout.setContentsMargins(0, 0, 0, 0)
+        repo_layout.setSpacing(8)
+        repo_layout.addWidget(self.github_backup_repo, 1)
+        choose_btn = PushButton("选择…")
+        choose_btn.clicked.connect(self._choose_github_backup_repo)
+        repo_layout.addWidget(choose_btn)
+        form.addRow("本地仓库目录", repo_row)
+        form.addRow("远端地址", self.github_backup_remote)
+        card_layout.addLayout(form)
+
+        self.github_backup_repo.editingFinished.connect(self._save_github_backup_settings)
+        self.github_backup_remote.editingFinished.connect(self._save_github_backup_settings)
+        self.github_backup_init_btn.clicked.connect(self._init_github_backup)
+        self.github_backup_push_btn.clicked.connect(self._push_github_backup)
+        self.github_backup_open_btn.clicked.connect(self._open_github_backup_repo)
+
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(8)
+        btn_row.addWidget(self.github_backup_init_btn)
+        btn_row.addWidget(self.github_backup_push_btn)
+        btn_row.addWidget(self.github_backup_open_btn)
+        btn_row.addStretch()
+        card_layout.addLayout(btn_row)
+        card_layout.addWidget(self.github_backup_status)
+        return card
+
     def _build_award_import_card(self) -> QWidget:
         card, card_layout = create_card()
         card_layout.addWidget(make_section_title("数据导入 / 导出"))
@@ -2080,6 +2148,101 @@ class SettingsPage(BasePage):
         has_selection = bool(self.backup_list.selectedItems())
         self.restore_btn.setEnabled(has_selection)
         self.verify_btn.setEnabled(has_selection)
+
+    def _save_github_backup_settings(self) -> None:
+        self.ctx.settings.set("github_backup_repo", self.github_backup_repo.text().strip())
+        self.ctx.settings.set("github_backup_remote", self.github_backup_remote.text().strip())
+        self._refresh_github_backup_status()
+
+    def _refresh_github_backup_status(self) -> None:
+        repo_text = self.github_backup_repo.text().strip()
+        if not repo_text:
+            self.github_backup_status.setText("GitHub 备份：未配置本地仓库目录")
+            return
+        repo = Path(repo_text)
+        if (repo / ".git").exists():
+            self.github_backup_status.setText(f"GitHub 备份：已配置 Git 仓库 {repo}")
+        elif repo.exists():
+            self.github_backup_status.setText(f"GitHub 备份：目录存在，但尚未初始化 Git 仓库 {repo}")
+        else:
+            self.github_backup_status.setText(f"GitHub 备份：目录不存在，初始化时会创建 {repo}")
+
+    def _set_github_backup_busy(self, busy: bool) -> None:
+        self._github_backup_busy = busy
+        self.github_backup_init_btn.setEnabled(not busy)
+        self.github_backup_push_btn.setEnabled(not busy)
+        self.github_backup_open_btn.setEnabled(not busy)
+
+    def _init_github_backup(self) -> None:
+        if self._github_backup_busy:
+            return
+        repo_text = self.github_backup_repo.text().strip()
+        if not repo_text:
+            InfoBar.info("提示", "请先填写或选择本地备份仓库目录", parent=self.window())
+            return
+        self._save_github_backup_settings()
+        repo = Path(repo_text)
+        remote = self.github_backup_remote.text().strip()
+        self._set_github_backup_busy(True)
+        self.github_backup_status.setText("GitHub 备份：正在初始化仓库…")
+
+        def task() -> Path:
+            init_github_backup_repo(repo, remote)
+            return repo.resolve()
+
+        def on_done(result: Path | Exception) -> None:
+            self._set_github_backup_busy(False)
+            if isinstance(result, Exception):
+                self.github_backup_status.setText("GitHub 备份：初始化失败")
+                InfoBar.error("初始化失败", str(result), parent=self.window())
+                return
+            self.github_backup_repo.setText(str(result))
+            self._save_github_backup_settings()
+            InfoBar.success("初始化完成", str(result), parent=self.window())
+
+        run_in_thread_guarded(task, on_done, guard=self)
+
+    def _push_github_backup(self) -> None:
+        if self._github_backup_busy:
+            return
+        repo_text = self.github_backup_repo.text().strip()
+        if not repo_text:
+            InfoBar.info("提示", "请先填写或选择本地备份仓库目录", parent=self.window())
+            return
+        self._save_github_backup_settings()
+        repo = Path(repo_text)
+        self._set_github_backup_busy(True)
+        self.github_backup_status.setText("GitHub 备份：正在创建备份并推送…")
+
+        def task():
+            return push_github_backup(
+                self.ctx.backup,
+                repo,
+                include_attachments=self.include_attachments.isChecked(),
+                include_logs=self.include_logs.isChecked(),
+            )
+
+        def on_done(result) -> None:
+            self._set_github_backup_busy(False)
+            if isinstance(result, Exception):
+                self.github_backup_status.setText("GitHub 备份：推送失败")
+                InfoBar.error("推送失败", str(result), parent=self.window())
+                return
+            self._refresh_backup_list()
+            status = "已推送到 GitHub" if result.pushed else "已创建备份，但没有新的 Git 提交"
+            self.github_backup_status.setText(f"GitHub 备份：{status}，文件 {result.copied_path.name}")
+            InfoBar.success("GitHub 备份", f"{status}\n{result.copied_path}", parent=self.window())
+
+        run_in_thread_guarded(task, on_done, guard=self)
+
+    def _open_github_backup_repo(self) -> None:
+        repo_text = self.github_backup_repo.text().strip()
+        if not repo_text:
+            InfoBar.info("提示", "请先填写或选择本地备份仓库目录", parent=self.window())
+            return
+        repo = Path(repo_text)
+        repo.mkdir(parents=True, exist_ok=True)
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(repo.resolve())))
 
     def _refresh_import_log(self) -> None:
         self.import_log_list.clear()

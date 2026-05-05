@@ -40,6 +40,7 @@ from qfluentwidgets import (
     TransparentToolButton,
 )
 
+from ...path_utils import resolve_app_path
 from ...services.ai_certificate_service import CertificateExtractedInfo
 from ...services.doc_extractor import extract_member_info_from_doc
 from ...services.validators import FormValidator
@@ -1400,7 +1401,7 @@ class EntryPage(BasePage):
                 award = session.query(Award).options(joinedload(Award.attachments)).filter(Award.id == award_id).first()
                 if not award:
                     return
-                root = Path(self.ctx.settings.get("attachment_root", "attachments"))
+                root = resolve_app_path(self.ctx.settings.get("attachment_root", "attachments"), "attachments")
                 for attachment in award.attachments:
                     if getattr(attachment, "deleted", False):
                         continue

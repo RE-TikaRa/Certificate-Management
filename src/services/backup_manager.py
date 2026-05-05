@@ -13,6 +13,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from ..config import ATTACHMENTS_DIR, BACKUP_DIR, DB_PATH, LOG_DIR
 from ..data.database import Database
 from ..data.models import BackupRecord
+from ..path_utils import resolve_app_path
 from .audit_logger import EntityType, OperationType, get_audit_logger
 from .settings_service import SettingsService
 
@@ -54,7 +55,7 @@ class BackupManager:
 
     @property
     def backup_root(self) -> Path:
-        configured = Path(self.settings.get("backup_root", str(BACKUP_DIR))).expanduser()
+        configured = resolve_app_path(self.settings.get("backup_root", "backups"), BACKUP_DIR)
         try:
             configured.mkdir(parents=True, exist_ok=True)
             return configured
@@ -63,7 +64,7 @@ class BackupManager:
             fallback = BACKUP_DIR
             fallback.mkdir(parents=True, exist_ok=True)
             # 覆盖无效配置，避免下次启动再次报错
-            self.settings.set("backup_root", str(fallback))
+            self.settings.set("backup_root", "backups")
             return fallback
 
     def _build_archive_name(self) -> Path:
@@ -93,7 +94,9 @@ class BackupManager:
             self._backup_sqlite_db(db_copy / DB_PATH.name)
 
             if include_attachments:
-                attachments_root = Path(self.settings.get("attachment_root", str(ATTACHMENTS_DIR)))
+                attachments_root = resolve_app_path(
+                    self.settings.get("attachment_root", "attachments"), ATTACHMENTS_DIR
+                )
                 if attachments_root.exists():
                     shutil.copytree(attachments_root, tmp_dir / "attachments", dirs_exist_ok=True)
             if include_logs and LOG_DIR.exists():
@@ -248,7 +251,7 @@ class BackupManager:
             if restore_attachments:
                 attach_src = temp_dir / "attachments"
                 if attach_src.exists():
-                    dest = Path(self.settings.get("attachment_root", str(ATTACHMENTS_DIR)))
+                    dest = resolve_app_path(self.settings.get("attachment_root", "attachments"), ATTACHMENTS_DIR)
                     dest.mkdir(parents=True, exist_ok=True)
                     shutil.copytree(attach_src, dest, dirs_exist_ok=True)
 

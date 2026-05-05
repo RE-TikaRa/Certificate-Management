@@ -42,6 +42,7 @@ mcp-web = ["gradio"]
 
 [project.scripts]
 certificate-management = "src.main:main"
+certificate-cli = "src.cli:main"
 certificate-mcp = "src.mcp.server:main"
 certificate-mcp-web = "src.mcp.web:main"
 
